@@ -195,7 +195,7 @@ func TestARSAreNotUpdated(t *testing.T) {
 	}
 }
 
-func TestARSDropsAllVersionsExceptTheSelectedOne(t *testing.T) {
+func TestARSOnlyContainsSelectedCRDVersion(t *testing.T) {
 	const (
 		apiExportName = "example.com"
 		theVersion    = "v1"
@@ -205,7 +205,7 @@ func TestARSDropsAllVersionsExceptTheSelectedOne(t *testing.T) {
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
-	orgKubconfig := utils.CreateOrganization(t, ctx, "ars-drops-crd-versions", apiExportName)
+	orgKubconfig := utils.CreateOrganization(t, ctx, "ars-single-version-only", apiExportName)
 
 	// start a service cluster
 	envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
@@ -375,5 +375,61 @@ func TestProjection(t *testing.T) {
 
 	if !cmp.Equal(ars.Spec.Names.ShortNames, pr.Spec.Projection.ShortNames) {
 		t.Errorf("Expected ARS to have short names %v, but has %v.", pr.Spec.Projection.ShortNames, ars.Spec.Names.ShortNames)
+	}
+}
+
+func TestNonCRDResource(t *testing.T) {
+	const (
+		apiExportName   = "example.com"
+		originalVersion = "v1"
+	)
+
+	ctx := context.Background()
+	ctrlruntime.SetLogger(logr.Discard())
+
+	// setup a test environment in kcp
+	orgKubconfig := utils.CreateOrganization(t, ctx, "ars-non-crd", apiExportName)
+
+	// start a service cluster
+	envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, nil)
+
+	// publish rbac Roles
+	t.Logf("Publishing Roles…")
+	pr := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "publish-roles",
+		},
+		Spec: syncagentv1alpha1.PublishedResourceSpec{
+			Resource: syncagentv1alpha1.SourceResourceDescriptor{
+				APIGroup: "rbac.authorization.k8s.io",
+				Version:  "v1",
+				Kind:     "Role",
+			},
+		},
+	}
+
+	if err := envtestClient.Create(ctx, pr); err != nil {
+		t.Fatalf("Failed to create PublishedResource: %v", err)
+	}
+
+	// let the agent do its thing
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+
+	// wait for the APIExport to be updated
+	t.Logf("Waiting for APIExport to be updated…")
+	orgClient := utils.GetClient(t, orgKubconfig)
+	apiExportKey := types.NamespacedName{Name: apiExportName}
+
+	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute, false, func(ctx context.Context) (done bool, err error) {
+		apiExport := &kcpapisv1alpha1.APIExport{}
+		err = orgClient.Get(ctx, apiExportKey, apiExport)
+		if err != nil {
+			return false, err
+		}
+
+		return len(apiExport.Spec.LatestResourceSchemas) > 0, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for APIExport to be updated: %v", err)
 	}
 }
