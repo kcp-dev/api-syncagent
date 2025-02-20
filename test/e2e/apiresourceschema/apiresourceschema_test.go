@@ -195,7 +195,7 @@ func TestARSAreNotUpdated(t *testing.T) {
 	}
 }
 
-func TestARSDropsAllVersionsExceptTheSelectedOne(t *testing.T) {
+func TestARSOnlyContainsSelectedCRDVersion(t *testing.T) {
 	const (
 		apiExportName = "example.com"
 		theVersion    = "v1"
@@ -205,7 +205,7 @@ func TestARSDropsAllVersionsExceptTheSelectedOne(t *testing.T) {
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
-	orgKubconfig := utils.CreateOrganization(t, ctx, "ars-drops-crd-versions", apiExportName)
+	orgKubconfig := utils.CreateOrganization(t, ctx, "ars-single-version-only", apiExportName)
 
 	// start a service cluster
 	envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
