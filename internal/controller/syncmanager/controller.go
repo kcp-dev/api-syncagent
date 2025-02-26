@@ -98,6 +98,11 @@ func Add(
 	stateNamespace string,
 	agentName string,
 ) error {
+	discoveryClient, err := discovery.NewClient(localManager.GetConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create discovery client: %w", err)
+	}
+
 	reconciler := &Reconciler{
 		ctx:             ctx,
 		localManager:    localManager,
@@ -107,13 +112,13 @@ func Add(
 		log:             log,
 		recorder:        localManager.GetEventRecorderFor(ControllerName),
 		syncWorkers:     map[string]lifecycle.Controller{},
-		discoveryClient: discovery.NewClient(localManager.GetClient()),
+		discoveryClient: discoveryClient,
 		prFilter:        prFilter,
 		stateNamespace:  stateNamespace,
 		agentName:       agentName,
 	}
 
-	_, err := builder.ControllerManagedBy(localManager).
+	_, err = builder.ControllerManagedBy(localManager).
 		Named(ControllerName).
 		WithOptions(controller.Options{
 			// this controller is meant to control others, so we only want 1 thread

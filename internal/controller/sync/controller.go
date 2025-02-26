@@ -90,7 +90,7 @@ func Create(
 	remoteDummy.SetGroupVersionKind(remoteGVK)
 
 	// find the local CRD so we know the actual local object scope
-	localCRD, err := discoveryClient.DiscoverResourceType(ctx, localGVK.GroupKind())
+	localCRD, err := discoveryClient.RetrieveCRD(ctx, localGVK)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find local CRD: %w", err)
 	}
