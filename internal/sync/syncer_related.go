@@ -25,7 +25,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/kcp-dev/api-syncagent/internal/mutation"
+	"github.com/kcp-dev/api-syncagent/internal/projection"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
+	"github.com/kcp-dev/logicalcluster/v3"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -85,12 +87,22 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 		sourceObjs.SetKind(relRes.Kind)
 
 		// TODO: would need to handle replacer here as well to select right object.
+		cn, ok := source.object.GetLabels()[remoteObjectClusterLabel]
+		if !ok {
+			return false, fmt.Errorf("missing cluster label on source object")
+		}
+		clusterName := logicalcluster.Name(cn)
+		labels := projection.GenerateLocalLabelSelector(&relRes, source.object, clusterName)
 
-		if err := source.client.List(source.ctx, sourceObjs, ctrlruntimeclient.MatchingLabels(relRes.LabelSelector.MatchLabels)); err != nil {
+		if err := source.client.List(source.ctx, sourceObjs, ctrlruntimeclient.MatchingLabels(labels.MatchLabels)); err != nil {
 			return false, fmt.Errorf("failed to list related objects: %w", err)
 		}
-		if len(sourceObjs.Items) == 0 || len(sourceObjs.Items) > 1 {
-			return false, fmt.Errorf("expected exactly one related object, got %d", len(sourceObjs.Items))
+		if len(sourceObjs.Items) == 0 {
+			return false, nil
+		}
+		if len(sourceObjs.Items) > 1 {
+			// HACK: we take first one, as we can't select multiple objects or by name only!
+			log.Warnw("found multiple related objects, taking first one", "count", len(sourceObjs.Items))
 		}
 		sourceKey = &ctrlruntimeclient.ObjectKey{
 			Namespace: sourceObjs.Items[0].GetNamespace(),
