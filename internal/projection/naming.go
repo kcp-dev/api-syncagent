@@ -41,14 +41,7 @@ func GenerateLocalObjectName(pr *syncagentv1alpha1.PublishedResource, object met
 		naming = &syncagentv1alpha1.ResourceNaming{}
 	}
 
-	replacer := strings.NewReplacer(
-		// order of elements is important here, "$fooHash" needs to be defined before "$foo"
-		syncagentv1alpha1.PlaceholderRemoteClusterName, clusterName.String(),
-		syncagentv1alpha1.PlaceholderRemoteNamespaceHash, shortSha1Hash(object.GetNamespace()),
-		syncagentv1alpha1.PlaceholderRemoteNamespace, object.GetNamespace(),
-		syncagentv1alpha1.PlaceholderRemoteNameHash, shortSha1Hash(object.GetName()),
-		syncagentv1alpha1.PlaceholderRemoteName, object.GetName(),
-	)
+	replacer := getReplacer(object, clusterName)
 
 	result := types.NamespacedName{}
 
@@ -67,6 +60,33 @@ func GenerateLocalObjectName(pr *syncagentv1alpha1.PublishedResource, object met
 	result.Name = replacer.Replace(pattern)
 
 	return result
+}
+
+func GenerateLocalLabelSelector(pr *syncagentv1alpha1.RelatedResourceSpec, object metav1.Object, clusterName logicalcluster.Name) *metav1.LabelSelector {
+	replacer := getReplacer(object, clusterName)
+
+	result := metav1.LabelSelector{}
+
+	result.MatchLabels = map[string]string{}
+
+	for key, value := range pr.LabelSelector.MatchLabels {
+		result.MatchLabels[replacer.Replace(key)] = replacer.Replace(value)
+	}
+
+	// TODO: MatchExpressions are not yet supported with the current naming scheme.
+	result.MatchExpressions = pr.LabelSelector.MatchExpressions
+	return &result
+}
+
+func getReplacer(object metav1.Object, clusterName logicalcluster.Name) *strings.Replacer {
+	return strings.NewReplacer(
+		// order of elements is important here, "$fooHash" needs to be defined before "$foo"
+		syncagentv1alpha1.PlaceholderRemoteClusterName, clusterName.String(),
+		syncagentv1alpha1.PlaceholderRemoteNamespaceHash, shortSha1Hash(object.GetNamespace()),
+		syncagentv1alpha1.PlaceholderRemoteNamespace, object.GetNamespace(),
+		syncagentv1alpha1.PlaceholderRemoteNameHash, shortSha1Hash(object.GetName()),
+		syncagentv1alpha1.PlaceholderRemoteName, object.GetName(),
+	)
 }
 
 func shortSha1Hash(value string) string {

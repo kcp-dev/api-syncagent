@@ -70,10 +70,32 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 		dest = local
 	}
 
-	// to find the source related object, we first need to determine its name/namespace
-	sourceKey, err := resolveResourceReference(source.object, relRes.Reference)
-	if err != nil {
-		return false, fmt.Errorf("failed to determine related object's source key: %w", err)
+	var sourceKey *ctrlruntimeclient.ObjectKey
+	switch {
+	case relRes.Reference != nil:
+		// to find the source related object, we first need to determine its name/namespace
+		sourceKey, err = resolveResourceReference(source.object, *relRes.Reference)
+		if err != nil {
+			return false, fmt.Errorf("failed to determine related object's source key: %w", err)
+		}
+	case relRes.LabelSelector != nil:
+		// if no reference is given, we can use a label selector to find the source object
+		sourceObjs := &unstructured.UnstructuredList{}
+		sourceObjs.SetAPIVersion("v1")
+		sourceObjs.SetKind(relRes.Kind)
+
+		// TODO: would need to handle replacer here as well to select right object.
+
+		if err := source.client.List(source.ctx, sourceObjs, ctrlruntimeclient.MatchingLabels(relRes.LabelSelector.MatchLabels)); err != nil {
+			return false, fmt.Errorf("failed to list related objects: %w", err)
+		}
+		if len(sourceObjs.Items) == 0 || len(sourceObjs.Items) > 1 {
+			return false, fmt.Errorf("expected exactly one related object, got %d", len(sourceObjs.Items))
+		}
+		sourceKey = &ctrlruntimeclient.ObjectKey{
+			Namespace: sourceObjs.Items[0].GetNamespace(),
+			Name:      sourceObjs.Items[0].GetName(),
+		}
 	}
 
 	// find the source related object
@@ -92,9 +114,18 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 	}
 
 	// do the same to find the destination object
-	destKey, err := resolveResourceReference(dest.object, relRes.Reference)
-	if err != nil {
-		return false, fmt.Errorf("failed to determine related object's destination key: %w", err)
+	var destKey *ctrlruntimeclient.ObjectKey
+	switch {
+	case relRes.Reference != nil:
+		destKey, err = resolveResourceReference(dest.object, *relRes.Reference)
+		if err != nil {
+			return false, fmt.Errorf("failed to determine related object's destination key: %w", err)
+		}
+	case relRes.LabelSelector != nil:
+		destKey = &ctrlruntimeclient.ObjectKey{
+			Namespace: sourceObj.GetNamespace(),
+			Name:      sourceObj.GetName(),
+		}
 	}
 
 	destObj := &unstructured.Unstructured{}
