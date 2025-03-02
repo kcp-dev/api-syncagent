@@ -18,14 +18,19 @@ limitations under the License.
 
 package v1alpha1
 
+import (
+	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+)
+
 // RelatedResourceSpecApplyConfiguration represents a declarative configuration of the RelatedResourceSpec type for use
 // with apply.
 type RelatedResourceSpecApplyConfiguration struct {
-	Identifier *string                                     `json:"identifier,omitempty"`
-	Origin     *string                                     `json:"origin,omitempty"`
-	Kind       *string                                     `json:"kind,omitempty"`
-	Reference  *RelatedResourceReferenceApplyConfiguration `json:"reference,omitempty"`
-	Mutation   *ResourceMutationSpecApplyConfiguration     `json:"mutation,omitempty"`
+	Identifier    *string                                     `json:"identifier,omitempty"`
+	Origin        *string                                     `json:"origin,omitempty"`
+	Kind          *string                                     `json:"kind,omitempty"`
+	Reference     *RelatedResourceReferenceApplyConfiguration `json:"reference,omitempty"`
+	LabelSelector *v1.LabelSelectorApplyConfiguration         `json:"labelSelector,omitempty"`
+	Mutation      *ResourceMutationSpecApplyConfiguration     `json:"mutation,omitempty"`
 }
 
 // RelatedResourceSpecApplyConfiguration constructs a declarative configuration of the RelatedResourceSpec type for use with
@@ -63,6 +68,14 @@ func (b *RelatedResourceSpecApplyConfiguration) WithKind(value string) *RelatedR
 // If called multiple times, the Reference field is set to the value of the last call.
 func (b *RelatedResourceSpecApplyConfiguration) WithReference(value *RelatedResourceReferenceApplyConfiguration) *RelatedResourceSpecApplyConfiguration {
 	b.Reference = value
+	return b
+}
+
+// WithLabelSelector sets the LabelSelector field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the LabelSelector field is set to the value of the last call.
+func (b *RelatedResourceSpecApplyConfiguration) WithLabelSelector(value *v1.LabelSelectorApplyConfiguration) *RelatedResourceSpecApplyConfiguration {
+	b.LabelSelector = value
 	return b
 }
 

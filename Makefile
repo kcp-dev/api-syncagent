@@ -36,7 +36,7 @@ build: $(CMD)
 .PHONY: $(CMD)
 $(CMD): %: $(BUILD_DEST)/%
 
-$(BUILD_DEST)/%: cmd/%
+$(BUILD_DEST)/%: clean cmd/%
 	go build $(GOTOOLFLAGS) -o $@ ./cmd/$*
 
 GOLANGCI_LINT = _tools/golangci-lint

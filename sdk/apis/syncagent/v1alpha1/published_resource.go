@@ -158,6 +158,8 @@ type ResourceTemplateMutation struct {
 	Template string `json:"template"`
 }
 
+// +kubebuilder:validation:XValidation:rule="(has(self.reference) && !has(self.labelSelector)) || (!has(self.reference) && has(self.labelSelector))",message="must specify exactly one of reference or labelSelector"
+// RelatedResourceSpec describes a related resource that should be synchronized
 type RelatedResourceSpec struct {
 	// Identifier is a unique name for this related resource. The name must be unique within one
 	// PublishedResource and is the key by which consumers (end users) can identify and consume the
@@ -171,7 +173,11 @@ type RelatedResourceSpec struct {
 	// ConfigMap or Secret
 	Kind string `json:"kind"`
 
-	Reference RelatedResourceReference `json:"reference"`
+	// Reference to the related resource in the service cluster.
+	Reference *RelatedResourceReference `json:"reference,omitempty"`
+
+	// LabelSelector is used to filter the related resource in the service cluster.
+	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 
 	// Mutation configures optional transformation rules for the related resource.
 	// Status mutations are only performed when the related resource originates in kcp.
