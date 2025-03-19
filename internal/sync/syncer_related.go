@@ -40,13 +40,15 @@ import (
 
 func (s *ResourceSyncer) processRelatedResources(log *zap.SugaredLogger, stateStore ObjectStateStore, remote, local syncSide) (requeue bool, err error) {
 	for _, relatedResource := range s.pubRes.Spec.Related {
-		requeue, err := s.processRelatedResource(log.With("identifier", relatedResource.Identifier), stateStore, remote, local, relatedResource)
-		if err != nil {
-			return false, fmt.Errorf("failed to process related resource %s: %w", relatedResource.Identifier, err)
-		}
+		if !relatedResource.Optional {
+			requeue, err := s.processRelatedResource(log.With("identifier", relatedResource.Identifier), stateStore, remote, local, relatedResource)
+			if err != nil {
+				return false, fmt.Errorf("failed to process related resource %s: %w", relatedResource.Identifier, err)
+			}
 
-		if requeue {
-			return true, nil
+			if requeue {
+				return true, nil
+			}
 		}
 	}
 

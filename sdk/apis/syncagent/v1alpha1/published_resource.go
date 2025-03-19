@@ -178,6 +178,9 @@ type RelatedResourceSpec struct {
 	// Mutation configures optional transformation rules for the related resource.
 	// Status mutations are only performed when the related resource originates in kcp.
 	Mutation *ResourceMutationSpec `json:"mutation,omitempty"`
+
+	// Optional indicates whether the related resource must be referenced.
+	Optional bool `json:"optional,omitempty"`
 }
 
 // RelatedResourceSource configures how the related resource can be found on the origin side
