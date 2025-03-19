@@ -35,13 +35,15 @@ import (
 
 func (s *ResourceSyncer) processRelatedResources(log *zap.SugaredLogger, stateStore ObjectStateStore, remote, local syncSide) (requeue bool, err error) {
 	for _, relatedResource := range s.pubRes.Spec.Related {
-		requeue, err := s.processRelatedResource(log.With("identifier", relatedResource.Identifier), stateStore, remote, local, relatedResource)
-		if err != nil {
-			return false, fmt.Errorf("failed to process related resource %s: %w", relatedResource.Identifier, err)
-		}
+		if !relatedResource.Optional {
+			requeue, err := s.processRelatedResource(log.With("identifier", relatedResource.Identifier), stateStore, remote, local, relatedResource)
+			if err != nil {
+				return false, fmt.Errorf("failed to process related resource %s: %w", relatedResource.Identifier, err)
+			}
 
-		if requeue {
-			return true, nil
+			if requeue {
+				return true, nil
+			}
 		}
 	}
 
@@ -70,28 +72,23 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 		dest = local
 	}
 
-	// to find the source related object, we first need to determine its name/namespace
 	sourceKey, err := resolveResourceReference(source.object, relRes.Reference)
 	if err != nil {
 		return false, fmt.Errorf("failed to determine related object's source key: %w", err)
 	}
 
-	// find the source related object
 	sourceObj := &unstructured.Unstructured{}
-	sourceObj.SetAPIVersion("v1") // we only support ConfigMaps and Secrets, both are in core/v1
+	sourceObj.SetAPIVersion("v1")
 	sourceObj.SetKind(relRes.Kind)
 
 	err = source.client.Get(source.ctx, *sourceKey, sourceObj)
 	if err != nil {
-		// the source object doesn't exist yet, so we can just stop
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
-
 		return false, fmt.Errorf("failed to get source object: %w", err)
 	}
 
-	// do the same to find the destination object
 	destKey, err := resolveResourceReference(dest.object, relRes.Reference)
 	if err != nil {
 		return false, fmt.Errorf("failed to determine related object's destination key: %w", err)
@@ -137,7 +134,6 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 			dest := source.DeepCopy()
 			dest.SetName(destKey.Name)
 			dest.SetNamespace(destKey.Namespace)
-
 			return dest
 		},
 		// ConfigMaps and Secrets have no subresources
@@ -242,10 +238,7 @@ func resolveResourceLocator(jsonData string, loc syncagentv1alpha1.ResourceLocat
 			return "", fmt.Errorf("invalid pattern %q: %w", re.Pattern, err)
 		}
 
-		// this does apply some coalescing, like turning numbers into strings
-		strVal := gval.String()
-
-		return expr.ReplaceAllString(strVal, re.Replacement), nil
+		return expr.ReplaceAllString(gval.String(), re.Replacement), nil
 	}
 
 	return gval.String(), nil
