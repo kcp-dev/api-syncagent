@@ -72,23 +72,28 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 		dest = local
 	}
 
+	// to find the source related object, we first need to determine its name/namespace
 	sourceKey, err := resolveResourceReference(source.object, relRes.Reference)
 	if err != nil {
 		return false, fmt.Errorf("failed to determine related object's source key: %w", err)
 	}
 
+	// find the source related object
 	sourceObj := &unstructured.Unstructured{}
-	sourceObj.SetAPIVersion("v1")
+	sourceObj.SetAPIVersion("v1") // we only support ConfigMaps and Secrets, both are in core/v1
 	sourceObj.SetKind(relRes.Kind)
 
 	err = source.client.Get(source.ctx, *sourceKey, sourceObj)
 	if err != nil {
+		// the source object doesn't exist yet, so we can just stop
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
+
 		return false, fmt.Errorf("failed to get source object: %w", err)
 	}
 
+	// do the same to find the destination object
 	destKey, err := resolveResourceReference(dest.object, relRes.Reference)
 	if err != nil {
 		return false, fmt.Errorf("failed to determine related object's destination key: %w", err)
@@ -237,8 +242,10 @@ func resolveResourceLocator(jsonData string, loc syncagentv1alpha1.ResourceLocat
 		if err != nil {
 			return "", fmt.Errorf("invalid pattern %q: %w", re.Pattern, err)
 		}
+		// this does apply some coalescing, like turning numbers into strings
+		strVal := gval.String()
 
-		return expr.ReplaceAllString(gval.String(), re.Replacement), nil
+		return expr.ReplaceAllString(strVal, re.Replacement), nil
 	}
 
 	return gval.String(), nil

@@ -407,6 +407,9 @@ spec:
                               type: object
                             type: array
                         type: object
+                      optional:
+                        description: Optional indicates whether the related resource must be referenced.
+                        type: boolean
                       origin:
                         description: '"service" or "kcp"'
                         type: string
