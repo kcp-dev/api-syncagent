@@ -35,13 +35,15 @@ import (
 
 func (s *ResourceSyncer) processRelatedResources(log *zap.SugaredLogger, stateStore ObjectStateStore, remote, local syncSide) (requeue bool, err error) {
 	for _, relatedResource := range s.pubRes.Spec.Related {
-		requeue, err := s.processRelatedResource(log.With("identifier", relatedResource.Identifier), stateStore, remote, local, relatedResource)
-		if err != nil {
-			return false, fmt.Errorf("failed to process related resource %s: %w", relatedResource.Identifier, err)
-		}
+		if !relatedResource.Optional {
+			requeue, err := s.processRelatedResource(log.With("identifier", relatedResource.Identifier), stateStore, remote, local, relatedResource)
+			if err != nil {
+				return false, fmt.Errorf("failed to process related resource %s: %w", relatedResource.Identifier, err)
+			}
 
-		if requeue {
-			return true, nil
+			if requeue {
+				return true, nil
+			}
 		}
 	}
 
@@ -137,7 +139,6 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 			dest := source.DeepCopy()
 			dest.SetName(destKey.Name)
 			dest.SetNamespace(destKey.Namespace)
-
 			return dest
 		},
 		// ConfigMaps and Secrets have no subresources
@@ -241,7 +242,6 @@ func resolveResourceLocator(jsonData string, loc syncagentv1alpha1.ResourceLocat
 		if err != nil {
 			return "", fmt.Errorf("invalid pattern %q: %w", re.Pattern, err)
 		}
-
 		// this does apply some coalescing, like turning numbers into strings
 		strVal := gval.String()
 
