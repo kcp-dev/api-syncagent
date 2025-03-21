@@ -21,8 +21,8 @@ package v1alpha1
 // RelatedResourceReferenceApplyConfiguration represents a declarative configuration of the RelatedResourceReference type for use
 // with apply.
 type RelatedResourceReferenceApplyConfiguration struct {
-	Name      *ResourceLocatorApplyConfiguration `json:"name,omitempty"`
-	Namespace *ResourceLocatorApplyConfiguration `json:"namespace,omitempty"`
+	Path  *string                              `json:"path,omitempty"`
+	Regex *RegularExpressionApplyConfiguration `json:"regex,omitempty"`
 }
 
 // RelatedResourceReferenceApplyConfiguration constructs a declarative configuration of the RelatedResourceReference type for use with
@@ -31,18 +31,18 @@ func RelatedResourceReference() *RelatedResourceReferenceApplyConfiguration {
 	return &RelatedResourceReferenceApplyConfiguration{}
 }
 
-// WithName sets the Name field in the declarative configuration to the given value
+// WithPath sets the Path field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Name field is set to the value of the last call.
-func (b *RelatedResourceReferenceApplyConfiguration) WithName(value *ResourceLocatorApplyConfiguration) *RelatedResourceReferenceApplyConfiguration {
-	b.Name = value
+// If called multiple times, the Path field is set to the value of the last call.
+func (b *RelatedResourceReferenceApplyConfiguration) WithPath(value string) *RelatedResourceReferenceApplyConfiguration {
+	b.Path = &value
 	return b
 }
 
-// WithNamespace sets the Namespace field in the declarative configuration to the given value
+// WithRegex sets the Regex field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Namespace field is set to the value of the last call.
-func (b *RelatedResourceReferenceApplyConfiguration) WithNamespace(value *ResourceLocatorApplyConfiguration) *RelatedResourceReferenceApplyConfiguration {
-	b.Namespace = value
+// If called multiple times, the Regex field is set to the value of the last call.
+func (b *RelatedResourceReferenceApplyConfiguration) WithRegex(value *RegularExpressionApplyConfiguration) *RelatedResourceReferenceApplyConfiguration {
+	b.Regex = value
 	return b
 }

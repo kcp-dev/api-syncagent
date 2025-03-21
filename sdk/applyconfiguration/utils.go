@@ -40,18 +40,26 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &syncagentv1alpha1.PublishedResourceSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("PublishedResourceStatus"):
 		return &syncagentv1alpha1.PublishedResourceStatusApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("RegexResourceLocator"):
-		return &syncagentv1alpha1.RegexResourceLocatorApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("RegularExpression"):
+		return &syncagentv1alpha1.RegularExpressionApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("RelatedResourceDestination"):
+		return &syncagentv1alpha1.RelatedResourceDestinationApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("RelatedResourceDestinationSpec"):
+		return &syncagentv1alpha1.RelatedResourceDestinationSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RelatedResourceReference"):
 		return &syncagentv1alpha1.RelatedResourceReferenceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("RelatedResourceSelector"):
+		return &syncagentv1alpha1.RelatedResourceSelectorApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("RelatedResourceSource"):
+		return &syncagentv1alpha1.RelatedResourceSourceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("RelatedResourceSourceSpec"):
+		return &syncagentv1alpha1.RelatedResourceSourceSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RelatedResourceSpec"):
 		return &syncagentv1alpha1.RelatedResourceSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ResourceDeleteMutation"):
 		return &syncagentv1alpha1.ResourceDeleteMutationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ResourceFilter"):
 		return &syncagentv1alpha1.ResourceFilterApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("ResourceLocator"):
-		return &syncagentv1alpha1.ResourceLocatorApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ResourceMutation"):
 		return &syncagentv1alpha1.ResourceMutationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ResourceMutationSpec"):

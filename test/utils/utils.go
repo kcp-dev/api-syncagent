@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/scale/scheme"
 	"k8s.io/client-go/tools/clientcmd"
@@ -173,4 +174,13 @@ func CreateKcpAgentKubeconfig(t *testing.T, path string) string {
 	})
 
 	return kubeconfigFile.Name()
+}
+
+func ToUnstructured(t *testing.T, obj any) *unstructured.Unstructured {
+	raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		t.Fatalf("Failed to convert object to unstructurd: %v", err)
+	}
+
+	return &unstructured.Unstructured{Object: raw}
 }

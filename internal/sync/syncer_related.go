@@ -18,6 +18,7 @@ package sync
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -27,7 +28,9 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/mutation"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -70,29 +73,19 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 		dest = local
 	}
 
-	// to find the source related object, we first need to determine its name/namespace
-	sourceKey, err := resolveResourceReference(source.object, relRes.Reference)
+	// find the source object by applying the ResourceSourceSpec
+	sourceObj, err := resolveResourceSource(source, relRes)
 	if err != nil {
-		return false, fmt.Errorf("failed to determine related object's source key: %w", err)
-	}
-
-	// find the source related object
-	sourceObj := &unstructured.Unstructured{}
-	sourceObj.SetAPIVersion("v1") // we only support ConfigMaps and Secrets, both are in core/v1
-	sourceObj.SetKind(relRes.Kind)
-
-	err = source.client.Get(source.ctx, *sourceKey, sourceObj)
-	if err != nil {
-		// the source object doesn't exist yet, so we can just stop
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		}
-
 		return false, fmt.Errorf("failed to get source object: %w", err)
 	}
 
+	// the source object doesn't exist yet, so we can just stop
+	if sourceObj == nil {
+		return false, nil
+	}
+
 	// do the same to find the destination object
-	destKey, err := resolveResourceReference(dest.object, relRes.Reference)
+	destKey, err := resolveResourceDestination(dest, relRes)
 	if err != nil {
 		return false, fmt.Errorf("failed to determine related object's destination key: %w", err)
 	}
@@ -201,23 +194,171 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 	return false, nil
 }
 
-func resolveResourceReference(obj *unstructured.Unstructured, ref syncagentv1alpha1.RelatedResourceReference) (*ctrlruntimeclient.ObjectKey, error) {
-	jsonData, err := obj.MarshalJSON()
+func resolveResourceSource(side syncSide, relRes syncagentv1alpha1.RelatedResourceSpec) (*unstructured.Unstructured, error) {
+	jsonData, err := side.object.MarshalJSON()
 	if err != nil {
 		return nil, err
 	}
 
-	name, err := resolveResourceLocator(string(jsonData), ref.Name)
-	if err != nil {
-		return nil, fmt.Errorf("cannot determine name: %w", err)
+	// resolving the namespace first allows us to scope down any .List() calls
+	// for the name of the object
+	namespace := side.object.GetNamespace()
+	if relRes.Source.Namespace != nil {
+		namespace, err = resolveResourceSourceNamespace(side, string(jsonData), *relRes.Source.Namespace)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve namespace: %w", err)
+		}
+
+		if namespace == "" {
+			return nil, nil
+		}
+	} else if namespace == "" {
+		return nil, errors.New("primary object is cluster-scoped and no source namespace configuration was provided")
 	}
 
-	namespace := obj.GetNamespace()
-	if ref.Namespace != nil {
-		namespace, err = resolveResourceLocator(string(jsonData), *ref.Namespace)
+	obj, err := resolveResourceSourceName(side, string(jsonData), relRes, relRes.Source.RelatedResourceSourceSpec, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve: %w", err)
+	}
+
+	return obj, nil
+}
+
+func resolveResourceSourceNamespace(side syncSide, jsonData string, spec syncagentv1alpha1.RelatedResourceSourceSpec) (string, error) {
+	switch {
+	case spec.Reference != nil:
+		return resolveResourceReference(jsonData, *spec.Reference)
+
+	case spec.Selector != nil:
+		namespaces := &corev1.NamespaceList{}
+
+		selector, err := metav1.LabelSelectorAsSelector(&spec.Selector.LabelSelector)
 		if err != nil {
-			return nil, fmt.Errorf("cannot determine namespace: %w", err)
+			return "", fmt.Errorf("invalid selector configured: %w", err)
 		}
+
+		opts := &ctrlruntimeclient.ListOptions{
+			LabelSelector: selector,
+			Limit:         2,
+		}
+
+		if err := side.client.List(side.ctx, namespaces, opts); err != nil {
+			return "", fmt.Errorf("failed to evaluate label selector: %w", err)
+		}
+
+		switch len(namespaces.Items) {
+		case 0:
+			// it's okay if the source namespace, and therefore the source related object, doesn't exist (yet)
+			return "", nil
+		case 1:
+			return namespaces.Items[0].Name, nil
+		default:
+			return "", fmt.Errorf("expected one namespace, but found %d matching the label selector", len(namespaces.Items))
+		}
+
+	case spec.Expression != "":
+		return "", errors.New("not yet implemented")
+
+	default:
+		return "", errors.New("invalid sourceSpec: no mechanism configured")
+	}
+}
+
+func resolveResourceSourceName(side syncSide, jsonData string, relRes syncagentv1alpha1.RelatedResourceSpec, spec syncagentv1alpha1.RelatedResourceSourceSpec, namespace string) (*unstructured.Unstructured, error) {
+	switch {
+	case spec.Reference != nil:
+		name, err := resolveResourceReference(jsonData, *spec.Reference)
+		if err != nil {
+			return nil, err
+		}
+
+		// we assume an operator on the service side will fill-in this value later
+		if name == "" {
+			return nil, nil
+		}
+
+		// find the source related object
+		sourceObj := &unstructured.Unstructured{}
+		sourceObj.SetAPIVersion("v1") // we only support ConfigMaps and Secrets, both are in core/v1
+		sourceObj.SetKind(relRes.Kind)
+
+		err = side.client.Get(side.ctx, types.NamespacedName{Name: name, Namespace: namespace}, sourceObj)
+		if err != nil {
+			// the source object doesn't exist yet, so we can just stop
+			if apierrors.IsNotFound(err) {
+				return nil, nil
+			}
+
+			return nil, fmt.Errorf("failed to get source object: %w", err)
+		}
+
+		return sourceObj, nil
+
+	case spec.Selector != nil:
+		sourceObjs := &unstructured.UnstructuredList{}
+		sourceObjs.SetAPIVersion("v1") // we only support ConfigMaps and Secrets, both are in core/v1
+		sourceObjs.SetKind(relRes.Kind)
+
+		selector, err := metav1.LabelSelectorAsSelector(&spec.Selector.LabelSelector)
+		if err != nil {
+			return nil, fmt.Errorf("invalid selector configured: %w", err)
+		}
+
+		opts := &ctrlruntimeclient.ListOptions{
+			LabelSelector: selector,
+			Limit:         2,
+			Namespace:     namespace,
+		}
+
+		if err := side.client.List(side.ctx, sourceObjs, opts); err != nil {
+			return nil, fmt.Errorf("failed to evaluate label selector: %w", err)
+		}
+
+		switch len(sourceObjs.Items) {
+		case 0:
+			// it's okay if the source object doesn't exist (yet)
+			return nil, nil
+		case 1:
+			return &sourceObjs.Items[0], nil
+		default:
+			return nil, fmt.Errorf("expected one %s object, but found %d matching the label selector", relRes.Kind, len(sourceObjs.Items))
+		}
+
+	case spec.Expression != "":
+		return nil, errors.New("not yet implemented")
+
+	default:
+		return nil, errors.New("invalid sourceSpec: no mechanism configured")
+	}
+}
+
+func resolveResourceDestination(side syncSide, relRes syncagentv1alpha1.RelatedResourceSpec) (*types.NamespacedName, error) {
+	jsonData, err := side.object.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	namespace := side.object.GetNamespace()
+	if relRes.Destination.Namespace != nil {
+		namespace, err = resolveResourceDestinationSpec(string(jsonData), *relRes.Destination.Namespace)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve namespace: %w", err)
+		}
+
+		if namespace == "" {
+			return nil, nil
+		}
+	} else if namespace == "" {
+		return nil, errors.New("primary object is cluster-scoped and no source namespace configuration was provided")
+	}
+
+	name, err := resolveResourceDestinationSpec(string(jsonData), relRes.Destination.RelatedResourceDestinationSpec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve name: %w", err)
+	}
+
+	if name == "" {
+		return nil, nil
 	}
 
 	return &types.NamespacedName{
@@ -226,13 +367,26 @@ func resolveResourceReference(obj *unstructured.Unstructured, ref syncagentv1alp
 	}, nil
 }
 
-func resolveResourceLocator(jsonData string, loc syncagentv1alpha1.ResourceLocator) (string, error) {
-	gval := gjson.Get(jsonData, loc.Path)
+func resolveResourceDestinationSpec(jsonData string, spec syncagentv1alpha1.RelatedResourceDestinationSpec) (string, error) {
+	switch {
+	case spec.Reference != nil:
+		return resolveResourceReference(jsonData, *spec.Reference)
+
+	case spec.Expression != "":
+		return "", errors.New("not yet implemented")
+
+	default:
+		return "", errors.New("invalid sourceSpec: no mechanism configured")
+	}
+}
+
+func resolveResourceReference(jsonData string, ref syncagentv1alpha1.RelatedResourceReference) (string, error) {
+	gval := gjson.Get(jsonData, ref.Path)
 	if !gval.Exists() {
-		return "", fmt.Errorf("cannot find %s in document", loc.Path)
+		return "", fmt.Errorf("cannot find %s in document", ref.Path)
 	}
 
-	if re := loc.Regex; re != nil {
+	if re := ref.Regex; re != nil {
 		if re.Pattern == "" {
 			return re.Replacement, nil
 		}
