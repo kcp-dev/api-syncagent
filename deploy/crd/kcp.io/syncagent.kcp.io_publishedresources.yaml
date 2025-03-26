@@ -411,6 +411,7 @@ spec:
                             type: array
                         type: object
 <<<<<<< HEAD
+<<<<<<< HEAD
                       object:
                         description: |-
                           Object describes how the related resource can be found on the origin side
@@ -658,6 +659,8 @@ spec:
                         description: Optional indicates whether the related resource must be referenced.
                         type: boolean
 >>>>>>> 2f5479b (update codegen)
+=======
+>>>>>>> 05c1537 (add the unit tests for related resources)
                       origin:
                         description: '"service" or "kcp"'
                         type: string

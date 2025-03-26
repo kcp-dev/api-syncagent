@@ -37,6 +37,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/kontext"
 )
 
+func newPublishedResources(relatedResources []syncagentv1alpha1.RelatedResourceSpec) *syncagentv1alpha1.PublishedResource {
+	return &syncagentv1alpha1.PublishedResource{
+		Spec: syncagentv1alpha1.PublishedResourceSpec{
+			Resource: syncagentv1alpha1.SourceResourceDescriptor{
+				APIGroup: dummyv1alpha1.GroupName,
+				Version:  dummyv1alpha1.GroupVersion,
+				Kind:     "NamespacedThing",
+			},
+			Projection: &syncagentv1alpha1.ResourceProjection{
+				Kind: "RemoteThing",
+			},
+			Naming: &syncagentv1alpha1.ResourceNaming{
+				Name: "$remoteClusterName-$remoteName",
+			},
+			Related: relatedResources,
+		},
+	}
+}
+
 func TestSyncerProcessingRelatedResources(t *testing.T) {
 	const stateNamespace = "kcp-system"
 
@@ -57,34 +76,12 @@ func TestSyncerProcessingRelatedResources(t *testing.T) {
 
 	clusterName := logicalcluster.Name("testcluster")
 
-	remoteThingPR := &syncagentv1alpha1.PublishedResource{
-		Spec: syncagentv1alpha1.PublishedResourceSpec{
-			Resource: syncagentv1alpha1.SourceResourceDescriptor{
-				APIGroup: dummyv1alpha1.GroupName,
-				Version:  dummyv1alpha1.GroupVersion,
-				Kind:     "NamespacedThing",
-			},
-			Projection: &syncagentv1alpha1.ResourceProjection{
-				Kind: "RemoteThing",
-			},
-			// include explicit naming rules to be independent of possible changes to the defaults
-			Naming: &syncagentv1alpha1.ResourceNaming{
-				Name: "$remoteClusterName-$remoteName", // Things are Cluster-scoped
-			},
-			Related: []syncagentv1alpha1.RelatedResourceSpec{
-				{
-					Identifier: "mandatory-credentials",
-					Origin:     "kcp",
-					Kind:       "Secret",
-					Reference: syncagentv1alpha1.RelatedResourceReference{
-						Name: syncagentv1alpha1.ResourceLocator{
-							Path: "metadata.name",
-							Regex: &syncagentv1alpha1.RegexResourceLocator{
-								Replacement: "mandatory-credentials",
-							},
-						},
-					},
-				},
+	testcases := []testcase{
+		{
+			name:           "optional related resource does not exist",
+			remoteAPIGroup: "remote.example.corp",
+			localCRD:       loadCRD("things"),
+			pubRes: newPublishedResources([]syncagentv1alpha1.RelatedResourceSpec{
 				{
 					Identifier: "optional-secret",
 					Origin:     "service",
@@ -97,20 +94,9 @@ func TestSyncerProcessingRelatedResources(t *testing.T) {
 							},
 						},
 					},
-					Optional: true,
 				},
-			},
-		},
-	}
-
-	testcases := []testcase{
-		{
-			name:            "optional related resource does not exist",
-			remoteAPIGroup:  "remote.example.corp",
-			localCRD:        loadCRD("things"),
-			pubRes:          remoteThingPR,
+			}),
 			performRequeues: true,
-
 			remoteObject: newUnstructured(&dummyv1alpha1.NamespacedThing{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "my-test-thing",
@@ -173,12 +159,25 @@ func TestSyncerProcessingRelatedResources(t *testing.T) {
 			expectedState: `{"apiVersion":"remote.example.corp/v1alpha1","kind":"RemoteThing","metadata":{"name":"my-test-thing","namespace":"kcp-system"},"spec":{"username":"Colonel Mustard"}}`,
 		},
 		{
-			name:            "mandatory related resource does not exist",
-			remoteAPIGroup:  "remote.example.corp",
-			localCRD:        loadCRD("things"),
-			pubRes:          remoteThingPR,
+			name:           "mandatory related resource does not exist",
+			remoteAPIGroup: "remote.example.corp",
+			localCRD:       loadCRD("things"),
+			pubRes: newPublishedResources([]syncagentv1alpha1.RelatedResourceSpec{
+				{
+					Identifier: "mandatory-credentials",
+					Origin:     "kcp",
+					Kind:       "Secret",
+					Reference: syncagentv1alpha1.RelatedResourceReference{
+						Name: syncagentv1alpha1.ResourceLocator{
+							Path: "metadata.name",
+							Regex: &syncagentv1alpha1.RegexResourceLocator{
+								Replacement: "mandatory-credentials",
+							},
+						},
+					},
+				},
+			}),
 			performRequeues: true,
-
 			remoteObject: newUnstructured(&dummyv1alpha1.NamespacedThing{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "my-test-thing",
