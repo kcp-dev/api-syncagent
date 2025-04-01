@@ -144,7 +144,7 @@ func TestStateStoreBasics(t *testing.T) {
 	assertObjectsEqual(t, "RemoteThing", firstObject, result)
 
 	///////////////////////////////////////
-	// strip subresoures
+	// strip subresources
 
 	thirdObject := newUnstructured(&dummyv1alpha1.ThingWithStatusSubresource{
 		ObjectMeta: metav1.ObjectMeta{

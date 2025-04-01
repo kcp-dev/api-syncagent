@@ -105,7 +105,7 @@ var apiRegex = regexp.MustCompile(`(/api/|/apis/)`)
 
 // generatePath formats the request path to target the specified cluster.
 func generatePath(originalPath string, workspacePath logicalcluster.Path) string {
-	// If the originalPath already has cluster.Path() then the path was already modifed and no change needed
+	// If the originalPath already has cluster.Path() then the path was already modified and no change needed
 	if strings.Contains(originalPath, workspacePath.RequestPath()) {
 		return originalPath
 	}

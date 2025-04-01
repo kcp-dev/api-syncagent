@@ -171,28 +171,88 @@ type RelatedResourceSpec struct {
 	// ConfigMap or Secret
 	Kind string `json:"kind"`
 
-	Reference RelatedResourceReference `json:"reference"`
+	// Object describes how the related resource can be found on the origin side
+	// and where it is to supposed to be created on the destination side.
+	Object RelatedResourceObject `json:"object"`
 
 	// Mutation configures optional transformation rules for the related resource.
 	// Status mutations are only performed when the related resource originates in kcp.
 	Mutation *ResourceMutationSpec `json:"mutation,omitempty"`
 }
 
-type RelatedResourceReference struct {
-	Name      ResourceLocator  `json:"name"`
-	Namespace *ResourceLocator `json:"namespace,omitempty"`
+// RelatedResourceSource configures how the related resource can be found on the origin side
+// and where it is to supposed to be created on the destination side.
+type RelatedResourceObject struct {
+	RelatedResourceObjectSpec `json:",inline"`
+
+	// Namespace configures in what namespace the related object resides in. If
+	// not specified, the same namespace as the main object is assumed. If the
+	// main object is cluster-scoped, this field is required and an error will be
+	// raised during syncing if the field is not specified.
+	Namespace *RelatedResourceObjectSpec `json:"namespace,omitempty"`
 }
 
-type ResourceLocator struct {
-	Path  string                `json:"path"`
-	Regex *RegexResourceLocator `json:"regex,omitempty"`
+// RelatedResourceObjectSpec configures different ways an object can be located.
+// All fields are mutually exclusive.
+type RelatedResourceObjectSpec struct {
+	// Selector is a label selector that is useful if no reference is in the
+	// main resource (i.e. if the related object links back to its parent, instead
+	// of the parent pointing to the related object).
+	Selector *RelatedResourceObjectSelector `json:"selector,omitempty"`
+	// Reference points to a field inside the main object. This reference is
+	// evaluated on both source and destination sides to find the related object.
+	Reference *RelatedResourceObjectReference `json:"reference,omitempty"`
+	// Template is a Go templated string that can make use of variables to
+	// construct the resulting string.
+	Template *TemplateExpression `json:"template,omitempty"`
 }
 
-type RegexResourceLocator struct {
+// RelatedResourceObjectReference describes a path expression that is evaluated inside
+// a JSON-marshalled Kubernetes object, yielding a string when evaluated.
+type RelatedResourceObjectReference struct {
+	// Path is a simplified JSONPath expression like "metadata.name". A reference
+	// must always select at least _something_ in the object, even if the value
+	// is discarded by the regular expression.
+	Path string `json:"path"`
+	// Regex is a Go regular expression that is optionally applied to the selected
+	// value from the path.
+	Regex *RegularExpression `json:"regex,omitempty"`
+}
+
+// RelatedResourceSelector is a dedicated struct in case we need additional options
+// for evaluating the label selector.
+
+// RelatedResourceObjectSelector describes how to locate a related object based on
+// labels. This is useful if the main resource has no and cannot construct a
+// reference to the related object because its name/namespace might be randomized.
+type RelatedResourceObjectSelector struct {
+	metav1.LabelSelector `json:",inline"`
+
+	Rewrite RelatedResourceSelectorRewrite `json:"rewrite"`
+}
+
+type RelatedResourceSelectorRewrite struct {
+	// Regex is a Go regular expression that is optionally applied to the selected
+	// value from the path.
+	Regex    *RegularExpression  `json:"regex,omitempty"`
+	Template *TemplateExpression `json:"template,omitempty"`
+}
+
+// RegularExpression models a Go regular expression string replacement. See
+// https://pkg.go.dev/regexp/syntax for more information on the syntax.
+type RegularExpression struct {
 	// Pattern can be left empty to simply replace the entire value with the
 	// replacement.
-	Pattern     string `json:"pattern,omitempty"`
+	Pattern string `json:"pattern,omitempty"`
+	// Replacement is the string that the matched pattern is replaced with. It
+	// can contain references to groups in the pattern by using \N.
 	Replacement string `json:"replacement,omitempty"`
+}
+
+// TemplateExpression is a Go templated string that can make use of variables to
+// construct the resulting string.
+type TemplateExpression struct {
+	Template string `json:"template,omitempty"`
 }
 
 // SourceResourceDescriptor and ResourceProjection are very similar, but as we do not

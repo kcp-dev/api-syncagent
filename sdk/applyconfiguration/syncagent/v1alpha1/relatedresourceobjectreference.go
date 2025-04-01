@@ -18,23 +18,23 @@ limitations under the License.
 
 package v1alpha1
 
-// ResourceLocatorApplyConfiguration represents a declarative configuration of the ResourceLocator type for use
+// RelatedResourceObjectReferenceApplyConfiguration represents a declarative configuration of the RelatedResourceObjectReference type for use
 // with apply.
-type ResourceLocatorApplyConfiguration struct {
-	Path  *string                                 `json:"path,omitempty"`
-	Regex *RegexResourceLocatorApplyConfiguration `json:"regex,omitempty"`
+type RelatedResourceObjectReferenceApplyConfiguration struct {
+	Path  *string                              `json:"path,omitempty"`
+	Regex *RegularExpressionApplyConfiguration `json:"regex,omitempty"`
 }
 
-// ResourceLocatorApplyConfiguration constructs a declarative configuration of the ResourceLocator type for use with
+// RelatedResourceObjectReferenceApplyConfiguration constructs a declarative configuration of the RelatedResourceObjectReference type for use with
 // apply.
-func ResourceLocator() *ResourceLocatorApplyConfiguration {
-	return &ResourceLocatorApplyConfiguration{}
+func RelatedResourceObjectReference() *RelatedResourceObjectReferenceApplyConfiguration {
+	return &RelatedResourceObjectReferenceApplyConfiguration{}
 }
 
 // WithPath sets the Path field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Path field is set to the value of the last call.
-func (b *ResourceLocatorApplyConfiguration) WithPath(value string) *ResourceLocatorApplyConfiguration {
+func (b *RelatedResourceObjectReferenceApplyConfiguration) WithPath(value string) *RelatedResourceObjectReferenceApplyConfiguration {
 	b.Path = &value
 	return b
 }
@@ -42,7 +42,7 @@ func (b *ResourceLocatorApplyConfiguration) WithPath(value string) *ResourceLoca
 // WithRegex sets the Regex field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Regex field is set to the value of the last call.
-func (b *ResourceLocatorApplyConfiguration) WithRegex(value *RegexResourceLocatorApplyConfiguration) *ResourceLocatorApplyConfiguration {
+func (b *RelatedResourceObjectReferenceApplyConfiguration) WithRegex(value *RegularExpressionApplyConfiguration) *RelatedResourceObjectReferenceApplyConfiguration {
 	b.Regex = value
 	return b
 }

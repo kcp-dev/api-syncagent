@@ -18,23 +18,23 @@ limitations under the License.
 
 package v1alpha1
 
-// RegexResourceLocatorApplyConfiguration represents a declarative configuration of the RegexResourceLocator type for use
+// RegularExpressionApplyConfiguration represents a declarative configuration of the RegularExpression type for use
 // with apply.
-type RegexResourceLocatorApplyConfiguration struct {
+type RegularExpressionApplyConfiguration struct {
 	Pattern     *string `json:"pattern,omitempty"`
 	Replacement *string `json:"replacement,omitempty"`
 }
 
-// RegexResourceLocatorApplyConfiguration constructs a declarative configuration of the RegexResourceLocator type for use with
+// RegularExpressionApplyConfiguration constructs a declarative configuration of the RegularExpression type for use with
 // apply.
-func RegexResourceLocator() *RegexResourceLocatorApplyConfiguration {
-	return &RegexResourceLocatorApplyConfiguration{}
+func RegularExpression() *RegularExpressionApplyConfiguration {
+	return &RegularExpressionApplyConfiguration{}
 }
 
 // WithPattern sets the Pattern field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Pattern field is set to the value of the last call.
-func (b *RegexResourceLocatorApplyConfiguration) WithPattern(value string) *RegexResourceLocatorApplyConfiguration {
+func (b *RegularExpressionApplyConfiguration) WithPattern(value string) *RegularExpressionApplyConfiguration {
 	b.Pattern = &value
 	return b
 }
@@ -42,7 +42,7 @@ func (b *RegexResourceLocatorApplyConfiguration) WithPattern(value string) *Rege
 // WithReplacement sets the Replacement field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Replacement field is set to the value of the last call.
-func (b *RegexResourceLocatorApplyConfiguration) WithReplacement(value string) *RegexResourceLocatorApplyConfiguration {
+func (b *RegularExpressionApplyConfiguration) WithReplacement(value string) *RegularExpressionApplyConfiguration {
 	b.Replacement = &value
 	return b
 }

@@ -226,25 +226,42 @@ Likewise it's possible for auxiliary resources having to be created by the user,
 the user has to provide credentials.
 
 To handle these cases, a `PublishedResource` can define multiple "related resources". Each related
-resource currently represents exactly one object to synchronize between user workspace and service
-cluster (i.e. you cannot express "sync all Secrets"). While the main published resource sync is
-always workspace->service cluster, related resources can originate on either side and so either can
-work as the source of truth.
+resource represents usually one, but can be multiple objects to synchronize between user workspace
+and service cluster. While the main published resource sync is always workspace->service cluster,
+related resources can originate on either side and so either can work as the source of truth.
 
 At the moment, only `ConfigMaps` and `Secrets` are allowed related resource kinds.
 
-For each related resource, the Sync Agent needs to be told their name/namespace. This is done by
-selecting a field in the main resource (for a `Certificate` this would mean `spec.secretName`). Both
-name and namespace need to be part of the main object (or be fixed values, like a hardcoded
-`kube-system` namespace).
+For each related resource, the Sync Agent needs to be told how to find the object on the origin side
+and where to create it on the destination side. There are multiple options that you can choose from.
 
-The path expressions for name and namespace are evaluated against the main object on either side
-to determine their values. So if you had a `Certificate` in your workspace with
-`spec.secretName = "my-cert"` and after syncing it down, the copy on the service cluster has a
-rewritten/mutated `spec.secretName = "jk23h4wz47329rz2r72r92-cert"` (e.g. to prevent naming
-collisions), the expression `spec.secretName` would yield `"my-cert"` for the name in the workspace
-and `"jk...."` as the name on the service cluster. Once the object exists with that name on the
-originating side, the Sync Agent will begin to sync it to the other side.
+By default all related objects live in the same namespace as the primary object (their owner/parent).
+If the primary object is cluster scoped, admins must configure additional rules to specify what
+namespace the ConfigMap/Secret shall be read from and created in.
+
+Related resources are always optional. Even if references (see below) are used and their path
+expression points to a non-existing field in the primary object (e.g. `spec.secretName` is configured,
+but that field does not exist in Certificate object), this will simply be treated as "not _yet_
+existing" and not create an error.
+
+#### References
+
+A reference is a JSONPath-like expression that are evaluated on both sides of the synchronization.
+You configure a single path expression (like `spec.secretName`) and the sync agent will evlauate it
+in the original primary object (in kcp) and again in the copied primary object (on the service
+cluster). Since the primary object has already been mutated, the `spec.secretName` is already
+rewritten/adjusted to work on the service cluster (for example it was changed from `my-secret` to
+`jk23h4wz47329rz2r72r92-secret` on the service cluster side). By doing it this way, admins only have
+to think about mutations and rewrites once (when configuring the primary object in the
+PublishedResource) and the path will yield 2 ready to use values (`my-secret` and the computed value).
+
+The value selected by the path expression must be a string (or number, but it will be coalesced into
+a string) and can then be further adjusted by applying a regular expression to it.
+
+References can only ever select 1 related object. Their upside is that they are simple to understand
+and easy to use, but require a "link" in the primary object that would point to the related object.
+
+Here's an example on how to use references to locate the related object.
 
 ```yaml
 apiVersion: syncagent.kcp.io/v1alpha1
@@ -277,10 +294,11 @@ spec:
       # there is no GVK projection for related resources
       kind: Secret
 
-      # configure where in the parent object we can find
-      # the name/namespace of the related resource (the child)
-      reference:
-        name:
+      # configure where in the parent object we can find the child object
+      object:
+        # Object can use either reference, labelSelector or expressions. In this
+        # example we use references.
+        reference:
           # This path is evaluated in both the local and remote objects, to figure out
           # the local and remote names for the related object. This saves us from having
           # to remember mutated fields before their mutation (similar to the last-known
@@ -289,21 +307,114 @@ spec:
 
         # namespace part is optional; if not configured,
         # Sync Agent assumes the same namespace as the owning resource
-        #
         # namespace:
-        #   path: spec.secretName
-        #   regex:
-        #     pattern: '...'
-        #     replacement: '...'
-        #
-        # to inject static values, select a meaningless string value
-        # and leave the pattern empty
-        #
-        # namespace:
-        #   path: metadata.uid
-        #   regex:
-        #     replacement: kube-system
+        #   reference:
+        #     path: spec.secretName
+        #     regex:
+        #       pattern: '...'
+        #       replacement: '...'
 ```
+
+#### Label Selectors
+
+In some cases, the primary object does not have a link to its child/children objects. In these cases,
+a label selector can be used. This allows to configure the labels that any related object must have
+to be included.
+
+Notably, this allows for _multiple_ objects that are synced for a single configured related resource.
+The sync agent will not prevent misconfigurations, so great care must be taken when configuring
+selectors to not accidentally include too many objects.
+
+Additionally, it is assumed that
+
+* Primary objects synced from kcp to a service cluster will be renamed, to prevent naming collisions.
+* The renamed objects on the service cluster might contain private, sensitive information that should
+  not be leaked into kcp workspaces.
+* When there is no explicit name being requested (like by setting `spec.secretName`), it can be
+  assumed that the operator on the service cluster that is actually processing the primary object
+  will use the primary object's name (at least in parts) to construct the names of related objects,
+  for example a Certificate `yaddasupersecretyadda` might automatically get a Secret created named
+  `yaddasupersecretyadda-secret`.
+
+Since the name of the related object must not leak into a kcp workspace, admins who configure a
+label selector also always have to provide a naming scheme for the copies of the related objects on
+the destination side.
+
+Namespaces work the same as with references, i.e. by default the same namespace as the primary object
+is assumed. However you can actually also use label selectors to find the origin _namespaces_
+dynamically. So you can configure two label selectors, and then agent will first use the namespace
+selector to find all applicable namespaces, and then use the other label selector _in each of the
+applicable namespaces_ to finally locate the related objects. How useful this is depends a lot on
+how crazy the underlying operators on the service clusters are.
+
+Here is an example on how to use label selectors:
+
+```yaml
+apiVersion: syncagent.kcp.io/v1alpha1
+kind: PublishedResource
+metadata:
+  name: publish-certmanager-certs
+spec:
+  resource:
+    kind: Certificate
+    apiGroup: cert-manager.io
+    version: v1
+
+  naming:
+    namespace: kube-system
+    name: "$remoteClusterName-$remoteNamespaceHash-$remoteNameHash"
+
+  related:
+    - identifier: tls-secrets
+
+      # "service" or "kcp"
+      origin: service
+
+      # for now, only "Secret" and "ConfigMap" are supported;
+      # there is no GVK projection for related resources
+      kind: Secret
+
+      # configure where in the parent object we can find the child object
+      object:
+        # A selector is a standard Kubernetes label selector, supporting
+        # matchLabels and matchExpressions.
+        selector:
+          matchLabels:
+            my-key: my-value
+            another: pair
+
+          # You also need to provide rules on how objects found by this selector
+          # should be named on the destination side of the sync.
+          # Rewrites are either using regular expressions or templated strings,
+          # never both.
+          # The rewrite config is applied to each individual found object.
+          rewrite:
+            regex:
+              pattern: "foo-(.+)"
+              replacement: "bar-\\1"
+
+            # or
+            template:
+              template: "{{ .Name }}-foo"
+
+        # Like with references, the namespace can (or must) be configured explicitly.
+        # You do not need to also use label selectors here, you can mix and match
+        # freely.
+        # namespace:
+        #   reference:
+        #     path: metadata.namespace
+        #     regex:
+        #       pattern: '...'
+        #       replacement: '...'
+```
+
+#### Templates
+
+The third option to configure how to find/create related objects are templates. These are simple
+Go template strings (like `{{ .Variable }}`) that allow to easily configure static values with a
+sprinkling of dynamic values.
+
+This feature has not been fully implemented yet.
 
 ## Examples
 
