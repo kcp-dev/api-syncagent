@@ -151,6 +151,8 @@ the RBAC rules that grant the Agent access.
 
 The Sync Agent needs to
 
+* access the workspace of its `APIExport`,
+* get the `LogicalCluster`,
 * manage its `APIExport`,
 * manage `APIResourceSchemas` and
 * access the virtual workspace for its `APIExport`.
@@ -163,6 +165,15 @@ kind: ClusterRole
 metadata:
   name: api-syncagent-mango
 rules:
+  # get the LogicalCluster
+  - apiGroups:
+      - core.kcp.io
+    resources:
+      - logicalclusters
+    resourceNames:
+      - cluster
+    verbs:
+      - get
   # manage its APIExport
   - apiGroups:
       - apis.kcp.io
@@ -200,11 +211,24 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: api-syncagent-columbo:mango-system
+  name: api-syncagent-mango:system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: api-syncagent-mango
+subjects:
+  - kind: User
+    name: api-syncagent-mango
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: api-syncagent-mango:access
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:kcp:workspace:access
 subjects:
   - kind: User
     name: api-syncagent-mango
