@@ -55,36 +55,36 @@ func newPublishedResources(relatedResources []syncagentv1alpha1.RelatedResourceS
 		},
 	}
 }
-
 func TestSyncerProcessingRelatedResources(t *testing.T) {
 	const stateNamespace = "kcp-system"
 
 	type testcase struct {
-		name                 string
-		remoteAPIGroup       string
-		localCRD             *apiextensionsv1.CustomResourceDefinition
-		pubRes               *syncagentv1alpha1.PublishedResource
-		remoteObject         *unstructured.Unstructured
-		localObject          *unstructured.Unstructured
-		existingState        string
-		performRequeues      bool
-		expectedRemoteObject *unstructured.Unstructured
-		expectedLocalObject  *unstructured.Unstructured
-		expectedState        string
-		customVerification   func(t *testing.T, requeue bool, processErr error, finalRemoteObject *unstructured.Unstructured, finalLocalObject *unstructured.Unstructured, testcase testcase)
+		name                        string
+		remoteAPIGroup              string
+		localCRD                    *apiextensionsv1.CustomResourceDefinition
+		pubRes                      *syncagentv1alpha1.PublishedResource
+		remoteRelatedSecret         *unstructured.Unstructured
+		localRelatedSecret          *unstructured.Unstructured
+		remoteObject                *unstructured.Unstructured
+		localObject                 *unstructured.Unstructured
+		existingState               string
+		performRequeues             bool
+		expectedRemoteRelatedSecret *unstructured.Unstructured
+		expectedLocalRelatedSecret  *unstructured.Unstructured
+		expectedState               string
 	}
 
 	clusterName := logicalcluster.Name("testcluster")
 
 	testcases := []testcase{
 		{
-			name:           "optional related resource does not exist",
+			name:           "optional related resource of kcp origin does not exist in the source",
 			remoteAPIGroup: "remote.example.corp",
 			localCRD:       loadCRD("things"),
 			pubRes: newPublishedResources([]syncagentv1alpha1.RelatedResourceSpec{
 				{
 					Identifier: "optional-secret",
-					Origin:     "service",
+					Origin:     "kcp",
 					Kind:       "Secret",
 					Reference: syncagentv1alpha1.RelatedResourceReference{
 						Name: syncagentv1alpha1.ResourceLocator{
@@ -96,7 +96,9 @@ func TestSyncerProcessingRelatedResources(t *testing.T) {
 					},
 				},
 			}),
-			performRequeues: true,
+			performRequeues:     true,
+			remoteRelatedSecret: nil,
+			localRelatedSecret:  nil,
 			remoteObject: newUnstructured(&dummyv1alpha1.NamespacedThing{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "my-test-thing",
@@ -124,42 +126,13 @@ func TestSyncerProcessingRelatedResources(t *testing.T) {
 					Username: "Colonel Mustard",
 				},
 			}),
-			existingState: "",
-
-			expectedRemoteObject: newUnstructured(&dummyv1alpha1.NamespacedThing{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-thing",
-					Namespace: stateNamespace,
-					Finalizers: []string{
-						deletionFinalizer,
-					},
-				},
-				Spec: dummyv1alpha1.ThingSpec{
-					Username: "Colonel Mustard",
-				},
-			}, withGroupKind("remote.example.corp", "RemoteThing")),
-			expectedLocalObject: newUnstructured(&dummyv1alpha1.NamespacedThing{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "testcluster-my-test-thing",
-					Namespace: stateNamespace,
-					Labels: map[string]string{
-						agentNameLabel:            "textor-the-doctor",
-						remoteObjectClusterLabel:  "testcluster",
-						remoteObjectNameHashLabel: "c346c8ceb5d104cc783d09b95e8ea7032c190948",
-					},
-					Annotations: map[string]string{
-						remoteObjectNameAnnotation:      "my-test-thing",
-						remoteObjectNamespaceAnnotation: stateNamespace,
-					},
-				},
-				Spec: dummyv1alpha1.ThingSpec{
-					Username: "Colonel Mustard",
-				},
-			}),
-			expectedState: `{"apiVersion":"remote.example.corp/v1alpha1","kind":"RemoteThing","metadata":{"name":"my-test-thing","namespace":"kcp-system"},"spec":{"username":"Colonel Mustard"}}`,
+			existingState:               "",
+			expectedRemoteRelatedSecret: nil,
+			expectedLocalRelatedSecret:  nil,
+			expectedState:               "",
 		},
 		{
-			name:           "mandatory related resource does not exist",
+			name:           "mandatory related resource of kcp origin exists in the source side",
 			remoteAPIGroup: "remote.example.corp",
 			localCRD:       loadCRD("things"),
 			pubRes: newPublishedResources([]syncagentv1alpha1.RelatedResourceSpec{
@@ -178,6 +151,30 @@ func TestSyncerProcessingRelatedResources(t *testing.T) {
 				},
 			}),
 			performRequeues: true,
+			remoteRelatedSecret: newUnstructured(&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mandatory-credentials",
+					Namespace: stateNamespace,
+					Labels: map[string]string{
+						"hello": "world",
+					},
+				},
+				Data: map[string][]byte{
+					"password": []byte("hunter2"),
+				},
+			}),
+			localRelatedSecret: newUnstructured(&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mandatory-credentials",
+					Namespace: stateNamespace,
+					Labels: map[string]string{
+						"hello": "world",
+					},
+				},
+				Data: map[string][]byte{
+					"password": []byte("hunter2"),
+				},
+			}),
 			remoteObject: newUnstructured(&dummyv1alpha1.NamespacedThing{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "my-test-thing",
@@ -206,57 +203,41 @@ func TestSyncerProcessingRelatedResources(t *testing.T) {
 				},
 			}),
 			existingState: "",
-
-			expectedRemoteObject: newUnstructured(&dummyv1alpha1.NamespacedThing{
+			expectedRemoteRelatedSecret: newUnstructured(&corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-test-thing",
+					Name:      "mandatory-credentials",
 					Namespace: stateNamespace,
+					Labels: map[string]string{
+						"hello": "world",
+					},
 					Finalizers: []string{
 						deletionFinalizer,
 					},
 				},
-				Spec: dummyv1alpha1.ThingSpec{
-					Username: "Colonel Mustard",
-				},
-			}, withGroupKind("remote.example.corp", "RemoteThing")),
-			expectedLocalObject: newUnstructured(&dummyv1alpha1.NamespacedThing{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "testcluster-my-test-thing",
-					Namespace: stateNamespace,
-					Labels: map[string]string{
-						agentNameLabel:            "textor-the-doctor",
-						remoteObjectClusterLabel:  "testcluster",
-						remoteObjectNameHashLabel: "c346c8ceb5d104cc783d09b95e8ea7032c190948",
-					},
-					Annotations: map[string]string{
-						remoteObjectNameAnnotation:      "my-test-thing",
-						remoteObjectNamespaceAnnotation: stateNamespace,
-					},
-				},
-				Spec: dummyv1alpha1.ThingSpec{
-					Username: "Colonel Mustard",
+				Data: map[string][]byte{
+					"password": []byte("hunter2"),
 				},
 			}),
-			expectedState: `{"apiVersion":"remote.example.corp/v1alpha1","kind":"RemoteThing","metadata":{"name":"my-test-thing","namespace":"kcp-system"},"spec":{"username":"Colonel Mustard"}}`,
+			expectedLocalRelatedSecret: newUnstructured(&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mandatory-credentials",
+					Namespace: stateNamespace,
+					Labels: map[string]string{
+						"hello": "world",
+					},
+				},
+				Data: map[string][]byte{
+					"password": []byte("hunter2"),
+				},
+			}),
+			expectedState: `{"apiVersion":"v1","data":{"password":"aHVudGVyMg=="},"kind":"Secret","metadata":{"labels":{"hello":"world"},"name":"mandatory-credentials","namespace":"kcp-system"}}`,
 		},
 	}
 
-	credentials := newUnstructured(&corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mandatory-credentials",
-			Namespace: stateNamespace,
-			Labels: map[string]string{
-				"hello": "world",
-			},
-		},
-		Data: map[string][]byte{
-			"password": []byte("hunter2"),
-		},
-	})
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			localClient := buildFakeClient(testcase.localObject, credentials)
-			remoteClient := buildFakeClient(testcase.remoteObject, credentials)
+			localClient := buildFakeClient(testcase.localObject, testcase.localRelatedSecret)
+			remoteClient := buildFakeClient(testcase.remoteObject, testcase.remoteRelatedSecret)
 
 			syncer, err := NewResourceSyncer(
 				// zap.Must(zap.NewDevelopment()).Sugar(),
@@ -326,42 +307,39 @@ func TestSyncerProcessingRelatedResources(t *testing.T) {
 					}
 				}
 			} else {
-				requeue, err = syncer.Process(ctx, testcase.remoteObject)
+				_, err = syncer.Process(ctx, testcase.remoteObject)
 			}
 
-			finalRemoteObject, getErr := getFinalObjectVersion(remoteCtx, remoteClient, testcase.remoteObject, testcase.expectedRemoteObject)
+			finalRemoteObject, getErr := getFinalObjectVersion(remoteCtx, remoteClient, testcase.remoteRelatedSecret, testcase.expectedRemoteRelatedSecret)
 			if getErr != nil {
 				t.Fatalf("Failed to get final remote object: %v", getErr)
 			}
 
-			finalLocalObject, getErr := getFinalObjectVersion(localCtx, localClient, testcase.localObject, testcase.expectedLocalObject)
+			finalLocalObject, getErr := getFinalObjectVersion(localCtx, localClient, testcase.localRelatedSecret, testcase.expectedLocalRelatedSecret)
 			if getErr != nil {
 				t.Fatalf("Failed to get final local object: %v", getErr)
 			}
 
-			if testcase.customVerification != nil {
-				testcase.customVerification(t, requeue, err, finalRemoteObject, finalLocalObject, testcase)
-			} else {
-				if err != nil {
-					t.Fatalf("Processing failed: %v", err)
+			if err != nil {
+				t.Fatalf("Processing failed: %v", err)
+			}
+
+			assertObjectsEqual(t, "local", testcase.expectedLocalRelatedSecret, finalLocalObject)
+			assertObjectsEqual(t, "remote", testcase.expectedRemoteRelatedSecret, finalRemoteObject)
+
+			if testcase.expectedState != "" {
+				if backend == nil {
+					t.Fatal("Cannot check object state, state store was never instantiated.")
 				}
 
-				assertObjectsEqual(t, "local", testcase.expectedLocalObject, finalLocalObject)
-				assertObjectsEqual(t, "remote", testcase.expectedRemoteObject, finalRemoteObject)
-
-				if testcase.expectedState != "" {
-					if backend == nil {
-						t.Fatal("Cannot check object state, state store was never instantiated.")
-					}
-
-					finalState, err := backend.Get(testcase.expectedRemoteObject, clusterName)
-					if err != nil {
-						t.Fatalf("Failed to get final state: %v", err)
-					} else if !bytes.Equal(finalState, []byte(testcase.expectedState)) {
-						t.Fatalf("States do not match:\n%s", diff.StringDiff(testcase.expectedState, string(finalState)))
-					}
+				finalState, err := backend.Get(testcase.expectedRemoteRelatedSecret, clusterName)
+				if err != nil {
+					t.Fatalf("Failed to get final state: %v", err)
+				} else if !bytes.Equal(finalState, []byte(testcase.expectedState)) {
+					t.Fatalf("States do not match:\n%s", diff.StringDiff(testcase.expectedState, string(finalState)))
 				}
 			}
+
 		})
 	}
 }
