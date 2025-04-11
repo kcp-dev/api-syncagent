@@ -83,14 +83,16 @@ func TestSyncerProcessingRelatedResources(t *testing.T) {
 			localCRD:       loadCRD("things"),
 			pubRes: newPublishedResources([]syncagentv1alpha1.RelatedResourceSpec{
 				{
-					Identifier: "optional-secret",
+					Identifier: "optional-credentials",
 					Origin:     "kcp",
 					Kind:       "Secret",
-					Reference: syncagentv1alpha1.RelatedResourceReference{
-						Name: syncagentv1alpha1.ResourceLocator{
-							Path: "metadata.name",
-							Regex: &syncagentv1alpha1.RegexResourceLocator{
-								Replacement: "optional-credentials",
+					Object: syncagentv1alpha1.RelatedResourceObject{
+						RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
+							Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
+								Path: "metadata.name",
+								Regex: &syncagentv1alpha1.RegularExpression{
+									Replacement: "optional-credentials",
+								},
 							},
 						},
 					},
@@ -140,11 +142,13 @@ func TestSyncerProcessingRelatedResources(t *testing.T) {
 					Identifier: "mandatory-credentials",
 					Origin:     "kcp",
 					Kind:       "Secret",
-					Reference: syncagentv1alpha1.RelatedResourceReference{
-						Name: syncagentv1alpha1.ResourceLocator{
-							Path: "metadata.name",
-							Regex: &syncagentv1alpha1.RegexResourceLocator{
-								Replacement: "mandatory-credentials",
+					Object: syncagentv1alpha1.RelatedResourceObject{
+						RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
+							Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
+								Path: "metadata.name",
+								Regex: &syncagentv1alpha1.RegularExpression{
+									Replacement: "mandatory-credentials",
+								},
 							},
 						},
 					},
@@ -240,13 +244,12 @@ func TestSyncerProcessingRelatedResources(t *testing.T) {
 			remoteClient := buildFakeClient(testcase.remoteObject, testcase.remoteRelatedSecret)
 
 			syncer, err := NewResourceSyncer(
-				// zap.Must(zap.NewDevelopment()).Sugar(),
-				zap.NewNop().Sugar(),
+				zap.Must(zap.NewDevelopment()).Sugar(),
+				//zap.NewNop().Sugar(),
 				localClient,
 				remoteClient,
 				testcase.pubRes,
 				testcase.localCRD,
-				testcase.remoteAPIGroup,
 				nil,
 				stateNamespace,
 				"textor-the-doctor",
