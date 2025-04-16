@@ -8,3 +8,6 @@
 *.kubeconfig
 *.pem
 *.key
+.DS_Store
+/docs/__pycache__
+.idea/

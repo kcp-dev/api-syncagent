@@ -197,11 +197,13 @@ usual path, without a leading dot.
 
 #### Template
 
+{% raw %}
 ```yaml
 template:
   path: "json.path[expression]"
   template: "{{ .LocalObject.ObjectMeta.Namespace }}"
 ```
+{% endraw %}
 
 This mutation applies a Go template expression to a single value inside the document. JSON path is the
 usual path, without a leading dot.
