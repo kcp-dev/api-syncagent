@@ -144,3 +144,26 @@ imports: $(GIMPS)
 verify:
 	./hack/verify-boilerplate.sh
 	./hack/verify-licenses.sh
+
+
+### docs
+
+VENVDIR=$(abspath docs/venv)
+REQUIREMENTS_TXT=docs/requirements.txt
+
+.PHONY: local-docs
+local-docs: venv ## Run mkdocs serve
+	. $(VENV)/activate; \
+	VENV=$(VENV) cd docs && mkdocs serve
+
+.PHONY: serve-docs
+serve-docs: venv ## Serve docs
+	. $(VENV)/activate; \
+	VENV=$(VENV) REMOTE=$(REMOTE) BRANCH=$(BRANCH) docs/scripts/serve-docs.sh
+
+.PHONY: deploy-docs
+deploy-docs: venv ## Deploy docs
+	. $(VENV)/activate; \
+	REMOTE=$(REMOTE) BRANCH=$(BRANCH) docs/scripts/deploy-docs.sh
+
+include Makefile.venv
