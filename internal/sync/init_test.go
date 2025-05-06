@@ -21,6 +21,7 @@ import (
 
 	dummyv1alpha1 "github.com/kcp-dev/api-syncagent/internal/sync/apis/dummy/v1alpha1"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -30,6 +31,9 @@ var testScheme *runtime.Scheme
 func init() {
 	testScheme = runtime.NewScheme()
 	if err := dummyv1alpha1.AddToScheme(testScheme); err != nil {
+		panic(err)
+	}
+	if err := corev1.AddToScheme(testScheme); err != nil {
 		panic(err)
 	}
 }
