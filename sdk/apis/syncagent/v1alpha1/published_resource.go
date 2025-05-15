@@ -255,16 +255,19 @@ type TemplateExpression struct {
 	Template string `json:"template,omitempty"`
 }
 
-// SourceResourceDescriptor and ResourceProjection are very similar, but as we do not
-// want to burden service clusters with validation webhooks, it's easier to split them
-// into 2 structs here and rely on the schema for validation.
-
 // SourceResourceDescriptor uniquely describes a resource type in the cluster.
 type SourceResourceDescriptor struct {
 	// The API group of a resource, for example "storage.initroid.com".
 	APIGroup string `json:"apiGroup"`
-	// The API version, for example "v1beta1".
-	Version string `json:"version"`
+	// The API version, for example "v1beta1". Setting this field will only publish
+	// the given version, otherwise all versions for the group/kind will be
+	// published.
+	//
+	// Deprecated: Use .versions instead.
+	Version string `json:"version,omitempty"`
+	// Versions allows to select a subset of versions to publish. Leave empty
+	// to publish all available versions.
+	Versions []string `json:"versions,omitempty"`
 	// The resource Kind, for example "Database".
 	Kind string `json:"kind"`
 }
@@ -282,10 +285,17 @@ const (
 
 // ResourceProjection describes how the source GVK should be modified before it's published in kcp.
 type ResourceProjection struct {
-	// The API group, for example "myservice.example.com".
+	// The API group, for example "myservice.example.com". Leave empty to not modify the API group.
 	Group string `json:"group,omitempty"`
-	// The API version, for example "v1beta1".
+	// The API version, for example "v1beta1". Leave empty to not modify the version.
+	//
+	// This field must not be set when multiple versions have been selected.
+	//
+	// Deprecated: Use .versions instead.
 	Version string `json:"version,omitempty"`
+	// Versions allows to map API versions onto new values in kcp. Leave empty to not modify the
+	// versions.
+	Versions []VersionProjection `json:"versions,omitempty"`
 	// Whether or not the resource is namespaced.
 	// +kubebuilder:validation:Enum=Cluster;Namespaced
 	Scope ResourceScope `json:"scope,omitempty"`
@@ -307,6 +317,11 @@ type ResourceProjection struct {
 	// this to an empty list to remove all categories.
 	// +optional
 	Categories []string `json:"categories"` // not omitempty because we need to distinguish between [] and nil
+}
+
+type VersionProjection struct {
+	From string `json:"from"`
+	To   string `json:"to"`
 }
 
 // ResourceFilter can be used to limit what resources should be included in an operation.
