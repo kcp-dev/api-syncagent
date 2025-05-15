@@ -24,13 +24,13 @@ package v1alpha1
 import (
 	"context"
 
-	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 	kcpclient "github.com/kcp-dev/apimachinery/v2/pkg/client"
 	"github.com/kcp-dev/logicalcluster/v3"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 
+	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 	syncagentv1alpha1client "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned/typed/syncagent/v1alpha1"
 )
 

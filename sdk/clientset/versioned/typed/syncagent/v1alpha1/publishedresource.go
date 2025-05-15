@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The KCP Authors.
+Copyright The KCP Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,13 +21,12 @@ package v1alpha1
 import (
 	"context"
 
-	v1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
-
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
 
+	v1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 	scheme "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned/scheme"
 )
 

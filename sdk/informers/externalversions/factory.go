@@ -26,8 +26,6 @@ import (
 	"sync"
 	"time"
 
-	scopedclientset "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned"
-	clientset "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned/cluster"
 	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
 	"github.com/kcp-dev/logicalcluster/v3"
 
@@ -36,6 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 
+	scopedclientset "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned"
+	clientset "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned/cluster"
 	"github.com/kcp-dev/api-syncagent/sdk/informers/externalversions/internalinterfaces"
 	syncagentinformers "github.com/kcp-dev/api-syncagent/sdk/informers/externalversions/syncagent"
 )

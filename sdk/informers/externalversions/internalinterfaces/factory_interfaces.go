@@ -24,13 +24,14 @@ package internalinterfaces
 import (
 	time "time"
 
-	scopedclientset "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned"
-	clientset "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned/cluster"
 	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+
+	scopedclientset "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned"
+	clientset "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned/cluster"
 )
 
 // NewInformerFunc takes clientset.ClusterInterface and time.Duration to return a ScopeableSharedIndexInformer.
