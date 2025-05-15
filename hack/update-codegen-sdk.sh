@@ -19,7 +19,7 @@ set -euo pipefail
 cd $(dirname $0)/..
 source hack/lib.sh
 
-BOILERPLATE_HEADER="$(realpath hack/boilerplate/boilerplate.generatego.txt)"
+BOILERPLATE_HEADER="$(realpath hack/boilerplate/generated/boilerplate.go.txt)"
 SDK_MODULE="github.com/kcp-dev/api-syncagent/sdk"
 APIS_PKG="$SDK_MODULE/apis"
 

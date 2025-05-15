@@ -16,7 +16,7 @@
 # https://github.com/kubermatic/reconciler
 
 package: reconciling
-boilerplate: hack/boilerplate/boilerplate.generatego.txt
+boilerplate: hack/boilerplate/generated/boilerplate.go.txt
 resourceTypes:
   # kcp-dev/v1alpha1
   - { package: github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1, importAlias: kcpdevv1alpha1, resourceName: APIExport }
