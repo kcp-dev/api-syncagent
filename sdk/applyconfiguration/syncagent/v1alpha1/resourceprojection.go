@@ -19,19 +19,20 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
+	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 )
 
 // ResourceProjectionApplyConfiguration represents a declarative configuration of the ResourceProjection type for use
 // with apply.
 type ResourceProjectionApplyConfiguration struct {
-	Group      *string                 `json:"group,omitempty"`
-	Version    *string                 `json:"version,omitempty"`
-	Scope      *v1alpha1.ResourceScope `json:"scope,omitempty"`
-	Kind       *string                 `json:"kind,omitempty"`
-	Plural     *string                 `json:"plural,omitempty"`
-	ShortNames []string                `json:"shortNames,omitempty"`
-	Categories []string                `json:"categories,omitempty"`
+	Group      *string                               `json:"group,omitempty"`
+	Version    *string                               `json:"version,omitempty"`
+	Versions   []VersionProjectionApplyConfiguration `json:"versions,omitempty"`
+	Scope      *syncagentv1alpha1.ResourceScope      `json:"scope,omitempty"`
+	Kind       *string                               `json:"kind,omitempty"`
+	Plural     *string                               `json:"plural,omitempty"`
+	ShortNames []string                              `json:"shortNames,omitempty"`
+	Categories []string                              `json:"categories,omitempty"`
 }
 
 // ResourceProjectionApplyConfiguration constructs a declarative configuration of the ResourceProjection type for use with
@@ -56,10 +57,23 @@ func (b *ResourceProjectionApplyConfiguration) WithVersion(value string) *Resour
 	return b
 }
 
+// WithVersions adds the given value to the Versions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Versions field.
+func (b *ResourceProjectionApplyConfiguration) WithVersions(values ...*VersionProjectionApplyConfiguration) *ResourceProjectionApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithVersions")
+		}
+		b.Versions = append(b.Versions, *values[i])
+	}
+	return b
+}
+
 // WithScope sets the Scope field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Scope field is set to the value of the last call.
-func (b *ResourceProjectionApplyConfiguration) WithScope(value v1alpha1.ResourceScope) *ResourceProjectionApplyConfiguration {
+func (b *ResourceProjectionApplyConfiguration) WithScope(value syncagentv1alpha1.ResourceScope) *ResourceProjectionApplyConfiguration {
 	b.Scope = &value
 	return b
 }
