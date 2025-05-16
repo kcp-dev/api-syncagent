@@ -41,18 +41,14 @@ func TestPublishedResourceSourceGVK(t *testing.T) {
 		},
 	}
 
-	gvk := PublishedResourceSourceGVK(&pubRes)
+	gk := PublishedResourceSourceGK(&pubRes)
 
-	if gvk.Group != apiGroup {
-		t.Errorf("Expected API group to be %q, but got %q.", apiGroup, gvk.Group)
+	if gk.Group != apiGroup {
+		t.Errorf("Expected API group to be %q, but got %q.", apiGroup, gk.Group)
 	}
 
-	if gvk.Version != version {
-		t.Errorf("Expected version to be %q, but got %q.", version, gvk.Version)
-	}
-
-	if gvk.Kind != kind {
-		t.Errorf("Expected kind to be %q, but got %q.", kind, gvk.Kind)
+	if gk.Kind != kind {
+		t.Errorf("Expected kind to be %q, but got %q.", kind, gk.Kind)
 	}
 }
 

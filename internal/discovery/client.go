@@ -156,6 +156,7 @@ func (c *Client) RetrieveCRD(ctx context.Context, gk schema.GroupKind) (*apiexte
 		crd.ObjectMeta = metav1.ObjectMeta{
 			Name:        oldMeta.Name,
 			Annotations: filterAnnotations(oldMeta.Annotations),
+			Generation:  oldMeta.Generation, // is stored as an annotation for convenience on the ARS
 		}
 		crd.Status.Conditions = []apiextensionsv1.CustomResourceDefinitionCondition{}
 
@@ -232,9 +233,7 @@ func (c *Client) RetrieveCRD(ctx context.Context, gk schema.GroupKind) (*apiexte
 	// fill-in the schema for each version, making sure that versions are sorted
 	// according to Kubernetes rules.
 	sortedVersions := availableVersions.UnsortedList()
-	slices.SortFunc(sortedVersions, func(a, b string) int {
-		return version.CompareKubeAwareVersionStrings(a, b)
-	})
+	slices.SortFunc(sortedVersions, version.CompareKubeAwareVersionStrings)
 
 	for _, version := range sortedVersions {
 		subresources := subresourcesPerVersion[version]
