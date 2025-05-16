@@ -24,6 +24,8 @@ import (
 
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
+	kcpapisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -67,7 +69,7 @@ func getStorageVersion(crd *apiextensionsv1.CustomResourceDefinition) string {
 // PublishedResourceProjectedGVK returns the effective GVK after the projection
 // rules have been applied according to the PublishedResource.
 func PublishedResourceProjectedGVK(originalCRD *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (schema.GroupVersionKind, error) {
-	projectedCRD, err := ApplyProjection(originalCRD, pubRes)
+	projectedCRD, err := ProjectCRD(originalCRD, pubRes)
 	if err != nil {
 		return schema.GroupVersionKind{}, fmt.Errorf("failed to project CRD: %w", err)
 	}
@@ -84,7 +86,7 @@ func PublishedResourceProjectedGVK(originalCRD *apiextensionsv1.CustomResourceDe
 	}, nil
 }
 
-func ApplyProjection(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (*apiextensionsv1.CustomResourceDefinition, error) {
+func ProjectCRD(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (*apiextensionsv1.CustomResourceDefinition, error) {
 	result := crd.DeepCopy()
 
 	// reduce the CRD down to the selected versions
@@ -100,7 +102,7 @@ func ApplyProjection(crd *apiextensionsv1.CustomResourceDefinition, pubRes *sync
 	}
 
 	// now we get to actually project something, if desired
-	result, err = projectCRD(result, pubRes)
+	result, err = projectCRDNames(result, pubRes)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +170,7 @@ func adjustStorageVersion(crd *apiextensionsv1.CustomResourceDefinition) (*apiex
 	return crd, nil
 }
 
-func projectCRD(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (*apiextensionsv1.CustomResourceDefinition, error) {
+func projectCRDNames(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (*apiextensionsv1.CustomResourceDefinition, error) {
 	projection := pubRes.Spec.Projection
 	if projection == nil {
 		return crd, nil
@@ -236,4 +238,23 @@ func projectCRD(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagent
 	}
 
 	return crd, nil
+}
+
+func ProjectConversionRules(pubRes *syncagentv1alpha1.PublishedResource) ([]kcpapisv1alpha1.APIVersionConversion, error) {
+	result := pubRes.DeepCopy().Spec.Conversions
+
+	if proj := pubRes.Spec.Projection; proj != nil {
+		for idx, conversion := range result {
+			if projectedFrom := proj.Versions[conversion.From]; projectedFrom != "" {
+				conversion.From = projectedFrom
+			}
+			if projectedTo := proj.Versions[conversion.To]; projectedTo != "" {
+				conversion.To = projectedTo
+			}
+
+			result[idx] = conversion
+		}
+	}
+
+	return result, nil
 }

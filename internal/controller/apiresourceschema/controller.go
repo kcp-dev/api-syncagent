@@ -28,6 +28,7 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/crypto"
 	"github.com/kcp-dev/api-syncagent/internal/discovery"
 	"github.com/kcp-dev/api-syncagent/internal/projection"
+	"github.com/kcp-dev/api-syncagent/internal/resources/reconciling"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
 	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
@@ -135,16 +136,28 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubR
 	}
 
 	// project the CRD (i.e. strip unwanted versions, rename values etc.)
-	projectedCRD, err := projection.ApplyProjection(crd, pubResource)
+	projectedCRD, err := projection.ProjectCRD(crd, pubResource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply projection rules: %w", err)
 	}
 
 	// generate a unique name for this exact state of the CRD
 	arsName := r.getAPIResourceSchemaName(projectedCRD)
+	wsCtx := kontext.WithCluster(ctx, r.lcName)
+
+	projectedConversions, err := projection.ProjectConversionRules(pubResource)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply projection rules to conversions: %w", err)
+	}
+
+	// only reconcile if there are rules because APIConversions must contain at least one conversion
+	if len(projectedConversions) > 0 {
+		if err := r.reconcileConversions(wsCtx, arsName, projectedConversions); err != nil {
+			return nil, fmt.Errorf("failed to reconcile APIConversions: %w", err)
+		}
+	}
 
 	// ensure ARS exists (don't try to reconcile it, it's basically entirely immutable)
-	wsCtx := kontext.WithCluster(ctx, r.lcName)
 	ars := &kcpdevv1alpha1.APIResourceSchema{}
 	err = r.kcpClient.Get(wsCtx, types.NamespacedName{Name: arsName}, ars, &ctrlruntimeclient.GetOptions{})
 
@@ -168,6 +181,8 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubR
 			}
 		}
 	}
+
+	// reconcile a matching APIConversion object
 
 	return nil, nil
 }
@@ -205,4 +220,12 @@ func (r *Reconciler) getAPIResourceSchemaName(crd *apiextensionsv1.CustomResourc
 
 	// include a leading "v" to prevent SHA-1 hashes with digits to break the name
 	return fmt.Sprintf("v%s.%s.%s", checksum[:8], crd.Spec.Names.Plural, crd.Spec.Group)
+}
+
+func (r *Reconciler) reconcileConversions(ctx context.Context, arsName string, rules []kcpdevv1alpha1.APIVersionConversion) error {
+	factories := []reconciling.NamedAPIConversionReconcilerFactory{
+		r.createAPIConversionReconciler(arsName, r.agentName, rules),
+	}
+
+	return reconciling.ReconcileAPIConversions(ctx, factories, "", r.kcpClient)
 }
