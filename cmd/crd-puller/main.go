@@ -41,13 +41,10 @@ func main() {
 	pflag.Parse()
 
 	if pflag.NArg() == 0 {
-		log.Fatal("No argument given. Please specify a GVK in the form 'Kind.version.apigroup.com' to pull.")
+		log.Fatal("No argument given. Please specify a GroupKind in the form 'Kind.apigroup.com' (case-sensitive) to pull.")
 	}
 
-	gvk, _ := schema.ParseKindArg(pflag.Arg(0))
-	if gvk == nil {
-		log.Fatal("Invalid GVK, please use the format 'Kind.version.apigroup.com'.")
-	}
+	gk := schema.ParseGroupKind(pflag.Arg(0))
 
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	loadingRules.ExplicitPath = kubeconfigPath
@@ -67,7 +64,7 @@ func main() {
 		log.Fatalf("Failed to create discovery client: %v.", err)
 	}
 
-	crd, err := discoveryClient.RetrieveCRD(ctx, *gvk)
+	crd, err := discoveryClient.RetrieveCRD(ctx, gk)
 	if err != nil {
 		log.Fatalf("Failed to pull CRD: %v.", err)
 	}

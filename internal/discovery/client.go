@@ -18,6 +18,7 @@ package discovery
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
@@ -61,12 +63,9 @@ func NewClient(config *rest.Config) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) RetrieveCRD(ctx context.Context, gvk schema.GroupVersionKind) (*apiextensionsv1.CustomResourceDefinition, error) {
-	// Most of this code follows the logic in kcp's crd-puller, but is slimmed down
-	// to extract a specific version, not necessarily the preferred version.
-
+func (c *Client) RetrieveCRD(ctx context.Context, gk schema.GroupKind) (*apiextensionsv1.CustomResourceDefinition, error) {
 	////////////////////////////////////
-	// Resolve GVK into GVR, because we need the resource name to construct
+	// Resolve GK into GR, because we need the resource name to construct
 	// the full CRD name.
 
 	_, resourceLists, err := c.discoveryClient.ServerGroupsAndResources()
@@ -74,34 +73,57 @@ func (c *Client) RetrieveCRD(ctx context.Context, gvk schema.GroupVersionKind) (
 		return nil, err
 	}
 
+	// resource is the resource described by gk in any of the found versions
 	var resource *metav1.APIResource
-	allResourceNames := sets.New[string]()
+
+	availableVersions := sets.New[string]()
+	subresourcesPerVersion := map[string]sets.Set[string]{}
+
 	for _, resList := range resourceLists {
 		for _, res := range resList.APIResources {
-			allResourceNames.Insert(res.Name)
-
-			// find the requested resource based on the Kind, but ensure that subresources
-			// are not misinterpreted as the main resource by checking for "/"
-			if resList.GroupVersion == gvk.GroupVersion().String() && res.Kind == gvk.Kind && !strings.Contains(res.Name, "/") {
-				resource = &res
+			// ignore other groups
+			if res.Group != gk.Group || res.Kind != gk.Kind {
+				continue
 			}
+
+			// res could describe the main resource or one of its subresources.
+			name := res.Name
+			subresource := ""
+			if strings.Contains(name, "/") {
+				parts := strings.SplitN(name, "/", 2)
+				name = parts[0]
+				subresource = parts[1]
+			}
+
+			if subresource == "" {
+				resource = &res
+			} else {
+				list, ok := subresourcesPerVersion[res.Version]
+				if !ok {
+					list = sets.New[string]()
+				}
+				list.Insert(subresource)
+				subresourcesPerVersion[res.Version] = list
+			}
+
+			availableVersions.Insert(res.Version)
 		}
 	}
 
 	if resource == nil {
-		return nil, fmt.Errorf("could not find %v in APIs", gvk)
+		return nil, fmt.Errorf("could not find %v in APIs", gk)
 	}
 
 	////////////////////////////////////
-	// If possible, retrieve the GVK as its original CRD, which is always preferred
+	// If possible, retrieve the GK as its original CRD, which is always preferred
 	// because it's much more precise than what we can retrieve from the OpenAPI.
 	// If no CRD can be found, fallback to the OpenAPI schema.
 
 	crdName := resource.Name
-	if gvk.Group == "" {
+	if gk.Group == "" {
 		crdName += ".core"
 	} else {
-		crdName += "." + gvk.Group
+		crdName += "." + gk.Group
 	}
 
 	crd, err := c.crdClient.CustomResourceDefinitions().Get(ctx, crdName, metav1.GetOptions{})
@@ -110,24 +132,19 @@ func (c *Client) RetrieveCRD(ctx context.Context, gvk schema.GroupVersionKind) (
 	// of re-creating it later on based on the openapi schema, we take the original
 	// CRD and just strip it down to what we need.
 	if err == nil {
-		// remove all but the requested version
-		crd.Spec.Versions = slices.DeleteFunc(crd.Spec.Versions, func(ver apiextensionsv1.CustomResourceDefinitionVersion) bool {
-			return ver.Name != gvk.Version
-		})
-
-		if len(crd.Spec.Versions) == 0 {
-			return nil, fmt.Errorf("CRD %s does not contain version %s", crdName, gvk.Version)
-		}
-
-		crd.Spec.Versions[0].Served = true
-		crd.Spec.Versions[0].Storage = true
-
 		if apihelpers.IsCRDConditionTrue(crd, apiextensionsv1.NonStructuralSchema) {
-			crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{
+			emptySchema := &apiextensionsv1.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
 					Type:                   "object",
 					XPreserveUnknownFields: ptr.To(true),
 				},
+			}
+
+			for i, version := range crd.Spec.Versions {
+				if version.Schema == nil || version.Schema.OpenAPIV3Schema == nil {
+					version.Schema = emptySchema
+					crd.Spec.Versions[i] = version
+				}
 			}
 		}
 
@@ -140,6 +157,7 @@ func (c *Client) RetrieveCRD(ctx context.Context, gvk schema.GroupVersionKind) (
 			Name:        oldMeta.Name,
 			Annotations: filterAnnotations(oldMeta.Annotations),
 		}
+		crd.Status.Conditions = []apiextensionsv1.CustomResourceDefinitionCondition{}
 
 		// There is only ever one version, so conversion rules do not make sense
 		// (and even if they did, the conversion webhook from the service cluster
@@ -156,49 +174,34 @@ func (c *Client) RetrieveCRD(ctx context.Context, gvk schema.GroupVersionKind) (
 		return nil, err
 	}
 
+	////////////////////////////////////
 	// CRD not found, so fall back to using the OpenAPI schema
+
 	openapiSchema, err := c.discoveryClient.OpenAPISchema()
 	if err != nil {
 		return nil, err
+	}
+
+	preferredVersion, err := c.getPreferredVersion(resource)
+	if err != nil {
+		return nil, err
+	}
+
+	if preferredVersion == "" {
+		return nil, errors.New("cannot determine storage version because no preferred version exists in the schema")
 	}
 
 	models, err := proto.NewOpenAPIData(openapiSchema)
 	if err != nil {
 		return nil, err
 	}
+
 	modelsByGKV, err := openapi.GetModelsByGKV(models)
 	if err != nil {
 		return nil, err
 	}
 
-	protoSchema := modelsByGKV[gvk]
-	if protoSchema == nil {
-		return nil, fmt.Errorf("no models for %v", gvk)
-	}
-
-	var schemaProps apiextensionsv1.JSONSchemaProps
-	errs := crdpuller.Convert(protoSchema, &schemaProps)
-	if len(errs) > 0 {
-		return nil, utilerrors.NewAggregate(errs)
-	}
-
-	hasSubResource := func(subResource string) bool {
-		return allResourceNames.Has(resource.Name + "/" + subResource)
-	}
-
-	var statusSubResource *apiextensionsv1.CustomResourceSubresourceStatus
-	if hasSubResource("status") {
-		statusSubResource = &apiextensionsv1.CustomResourceSubresourceStatus{}
-	}
-
-	var scaleSubResource *apiextensionsv1.CustomResourceSubresourceScale
-	if hasSubResource("scale") {
-		scaleSubResource = &apiextensionsv1.CustomResourceSubresourceScale{
-			SpecReplicasPath:   ".spec.replicas",
-			StatusReplicasPath: ".status.replicas",
-		}
-	}
-
+	// prepare an empty CRD
 	scope := apiextensionsv1.ClusterScoped
 	if resource.Namespaced {
 		scope = apiextensionsv1.NamespaceScoped
@@ -213,22 +216,9 @@ func (c *Client) RetrieveCRD(ctx context.Context, gvk schema.GroupVersionKind) (
 			Name: crdName,
 		},
 		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
-			Group: gvk.Group,
-			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
-				{
-					Name: gvk.Version,
-					Schema: &apiextensionsv1.CustomResourceValidation{
-						OpenAPIV3Schema: &schemaProps,
-					},
-					Subresources: &apiextensionsv1.CustomResourceSubresources{
-						Status: statusSubResource,
-						Scale:  scaleSubResource,
-					},
-					Served:  true,
-					Storage: true,
-				},
-			},
-			Scope: scope,
+			Group:    gk.Group,
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{},
+			Scope:    scope,
 			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural:     resource.Name,
 				Kind:       resource.Kind,
@@ -239,15 +229,85 @@ func (c *Client) RetrieveCRD(ctx context.Context, gvk schema.GroupVersionKind) (
 		},
 	}
 
+	// fill-in the schema for each version, making sure that versions are sorted
+	// according to Kubernetes rules.
+	sortedVersions := availableVersions.UnsortedList()
+	slices.SortFunc(sortedVersions, func(a, b string) int {
+		return version.CompareKubeAwareVersionStrings(a, b)
+	})
+
+	for _, version := range sortedVersions {
+		subresources := subresourcesPerVersion[version]
+		gvk := schema.GroupVersionKind{
+			Group:   gk.Group,
+			Version: version,
+			Kind:    gk.Kind,
+		}
+
+		protoSchema := modelsByGKV[gvk]
+		if protoSchema == nil {
+			return nil, fmt.Errorf("no models for %v", gk)
+		}
+
+		var schemaProps apiextensionsv1.JSONSchemaProps
+		errs := crdpuller.Convert(protoSchema, &schemaProps)
+		if len(errs) > 0 {
+			return nil, utilerrors.NewAggregate(errs)
+		}
+
+		var statusSubResource *apiextensionsv1.CustomResourceSubresourceStatus
+		if subresources.Has("status") {
+			statusSubResource = &apiextensionsv1.CustomResourceSubresourceStatus{}
+		}
+
+		var scaleSubResource *apiextensionsv1.CustomResourceSubresourceScale
+		if subresources.Has("scale") {
+			scaleSubResource = &apiextensionsv1.CustomResourceSubresourceScale{
+				SpecReplicasPath:   ".spec.replicas",
+				StatusReplicasPath: ".status.replicas",
+			}
+		}
+
+		out.Spec.Versions = append(out.Spec.Versions, apiextensionsv1.CustomResourceDefinitionVersion{
+			Name: version,
+			Schema: &apiextensionsv1.CustomResourceValidation{
+				OpenAPIV3Schema: &schemaProps,
+			},
+			Subresources: &apiextensionsv1.CustomResourceSubresources{
+				Status: statusSubResource,
+				Scale:  scaleSubResource,
+			},
+			Served:  true,
+			Storage: version == preferredVersion,
+		})
+	}
+
 	apiextensionsv1.SetDefaults_CustomResourceDefinition(out)
 
-	if apihelpers.IsProtectedCommunityGroup(gvk.Group) {
+	if apihelpers.IsProtectedCommunityGroup(gk.Group) {
 		out.Annotations = map[string]string{
 			apiextensionsv1.KubeAPIApprovedAnnotation: "https://github.com/kcp-dev/kubernetes/pull/4",
 		}
 	}
 
 	return out, nil
+}
+
+func (c *Client) getPreferredVersion(resource *metav1.APIResource) (string, error) {
+	result, err := c.discoveryClient.ServerPreferredResources()
+	if err != nil {
+		return "", err
+	}
+
+	for _, resList := range result {
+		for _, res := range resList.APIResources {
+			if res.Name == resource.Name && res.Group == resource.Group {
+				return res.Version, nil
+			}
+		}
+	}
+
+	return "", nil
 }
 
 func filterAnnotations(ann map[string]string) map[string]string {
