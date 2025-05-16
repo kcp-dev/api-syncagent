@@ -80,9 +80,19 @@ func (c *Client) RetrieveCRD(ctx context.Context, gk schema.GroupKind) (*apiexte
 	subresourcesPerVersion := map[string]sets.Set[string]{}
 
 	for _, resList := range resourceLists {
+		// .Group on an APIResource is empty for built-in resources, so we must
+		// parse and check GroupVersion of the entire list.
+		gv, err := schema.ParseGroupVersion(resList.GroupVersion)
+		if err != nil {
+			return nil, fmt.Errorf("Kubernetes reported invalid API group version %q: %w", resList.GroupVersion, err)
+		}
+
+		if gv.Group != gk.Group {
+			continue
+		}
+
 		for _, res := range resList.APIResources {
-			// ignore other groups
-			if res.Group != gk.Group || res.Kind != gk.Kind {
+			if res.Kind != gk.Kind {
 				continue
 			}
 
@@ -106,13 +116,17 @@ func (c *Client) RetrieveCRD(ctx context.Context, gk schema.GroupKind) (*apiexte
 				subresourcesPerVersion[res.Version] = list
 			}
 
-			availableVersions.Insert(res.Version)
+			// res.Version is also empty for built-in resources
+			availableVersions.Insert(gv.Version)
 		}
 	}
 
 	if resource == nil {
 		return nil, fmt.Errorf("could not find %v in APIs", gk)
 	}
+
+	// fill-in the missing Group for built-in resources
+	resource.Group = gk.Group
 
 	////////////////////////////////////
 	// If possible, retrieve the GK as its original CRD, which is always preferred
@@ -245,7 +259,7 @@ func (c *Client) RetrieveCRD(ctx context.Context, gk schema.GroupKind) (*apiexte
 
 		protoSchema := modelsByGKV[gvk]
 		if protoSchema == nil {
-			return nil, fmt.Errorf("no models for %v", gk)
+			return nil, fmt.Errorf("no models for %v", gvk)
 		}
 
 		var schemaProps apiextensionsv1.JSONSchemaProps
@@ -299,9 +313,21 @@ func (c *Client) getPreferredVersion(resource *metav1.APIResource) (string, erro
 	}
 
 	for _, resList := range result {
+		// .Group on an APIResource is empty for built-in resources, so we must
+		// parse and check GroupVersion of the entire list.
+		gv, err := schema.ParseGroupVersion(resList.GroupVersion)
+		if err != nil {
+			return "", fmt.Errorf("Kubernetes reported invalid API group version %q: %w", resList.GroupVersion, err)
+		}
+
+		if gv.Group != resource.Group {
+			continue
+		}
+
 		for _, res := range resList.APIResources {
-			if res.Name == resource.Name && res.Group == resource.Group {
-				return res.Version, nil
+			if res.Name == resource.Name {
+				// res.Version is empty for built-in resources
+				return gv.Version, nil
 			}
 		}
 	}
