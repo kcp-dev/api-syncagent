@@ -17,8 +17,8 @@ limitations under the License.
 package apiexport
 
 import (
-	"cmp"
 	"slices"
+	"strings"
 
 	"github.com/kcp-dev/api-syncagent/internal/resources/reconciling"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
@@ -34,16 +34,13 @@ import (
 func (r *Reconciler) createAPIExportReconciler(availableResourceSchemas sets.Set[string], claimedResourceKinds sets.Set[string], agentName string, apiExportName string) reconciling.NamedAPIExportReconcilerFactory {
 	return func() (string, reconciling.APIExportReconciler) {
 		return apiExportName, func(existing *kcpdevv1alpha1.APIExport) (*kcpdevv1alpha1.APIExport, error) {
-			known := sets.New(existing.Spec.LatestResourceSchemas...)
-
 			if existing.Annotations == nil {
 				existing.Annotations = map[string]string{}
 			}
 			existing.Annotations[syncagentv1alpha1.AgentNameAnnotation] = agentName
 
-			// we only ever add new schemas
-			result := known.Union(availableResourceSchemas)
-			existing.Spec.LatestResourceSchemas = sets.List(result)
+			// combine existing schemas with new ones
+			existing.Spec.LatestResourceSchemas = mergeResourceSchemas(existing.Spec.LatestResourceSchemas, availableResourceSchemas)
 
 			// To allow admins to configure additional permission claims, sometimes
 			// useful for debugging, we do not override the permission claims, but
@@ -73,11 +70,11 @@ func (r *Reconciler) createAPIExportReconciler(availableResourceSchemas sets.Set
 			// prevent reconcile loops by ensuring a stable order
 			slices.SortFunc(existing.Spec.PermissionClaims, func(a, b kcpdevv1alpha1.PermissionClaim) int {
 				if a.Group != b.Group {
-					return cmp.Compare(a.Group, b.Group)
+					return strings.Compare(a.Group, b.Group)
 				}
 
 				if a.Resource != b.Resource {
-					return cmp.Compare(a.Resource, b.Resource)
+					return strings.Compare(a.Resource, b.Resource)
 				}
 
 				return 0
@@ -86,4 +83,39 @@ func (r *Reconciler) createAPIExportReconciler(availableResourceSchemas sets.Set
 			return existing, nil
 		}
 	}
+}
+
+func mergeResourceSchemas(existing []string, configured sets.Set[string]) []string {
+	var result []string
+
+	// first we copy all ARS that are coming from the PublishedResources
+	knownResources := sets.New[string]()
+	for _, schema := range configured.UnsortedList() {
+		result = append(result, schema)
+		knownResources.Insert(parseResourceGroup(schema))
+	}
+
+	// Now we include all other existing ARS that use unknown resources;
+	// this both allows an APIExport to contain "unmanaged" ARS, and also
+	// will purposefully leave behind ARS for deleted PublishedResources,
+	// allowing cleanup to take place outside of the agent's control.
+	for _, schema := range existing {
+		if !knownResources.Has(parseResourceGroup(schema)) {
+			result = append(result, schema)
+		}
+	}
+
+	// for stability and beauty, sort the schemas
+	slices.SortFunc(result, func(a, b string) int {
+		return strings.Compare(parseResourceGroup(a), parseResourceGroup(b))
+	})
+
+	return result
+}
+
+func parseResourceGroup(schema string) string {
+	// <version>.<resource>.<group>
+	parts := strings.SplitN(schema, ".", 2)
+
+	return parts[1]
 }
