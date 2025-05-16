@@ -2,8 +2,6 @@ module github.com/kcp-dev/api-syncagent
 
 go 1.23.0
 
-toolchain go1.24.0
-
 replace github.com/kcp-dev/api-syncagent/sdk => ./sdk
 
 replace (

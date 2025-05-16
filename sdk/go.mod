@@ -2,8 +2,6 @@ module github.com/kcp-dev/api-syncagent/sdk
 
 go 1.23.0
 
-toolchain go1.24.0
-
 require (
 	github.com/kcp-dev/apimachinery/v2 v2.0.1-0.20250223115924-431177b024f3
 	github.com/kcp-dev/client-go v0.0.0-20250223133118-3dea338dc267
