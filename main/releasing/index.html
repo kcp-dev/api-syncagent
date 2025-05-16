@@ -8,13 +8,11 @@
       
       
       
-        <link rel="canonical" href="https://docs.kcp.io/api-syncagent/main/consuming-services/">
+        <link rel="canonical" href="https://docs.kcp.io/api-syncagent/main/releasing/">
       
       
-        <link rel="prev" href="../publish-resources/">
+        <link rel="prev" href="../faq/">
       
-      
-        <link rel="next" href="../faq/">
       
       
       <link rel="icon" href="../favicons/favicon.ico">
@@ -22,7 +20,7 @@
     
     
       
-        <title>Consuming Services - api-syncagent</title>
+        <title>Release Process - api-syncagent</title>
       
     
     
@@ -76,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#consuming-services" class="md-skip">
+        <a href="#release-process" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Consuming Services
+              Release Process
             
           </span>
         </div>
@@ -279,11 +277,9 @@
         
   
   
-    
   
-  
-    <li class="md-tabs__item md-tabs__item--active">
-      <a href="./" class="md-tabs__link">
+    <li class="md-tabs__item">
+      <a href="../consuming-services/" class="md-tabs__link">
         
   
     
@@ -315,9 +311,11 @@
         
   
   
+    
   
-    <li class="md-tabs__item">
-      <a href="../releasing/" class="md-tabs__link">
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
         
   
     
@@ -437,30 +435,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Consuming Services
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../consuming-services/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -469,44 +447,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#background" class="md-nav__link">
-    <span class="md-ellipsis">
-      Background
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#consuming-a-service" class="md-nav__link">
-    <span class="md-ellipsis">
-      Consuming a Service
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -535,10 +475,30 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../releasing/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Release Process
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -547,6 +507,53 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequisites
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#minor-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      Minor Release
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#patch-releases" class="md-nav__link">
+    <span class="md-ellipsis">
+      Patch Releases
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -578,18 +585,27 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#background" class="md-nav__link">
+  <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
-      Background
+      Prerequisites
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#consuming-a-service" class="md-nav__link">
+  <a href="#minor-release" class="md-nav__link">
     <span class="md-ellipsis">
-      Consuming a Service
+      Minor Release
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#patch-releases" class="md-nav__link">
+    <span class="md-ellipsis">
+      Patch Releases
     </span>
   </a>
   
@@ -613,62 +629,32 @@
   
 
 
-<h1 id="consuming-services">Consuming Services</h1>
-<p>This document describes how to use (consume) services offered by a Sync Agent.</p>
-<h2 id="background">Background</h2>
-<p>A "service" defines a unique Kubernetes API Group and offers a number of resources (types) to
-use. A service could offer certificate management, databases, cloud infrastructure or any other set
-of Kubernetes resources.</p>
-<p>Services are provided by service owners, who run their own Kubernetes clusters and take care of the
-maintenance and scaling tasks for the workload provisioned by all users of the service(s) they
-offer.</p>
-<p>A Service provided by a Sync Agent should not be confused with a Kubernetes Service. Internally, a
-"Sync Agent Service" is ultimately translated into a kcp <code>APIExport</code> with a number of
-<code>APIResourceSchemas</code> (which are more or less equivalent to CRDs).</p>
-<h2 id="consuming-a-service">Consuming a Service</h2>
-<p>To consume a service (or to make use of an <code>APIExport</code>) you have to create an <code>APIBinding</code> object
-in the kcp workspace where the service should be used. This section assumes that you are familiar
-with kcp on the command line and have the kcp kubectl plugin installed.</p>
-<p>First you need to get the kubeconfig for accessing your kcp workspaces. Once you have set your
-kubeconfig up, make sure you're in the correct namespace by using
-<code>kubectl ws &lt;path to your workspace&gt;</code>. Use <code>kubectl ws .</code> if you're unsure where you're at.</p>
-<p>To enable a Service, use <code>kcp bind apiexport</code> and specify the path to and name of the <code>APIExport</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># kubectl kcp bind apiexport &lt;path to APIExport&gt;:&lt;API Group of the Service&gt;</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>kubectl<span class="w"> </span>kcp<span class="w"> </span><span class="nb">bind</span><span class="w"> </span>apiexport<span class="w"> </span>:root:my-org:my.fancy.api
-</code></pre></div>
-<p>Without the plugin, you can create an <code>APIBinding</code> manually, simply <code>kubectl apply</code> this:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apis.kcp.io/v1alpha1</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">APIBinding</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">metadata</span><span class="p">:</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my.fancy.api</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nt">spec</span><span class="p">:</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">reference</span><span class="p">:</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">export</span><span class="p">:</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my.fancy.api</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">      </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">root:my-org</span>
-</code></pre></div>
-<p>Shortly after, the new API will be available in the workspace. Check via <code>kubectl api-resources</code>.
-You can now create objects for types in that API group to your liking and they will be synced and
-processed behind the scenes.</p>
-<p>Note that a Service often has related resources, often Secrets and ConfigMaps. You must explicitly
-allow the Service to access these in your workspace and this means editing/patching the <code>APIBinding</code>
-object (the kcp kubectl plugin currently has no support for managing permission claims). For each of
-the claimed resources, you have to accept or reject them:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">spec</span><span class="p">:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">permissionClaims</span><span class="p">:</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="c1"># Nearly all Sync Agents require access to namespaces, rejecting this will</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="c1"># most likely break the Service, even more than rejecting any other claim.</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">all</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nt">resources</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">namespaces</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">      </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Accepted</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">all</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">      </span><span class="nt">resources</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">secrets</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">      </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Accepted</span><span class="w"> </span><span class="c1"># or Rejected</span>
-</code></pre></div>
-<p>Rejecting a claim will severely impact a Service, if not even break it. Consult with the Service's
-documentation or the service owner if rejecting a claim is supported.</p>
-<p>When you <em>change into</em> (<code>kubctl ws …</code>) a different workspace, kubectl will inform you if there are
-outstanding permission claims that you need to accept or reject.</p>
+<h1 id="release-process">Release Process</h1>
+<p>The guide describes how to release a new version of the api-syncagent.</p>
+<h2 id="prerequisites">Prerequisites</h2>
+<ol>
+<li>Have all desired changes merged and/or cherrypicked into the appropriate
+   release branch.</li>
+</ol>
+<h2 id="minor-release">Minor Release</h2>
+<p>Minor releases (0.x) are tagged directly on the <code>main</code> branch and the <code>v0.X.0</code>
+tag represents where the corresponding <code>release/v0.X</code> branch branches off.</p>
+<ol>
+<li>Checkout the desired <code>main</code> branch commit.</li>
+<li>Tag the main module: <code>git tag -m "version 0.X" v0.X.0</code></li>
+<li>Tag the SDK module: <code>git tag -m "SDK version 0.X" sdk/v0.X.0</code></li>
+<li>Push the tags: <code>git push upstream v0.X.0 sdk/v0.X.0</code></li>
+<li>Create the release branch: <code>git checkout -B release/v0.X</code></li>
+<li>Push the release branch: <code>git push -u upstream release/v0.X</code></li>
+</ol>
+<h2 id="patch-releases">Patch Releases</h2>
+<p>Patch releases (v0.x.y) are tagged with in a release branch.</p>
+<ol>
+<li>Checkout the desired <code>release/v0.X</code> branch commit.</li>
+<li>Tag the main module: <code>git tag -m "version 0.X.Y" v0.X.Y</code></li>
+<li>Tag the SDK module: <code>git tag -m "SDK version 0.X.Y" sdk/v0.X.Y</code></li>
+<li>Push the tags: <code>git push upstream v0.X.Y sdk/v0.X.Y</code></li>
+</ol>
 
 
 
