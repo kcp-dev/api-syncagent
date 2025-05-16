@@ -111,13 +111,16 @@ func ApplyProjection(crd *apiextensionsv1.CustomResourceDefinition, pubRes *sync
 func stripUnwantedVersions(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (*apiextensionsv1.CustomResourceDefinition, error) {
 	src := pubRes.Spec.Resource
 
+	//nolint:staticcheck
 	if src.Version != "" && len(src.Versions) > 0 {
 		return nil, errors.New("cannot configure both .version and .versions in as the source of a PublishedResource")
 	}
 
 	crd.Spec.Versions = slices.DeleteFunc(crd.Spec.Versions, func(ver apiextensionsv1.CustomResourceDefinitionVersion) bool {
 		switch {
+		//nolint:staticcheck
 		case src.Version != "":
+			//nolint:staticcheck
 			return ver.Name != src.Version
 		case len(src.Versions) > 0:
 			return !slices.Contains(src.Versions, ver.Name)
@@ -128,7 +131,9 @@ func stripUnwantedVersions(crd *apiextensionsv1.CustomResourceDefinition, pubRes
 
 	if len(crd.Spec.Versions) == 0 {
 		switch {
+		//nolint:staticcheck
 		case src.Version != "":
+			//nolint:staticcheck
 			return nil, fmt.Errorf("CRD does not contain version %s", src.Version)
 		case len(src.Versions) > 0:
 			return nil, fmt.Errorf("CRD does not contain any of versions %v", src.Versions)
@@ -185,11 +190,13 @@ func projectCRD(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagent
 
 	// We already validated that Version and Versions can be set at the same time.
 
+	//nolint:staticcheck
 	if projection.Version != "" {
 		if size := len(crd.Spec.Versions); size != 1 {
 			return nil, fmt.Errorf("cannot project CRD version to a single version %q because it contains %d versions", projection.Version, size)
 		}
 
+		//nolint:staticcheck
 		crd.Spec.Versions[0].Name = projection.Version
 	} else if len(projection.Versions) > 0 {
 		for _, mut := range projection.Versions {

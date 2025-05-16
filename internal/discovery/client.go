@@ -97,11 +97,9 @@ func (c *Client) RetrieveCRD(ctx context.Context, gk schema.GroupKind) (*apiexte
 			}
 
 			// res could describe the main resource or one of its subresources.
-			name := res.Name
-			subresource := ""
-			if strings.Contains(name, "/") {
-				parts := strings.SplitN(name, "/", 2)
-				name = parts[0]
+			var subresource string
+			if strings.Contains(res.Name, "/") {
+				parts := strings.SplitN(res.Name, "/", 2)
 				subresource = parts[1]
 			}
 
