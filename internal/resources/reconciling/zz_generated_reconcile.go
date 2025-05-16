@@ -64,28 +64,28 @@ func ReconcileAPIExports(ctx context.Context, namedFactories []NamedAPIExportRec
 	return nil
 }
 
-// APIResourceSchemaReconciler defines an interface to create/update APIResourceSchemas.
-type APIResourceSchemaReconciler = func(existing *kcpdevv1alpha1.APIResourceSchema) (*kcpdevv1alpha1.APIResourceSchema, error)
+// APIConversionReconciler defines an interface to create/update APIConversions.
+type APIConversionReconciler = func(existing *kcpdevv1alpha1.APIConversion) (*kcpdevv1alpha1.APIConversion, error)
 
-// NamedAPIResourceSchemaReconcilerFactory returns the name of the resource and the corresponding Reconciler function.
-type NamedAPIResourceSchemaReconcilerFactory = func() (name string, reconciler APIResourceSchemaReconciler)
+// NamedAPIConversionReconcilerFactory returns the name of the resource and the corresponding Reconciler function.
+type NamedAPIConversionReconcilerFactory = func() (name string, reconciler APIConversionReconciler)
 
-// APIResourceSchemaObjectWrapper adds a wrapper so the APIResourceSchemaReconciler matches ObjectReconciler.
+// APIConversionObjectWrapper adds a wrapper so the APIConversionReconciler matches ObjectReconciler.
 // This is needed as Go does not support function interface matching.
-func APIResourceSchemaObjectWrapper(reconciler APIResourceSchemaReconciler) reconciling.ObjectReconciler {
+func APIConversionObjectWrapper(reconciler APIConversionReconciler) reconciling.ObjectReconciler {
 	return func(existing ctrlruntimeclient.Object) (ctrlruntimeclient.Object, error) {
 		if existing != nil {
-			return reconciler(existing.(*kcpdevv1alpha1.APIResourceSchema))
+			return reconciler(existing.(*kcpdevv1alpha1.APIConversion))
 		}
-		return reconciler(&kcpdevv1alpha1.APIResourceSchema{})
+		return reconciler(&kcpdevv1alpha1.APIConversion{})
 	}
 }
 
-// ReconcileAPIResourceSchemas will create and update the APIResourceSchemas coming from the passed APIResourceSchemaReconciler slice.
-func ReconcileAPIResourceSchemas(ctx context.Context, namedFactories []NamedAPIResourceSchemaReconcilerFactory, namespace string, client ctrlruntimeclient.Client, objectModifiers ...reconciling.ObjectModifier) error {
+// ReconcileAPIConversions will create and update the APIConversions coming from the passed APIConversionReconciler slice.
+func ReconcileAPIConversions(ctx context.Context, namedFactories []NamedAPIConversionReconcilerFactory, namespace string, client ctrlruntimeclient.Client, objectModifiers ...reconciling.ObjectModifier) error {
 	for _, factory := range namedFactories {
 		name, reconciler := factory()
-		reconcileObject := APIResourceSchemaObjectWrapper(reconciler)
+		reconcileObject := APIConversionObjectWrapper(reconciler)
 		reconcileObject = reconciling.CreateWithNamespace(reconcileObject, namespace)
 		reconcileObject = reconciling.CreateWithName(reconcileObject, name)
 
@@ -93,8 +93,8 @@ func ReconcileAPIResourceSchemas(ctx context.Context, namedFactories []NamedAPIR
 			reconcileObject = objectModifier(reconcileObject)
 		}
 
-		if err := reconciling.EnsureNamedObject(ctx, types.NamespacedName{Namespace: namespace, Name: name}, reconcileObject, client, &kcpdevv1alpha1.APIResourceSchema{}, false); err != nil {
-			return fmt.Errorf("failed to ensure APIResourceSchema %s/%s: %w", namespace, name, err)
+		if err := reconciling.EnsureNamedObject(ctx, types.NamespacedName{Namespace: namespace, Name: name}, reconcileObject, client, &kcpdevv1alpha1.APIConversion{}, false); err != nil {
+			return fmt.Errorf("failed to ensure APIConversion %s/%s: %w", namespace, name, err)
 		}
 	}
 
