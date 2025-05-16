@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	kcpapisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -87,6 +89,15 @@ type PublishedResourceSpec struct {
 	// directions during the synchronization.
 	Mutation *ResourceMutationSpec `json:"mutation,omitempty"`
 
+	// Conversions specify rules to convert between different API versions in the selected CRD.
+	// This field is required when more than one version is published into kcp.
+	//
+	// The from and to versions in each conversion refer to the local CRD versions, i.e. before
+	// any projection rules are applied. They will be automatically mutated during reconciliation.
+	Conversions []kcpapisv1alpha1.APIVersionConversion `json:"conversions,omitempty"`
+
+	// Related describes additional objects that belong to a primary object. These related objects
+	// can be synced along the primary object in both directions of the sync.
 	Related []RelatedResourceSpec `json:"related,omitempty"`
 }
 
