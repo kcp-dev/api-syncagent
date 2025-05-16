@@ -22,12 +22,11 @@ limitations under the License.
 package fake
 
 import (
+	applyconfigurationssyncagentv1alpha1 "applyconfiguration/syncagent/v1alpha1"
 	"context"
 	"encoding/json"
 	"fmt"
 
-	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
-	applyconfigurationssyncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/applyconfiguration/syncagent/v1alpha1"
 	"github.com/kcp-dev/logicalcluster/v3"
 
 	kcptesting "github.com/kcp-dev/client-go/third_party/k8s.io/client-go/testing"
@@ -38,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/testing"
 
+	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 	syncagentv1alpha1client "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned/typed/syncagent/v1alpha1"
 )
 

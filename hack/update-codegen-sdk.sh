@@ -19,43 +19,55 @@ set -euo pipefail
 cd $(dirname $0)/..
 source hack/lib.sh
 
-BOILERPLATE_HEADER="$(realpath hack/boilerplate/boilerplate.go.txt)"
+BOILERPLATE_HEADER="$(realpath hack/boilerplate/generated/boilerplate.go.txt)"
+SDK_MODULE="github.com/kcp-dev/api-syncagent/sdk"
+APIS_PKG="$SDK_MODULE/apis"
 
-BASE=github.com/kcp-dev/api-syncagent
-MODULE="$BASE/sdk"
-SDK_DIR=sdk
-SDK_PKG="$MODULE"
-APIS_PKG="$MODULE/apis"
+mkdir -p _tools
+export GOBIN=$(realpath _tools)
 
 set -x
-rm -rf -- $SDK_DIR/{applyconfiguration,clientset,informers,listers}
 
-go run k8s.io/code-generator/cmd/applyconfiguration-gen \
+go install k8s.io/code-generator/cmd/applyconfiguration-gen
+go install k8s.io/code-generator/cmd/client-gen
+go install github.com/kcp-dev/code-generator/v2
+go install github.com/openshift-eng/openshift-goimports
+go install sigs.k8s.io/controller-tools/cmd/controller-gen
+
+# these are types only used for testing the syncer
+$GOBIN/controller-gen \
+  "object:headerFile=$BOILERPLATE_HEADER" \
+  paths=./internal/sync/apis/...
+
+cd sdk
+rm -rf -- applyconfiguration clientset informers listers
+
+$GOBIN/controller-gen \
+  "object:headerFile=$BOILERPLATE_HEADER" \
+  paths=./apis/...
+
+$GOBIN/applyconfiguration-gen \
   --go-header-file "$BOILERPLATE_HEADER" \
-  --output-dir $SDK_DIR/applyconfiguration \
-  --output-pkg $SDK_PKG/applyconfiguration \
-  $APIS_PKG/syncagent/v1alpha1
+  --output-dir applyconfiguration \
+  --output-pkg $SDK_MODULE/applyconfiguration \
+  ./apis/...
 
-go run k8s.io/code-generator/cmd/client-gen \
-  --input-base "" \
-  --input $APIS_PKG/syncagent/v1alpha1 \
+$GOBIN/client-gen \
+  --go-header-file "$BOILERPLATE_HEADER" \
+  --output-dir clientset \
+  --output-pkg $SDK_MODULE/clientset \
   --clientset-name versioned \
-  --go-header-file "$BOILERPLATE_HEADER" \
-  --output-dir $SDK_DIR/clientset \
-  --output-pkg $SDK_PKG/clientset
+  --input-base $APIS_PKG \
+  --input syncagent/v1alpha1
 
-go run github.com/kcp-dev/code-generator/v2 \
-  "client:headerFile=$BOILERPLATE_HEADER,apiPackagePath=$APIS_PKG,outputPackagePath=$SDK_PKG,singleClusterClientPackagePath=$SDK_PKG/clientset/versioned,singleClusterApplyConfigurationsPackagePath=$SDK_PKG/applyconfiguration" \
-  "informer:headerFile=$BOILERPLATE_HEADER,apiPackagePath=$APIS_PKG,outputPackagePath=$SDK_PKG,singleClusterClientPackagePath=$SDK_PKG/clientset/versioned" \
+$GOBIN/code-generator \
+  "client:headerFile=$BOILERPLATE_HEADER,apiPackagePath=$APIS_PKG,outputPackagePath=$SDK_MODULE,singleClusterClientPackagePath=$SDK_MODULE/clientset/versioned,singleClusterApplyConfigurationsPackagePath=applyconfiguration" \
+  "informer:headerFile=$BOILERPLATE_HEADER,apiPackagePath=$APIS_PKG,outputPackagePath=$SDK_MODULE,singleClusterClientPackagePath=$SDK_MODULE/clientset/versioned" \
   "lister:headerFile=$BOILERPLATE_HEADER,apiPackagePath=$APIS_PKG" \
-  "paths=./sdk/apis/..." \
-  "output:dir=$SDK_DIR"
+  "paths=./apis/..." \
+  "output:dir=."
 
 # Use openshift's import fixer because gimps fails to parse some of the files;
 # its output is identical to how gimps would sort the imports, but it also fixes
 # the misplaced go:build directives.
-for submodule in "applyconfiguration" "clientset" "informers" "listers"; do
-  go run github.com/openshift-eng/openshift-goimports \
-    --module "$MODULE/$submodule" \
-    --path "$SDK_DIR/$submodule"
-done
+$GOBIN/openshift-goimports .

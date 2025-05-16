@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The KCP Authors.
+Copyright The KCP Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,10 +21,9 @@ package v1alpha1
 import (
 	"net/http"
 
-	v1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
-
 	rest "k8s.io/client-go/rest"
 
+	v1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 	"github.com/kcp-dev/api-syncagent/sdk/clientset/versioned/scheme"
 )
 

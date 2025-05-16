@@ -19,17 +19,16 @@ set -euo pipefail
 cd $(dirname $0)/..
 source hack/lib.sh
 
-sed="sed"
-[ "$(command -v gsed)" ] && sed="gsed"
+mkdir -p _tools
+export GOBIN=$(realpath _tools)
+
+go install k8c.io/reconciler/cmd/reconciler-gen
+go install sigs.k8s.io/controller-tools/cmd/controller-gen
 
 echodate "Generating reconciling helpers…"
 
 reconcileHelpers=internal/resources/reconciling/zz_generated_reconcile.go
-go run k8c.io/reconciler/cmd/reconciler-gen --config hack/reconciling.yaml > $reconcileHelpers
-
-currentYear=$(date +%Y)
-$sed -i "s/Copyright YEAR/Copyright $currentYear/g" $reconcileHelpers
-$sed -i "s/Copyright © YEAR/Copyright © $currentYear/g" $reconcileHelpers
+$GOBIN/reconciler-gen --config hack/reconciling.yaml > $reconcileHelpers
 
 CRD_DIR=deploy/crd
 KCP_CRD_DIR="$CRD_DIR/kcp.io"
@@ -38,17 +37,14 @@ mkdir -p "$KCP_CRD_DIR"
 
 echodate "Generating openAPI v3 CRDs…"
 
-# this also generates the deepcopy funcs
-go run sigs.k8s.io/controller-tools/cmd/controller-gen \
+$GOBIN/controller-gen \
   crd \
-  object:headerFile=./hack/boilerplate/boilerplate.go.txt \
   paths=./sdk/apis/... \
   output:crd:dir=./$KCP_CRD_DIR
 
 # these are types only used for testing the syncer
-go run sigs.k8s.io/controller-tools/cmd/controller-gen \
+$GOBIN/controller-gen \
   crd \
-  object:headerFile=./hack/boilerplate/boilerplate.go.txt \
   paths=./internal/sync/apis/... \
   output:crd:dir=./internal/sync/crd/
 

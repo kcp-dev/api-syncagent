@@ -25,10 +25,6 @@ import (
 	"context"
 	"time"
 
-	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
-	scopedclientset "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned"
-	clientset "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned/cluster"
-	syncagentv1alpha1listers "github.com/kcp-dev/api-syncagent/sdk/listers/syncagent/v1alpha1"
 	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
 	kcpinformers "github.com/kcp-dev/apimachinery/v2/third_party/informers"
 	"github.com/kcp-dev/logicalcluster/v3"
@@ -38,7 +34,11 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 
+	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
+	scopedclientset "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned"
+	clientset "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned/cluster"
 	"github.com/kcp-dev/api-syncagent/sdk/informers/externalversions/internalinterfaces"
+	syncagentv1alpha1listers "github.com/kcp-dev/api-syncagent/sdk/listers/syncagent/v1alpha1"
 )
 
 // PublishedResourceClusterInformer provides access to a shared informer and lister for

@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The KCP Authors.
+Copyright The KCP Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,12 +19,11 @@ limitations under the License.
 package applyconfiguration
 
 import (
-	v1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
-
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	testing "k8s.io/client-go/testing"
 
+	v1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 	internal "github.com/kcp-dev/api-syncagent/sdk/applyconfiguration/internal"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/applyconfiguration/syncagent/v1alpha1"
 )

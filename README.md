@@ -5,6 +5,21 @@
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kcp-dev/api-syncagent?sort=semver)](https://img.shields.io/github/v/release/kcp-dev/api-syncagent?sort=semver)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fkcp-dev%2Fapi-syncagent.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fkcp-dev%2Fapi-syncagent?ref=badge_shield)
 
+The kcp API Sync Agent is a Kubernetes controller capable of synchronizing objects from many kcp
+workspaces onto a single Kubernetes cluster (with kcp being the source of truth). In doing so it will
+move the desired state (usually the spec) of an object from kcp to the local cluster where the agent
+is running, and move the current object status back up into kcp. The agent can also sync so-called
+related objects, like a Secret belonging to a Certificate, in both directions.
+
+The agent can be used to provide an API in kcp and then serving it from a remote Kubernetes cluster
+where the actual workload is then processed, usually by a 3rd-party operator. In many situations the
+synchronized objects are further processed using tools like Crossplane.
+
+## Documentation
+
+Please visit [https://docs.kcp.io/api-syncagent](https://docs.kcp.io/api-syncagent) for the latest
+documentation.
+
 ## Troubleshooting
 
 If you encounter problems, please [file an issue][1].

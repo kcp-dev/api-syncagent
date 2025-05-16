@@ -25,6 +25,7 @@ nav:
   - Publishing Resources: publish-resources.md
   - Consuming Services: consuming-services.md
   - FAQ: faq.md
+  - Release Process: releasing.md
 
 # Site content
 docs_dir: 'content'

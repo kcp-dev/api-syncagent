@@ -22,11 +22,22 @@ source hack/lib.sh
 make --no-print-directory _tools/boilerplate
 
 echo "Checking file boilerplates…"
+
+set -x
+
 _tools/boilerplate \
   -boilerplates hack/boilerplate \
   -exclude .github \
   -exclude internal/certificates/triple \
+  -exclude sdk/applyconfiguration \
   -exclude sdk/clientset \
   -exclude sdk/informers \
   -exclude sdk/listers \
   -exclude test/crds
+
+_tools/boilerplate \
+  -boilerplates hack/boilerplate/generated \
+  sdk/applyconfiguration \
+  sdk/clientset \
+  sdk/informers \
+  sdk/listers
