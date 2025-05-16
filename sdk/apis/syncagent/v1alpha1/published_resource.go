@@ -306,7 +306,7 @@ type ResourceProjection struct {
 	Version string `json:"version,omitempty"`
 	// Versions allows to map API versions onto new values in kcp. Leave empty to not modify the
 	// versions.
-	Versions []VersionProjection `json:"versions,omitempty"`
+	Versions map[string]string `json:"versions,omitempty"`
 	// Whether or not the resource is namespaced.
 	// +kubebuilder:validation:Enum=Cluster;Namespaced
 	Scope ResourceScope `json:"scope,omitempty"`
@@ -328,11 +328,6 @@ type ResourceProjection struct {
 	// this to an empty list to remove all categories.
 	// +optional
 	Categories []string `json:"categories"` // not omitempty because we need to distinguish between [] and nil
-}
-
-type VersionProjection struct {
-	From string `json:"from"`
-	To   string `json:"to"`
 }
 
 // ResourceFilter can be used to limit what resources should be included in an operation.

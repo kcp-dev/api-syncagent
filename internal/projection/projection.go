@@ -178,16 +178,6 @@ func projectCRD(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagent
 		crd.Spec.Group = projection.Group
 	}
 
-	indexOfVersion := func(v string) int {
-		for i, version := range crd.Spec.Versions {
-			if version.Name == v {
-				return i
-			}
-		}
-
-		return -1
-	}
-
 	// We already validated that Version and Versions can be set at the same time.
 
 	//nolint:staticcheck
@@ -199,13 +189,12 @@ func projectCRD(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagent
 		//nolint:staticcheck
 		crd.Spec.Versions[0].Name = projection.Version
 	} else if len(projection.Versions) > 0 {
-		for _, mut := range projection.Versions {
-			fromIdx := indexOfVersion(mut.From)
-			if fromIdx < 0 {
-				return nil, fmt.Errorf("cannot project CRD version %s to %s because there is no %s version", mut.From, mut.To, mut.From)
-			}
+		for idx, version := range crd.Spec.Versions {
+			oldVersion := version.Name
 
-			crd.Spec.Versions[fromIdx].Name = mut.To
+			if newVersion := projection.Versions[oldVersion]; newVersion != "" {
+				crd.Spec.Versions[idx].Name = newVersion
+			}
 		}
 
 		// ensure we ended up with a unique set of versions

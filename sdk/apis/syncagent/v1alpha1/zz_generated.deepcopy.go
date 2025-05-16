@@ -419,8 +419,10 @@ func (in *ResourceProjection) DeepCopyInto(out *ResourceProjection) {
 	*out = *in
 	if in.Versions != nil {
 		in, out := &in.Versions, &out.Versions
-		*out = make([]VersionProjection, len(*in))
-		copy(*out, *in)
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 	if in.ShortNames != nil {
 		in, out := &in.ShortNames, &out.ShortNames
