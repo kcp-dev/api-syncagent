@@ -73,8 +73,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &syncagentv1alpha1.SourceResourceDescriptorApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TemplateExpression"):
 		return &syncagentv1alpha1.TemplateExpressionApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("VersionProjection"):
-		return &syncagentv1alpha1.VersionProjectionApplyConfiguration{}
 
 	}
 	return nil

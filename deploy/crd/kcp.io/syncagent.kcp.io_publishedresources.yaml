@@ -324,20 +324,12 @@ spec:
                         Deprecated: Use .versions instead.
                       type: string
                     versions:
+                      additionalProperties:
+                        type: string
                       description: |-
                         Versions allows to map API versions onto new values in kcp. Leave empty to not modify the
                         versions.
-                      items:
-                        properties:
-                          from:
-                            type: string
-                          to:
-                            type: string
-                        required:
-                          - from
-                          - to
-                        type: object
-                      type: array
+                      type: object
                   type: object
                 related:
                   items:
