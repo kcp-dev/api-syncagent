@@ -21,6 +21,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	apisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -107,6 +109,13 @@ func (in *PublishedResourceSpec) DeepCopyInto(out *PublishedResourceSpec) {
 		in, out := &in.Mutation, &out.Mutation
 		*out = new(ResourceMutationSpec)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.Conversions != nil {
+		in, out := &in.Conversions, &out.Conversions
+		*out = make([]apisv1alpha1.APIVersionConversion, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.Related != nil {
 		in, out := &in.Related, &out.Related

@@ -47,6 +47,73 @@ spec:
                 PublishedResourceSpec describes the desired resource publication from a service
                 cluster to kcp.
               properties:
+                conversions:
+                  description: |-
+                    Conversions specify rules to convert between different API versions in the selected CRD.
+                    This field is required when more than one version is published into kcp.
+
+                    The from and to versions in each conversion refer to the local CRD versions, i.e. before
+                    any projection rules are applied. They will be automatically mutated during reconciliation.
+                  items:
+                    description: |-
+                      APIVersionConversion contains rules to convert between two specific API versions in an
+                      APIResourceSchema. Additionally, to avoid data loss when round-tripping from a version that
+                      contains a new field to one that doesn't and back again, you can specify a list of fields to
+                      preserve (these are stored in annotations).
+                    properties:
+                      from:
+                        description: from is the source version.
+                        minLength: 1
+                        pattern: ^v[1-9][0-9]*([a-z]+[1-9][0-9]*)?$
+                        type: string
+                      preserve:
+                        description: |-
+                          preserve contains a list of JSONPath expressions to fields to preserve in the originating version
+                          of the object, relative to its root, such as '.spec.name.first'.
+                        items:
+                          type: string
+                        type: array
+                      rules:
+                        description: rules contains field-specific conversion expressions.
+                        items:
+                          description: APIConversionRule specifies how to convert a single field.
+                          properties:
+                            destination:
+                              description: |-
+                                destination is a JSONPath expression to the field in the target version of the object, relative to
+                                its root, such as '.spec.name.first'.
+                              minLength: 1
+                              type: string
+                            field:
+                              description: |-
+                                field is a JSONPath expression to the field in the originating version of the object, relative to its root, such
+                                as '.spec.name.first'.
+                              minLength: 1
+                              type: string
+                            transformation:
+                              description: |-
+                                transformation is an optional CEL expression used to execute user-specified rules to transform the
+                                originating field -- identified by 'self' -- to the destination field.
+                              type: string
+                          required:
+                            - destination
+                            - field
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                          - destination
+                        x-kubernetes-list-type: map
+                      to:
+                        description: to is the target version.
+                        minLength: 1
+                        pattern: ^v[1-9][0-9]*([a-z]+[1-9][0-9]*)?$
+                        type: string
+                    required:
+                      - from
+                      - rules
+                      - to
+                    type: object
+                  type: array
                 enableWorkspacePaths:
                   description: |-
                     EnableWorkspacePaths toggles whether the Sync Agent will not just store the kcp
@@ -340,6 +407,9 @@ spec:
                       type: array
                   type: object
                 related:
+                  description: |-
+                    Related describes additional objects that belong to a primary object. These related objects
+                    can be synced along the primary object in both directions of the sync.
                   items:
                     properties:
                       identifier:
