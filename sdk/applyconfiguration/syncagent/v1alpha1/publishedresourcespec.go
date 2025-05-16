@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1alpha1
 
+import (
+	apisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+)
+
 // PublishedResourceSpecApplyConfiguration represents a declarative configuration of the PublishedResourceSpec type for use
 // with apply.
 type PublishedResourceSpecApplyConfiguration struct {
@@ -27,6 +31,7 @@ type PublishedResourceSpecApplyConfiguration struct {
 	EnableWorkspacePaths *bool                                       `json:"enableWorkspacePaths,omitempty"`
 	Projection           *ResourceProjectionApplyConfiguration       `json:"projection,omitempty"`
 	Mutation             *ResourceMutationSpecApplyConfiguration     `json:"mutation,omitempty"`
+	Conversions          []apisv1alpha1.APIVersionConversion         `json:"conversions,omitempty"`
 	Related              []RelatedResourceSpecApplyConfiguration     `json:"related,omitempty"`
 }
 
@@ -81,6 +86,16 @@ func (b *PublishedResourceSpecApplyConfiguration) WithProjection(value *Resource
 // If called multiple times, the Mutation field is set to the value of the last call.
 func (b *PublishedResourceSpecApplyConfiguration) WithMutation(value *ResourceMutationSpecApplyConfiguration) *PublishedResourceSpecApplyConfiguration {
 	b.Mutation = value
+	return b
+}
+
+// WithConversions adds the given value to the Conversions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Conversions field.
+func (b *PublishedResourceSpecApplyConfiguration) WithConversions(values ...apisv1alpha1.APIVersionConversion) *PublishedResourceSpecApplyConfiguration {
+	for i := range values {
+		b.Conversions = append(b.Conversions, values[i])
+	}
 	return b
 }
 

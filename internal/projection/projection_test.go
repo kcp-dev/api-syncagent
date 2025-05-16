@@ -21,6 +21,7 @@ import (
 
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -41,18 +42,14 @@ func TestPublishedResourceSourceGVK(t *testing.T) {
 		},
 	}
 
-	gvk := PublishedResourceSourceGVK(&pubRes)
+	gk := PublishedResourceSourceGK(&pubRes)
 
-	if gvk.Group != apiGroup {
-		t.Errorf("Expected API group to be %q, but got %q.", apiGroup, gvk.Group)
+	if gk.Group != apiGroup {
+		t.Errorf("Expected API group to be %q, but got %q.", apiGroup, gk.Group)
 	}
 
-	if gvk.Version != version {
-		t.Errorf("Expected version to be %q, but got %q.", version, gvk.Version)
-	}
-
-	if gvk.Kind != kind {
-		t.Errorf("Expected kind to be %q, but got %q.", kind, gvk.Kind)
+	if gk.Kind != kind {
+		t.Errorf("Expected kind to be %q, but got %q.", kind, gk.Kind)
 	}
 }
 
@@ -69,6 +66,22 @@ func TestPublishedResourceProjectedGVK(t *testing.T) {
 				APIGroup: apiGroup,
 				Version:  version,
 				Kind:     kind,
+			},
+		},
+	}
+
+	crd := &apiextensionsv1.CustomResourceDefinition{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: apiGroup,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Kind: kind,
+			},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    version,
+					Served:  true,
+					Storage: true,
+				},
 			},
 		},
 	}
@@ -110,7 +123,10 @@ func TestPublishedResourceProjectedGVK(t *testing.T) {
 			pr := pubRes.DeepCopy()
 			pr.Spec.Projection = testcase.projection
 
-			gvk := PublishedResourceProjectedGVK(pr)
+			gvk, err := PublishedResourceProjectedGVK(crd, pr)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
 
 			if gvk.Group != testcase.expected.Group {
 				t.Errorf("Expected API group to be %q, but got %q.", testcase.expected.Group, gvk.Group)

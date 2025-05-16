@@ -27,6 +27,7 @@ import (
 type ResourceProjectionApplyConfiguration struct {
 	Group      *string                 `json:"group,omitempty"`
 	Version    *string                 `json:"version,omitempty"`
+	Versions   map[string]string       `json:"versions,omitempty"`
 	Scope      *v1alpha1.ResourceScope `json:"scope,omitempty"`
 	Kind       *string                 `json:"kind,omitempty"`
 	Plural     *string                 `json:"plural,omitempty"`
@@ -53,6 +54,20 @@ func (b *ResourceProjectionApplyConfiguration) WithGroup(value string) *Resource
 // If called multiple times, the Version field is set to the value of the last call.
 func (b *ResourceProjectionApplyConfiguration) WithVersion(value string) *ResourceProjectionApplyConfiguration {
 	b.Version = &value
+	return b
+}
+
+// WithVersions puts the entries into the Versions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the entries provided by each call will be put on the Versions field,
+// overwriting an existing map entries in Versions field with the same key.
+func (b *ResourceProjectionApplyConfiguration) WithVersions(entries map[string]string) *ResourceProjectionApplyConfiguration {
+	if b.Versions == nil && len(entries) > 0 {
+		b.Versions = make(map[string]string, len(entries))
+	}
+	for k, v := range entries {
+		b.Versions[k] = v
+	}
 	return b
 }
 

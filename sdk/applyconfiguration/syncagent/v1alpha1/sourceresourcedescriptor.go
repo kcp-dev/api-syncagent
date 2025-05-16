@@ -21,9 +21,10 @@ package v1alpha1
 // SourceResourceDescriptorApplyConfiguration represents a declarative configuration of the SourceResourceDescriptor type for use
 // with apply.
 type SourceResourceDescriptorApplyConfiguration struct {
-	APIGroup *string `json:"apiGroup,omitempty"`
-	Version  *string `json:"version,omitempty"`
-	Kind     *string `json:"kind,omitempty"`
+	APIGroup *string  `json:"apiGroup,omitempty"`
+	Version  *string  `json:"version,omitempty"`
+	Versions []string `json:"versions,omitempty"`
+	Kind     *string  `json:"kind,omitempty"`
 }
 
 // SourceResourceDescriptorApplyConfiguration constructs a declarative configuration of the SourceResourceDescriptor type for use with
@@ -45,6 +46,16 @@ func (b *SourceResourceDescriptorApplyConfiguration) WithAPIGroup(value string) 
 // If called multiple times, the Version field is set to the value of the last call.
 func (b *SourceResourceDescriptorApplyConfiguration) WithVersion(value string) *SourceResourceDescriptorApplyConfiguration {
 	b.Version = &value
+	return b
+}
+
+// WithVersions adds the given value to the Versions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Versions field.
+func (b *SourceResourceDescriptorApplyConfiguration) WithVersions(values ...string) *SourceResourceDescriptorApplyConfiguration {
+	for i := range values {
+		b.Versions = append(b.Versions, values[i])
+	}
 	return b
 }
 

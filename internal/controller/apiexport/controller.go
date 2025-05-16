@@ -19,6 +19,7 @@ package apiexport
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/kcp-dev/logicalcluster/v3"
 	"go.uber.org/zap"
@@ -121,12 +122,9 @@ func (r *Reconciler) reconcile(ctx context.Context) error {
 	}
 
 	// filter out those PRs that have not yet been processed into an ARS
-	filteredPubResources := []syncagentv1alpha1.PublishedResource{}
-	for i, pubResource := range pubResources.Items {
-		if pubResource.Status.ResourceSchemaName != "" {
-			filteredPubResources = append(filteredPubResources, pubResources.Items[i])
-		}
-	}
+	filteredPubResources := slices.DeleteFunc(pubResources.Items, func(pr syncagentv1alpha1.PublishedResource) bool {
+		return pr.Status.ResourceSchemaName == ""
+	})
 
 	// for each PR, we note down the created ARS and also the GVKs of related resources
 	arsList := sets.New[string]()
