@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -69,6 +70,22 @@ func TestPublishedResourceProjectedGVK(t *testing.T) {
 		},
 	}
 
+	crd := &apiextensionsv1.CustomResourceDefinition{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: apiGroup,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Kind: kind,
+			},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    version,
+					Served:  true,
+					Storage: true,
+				},
+			},
+		},
+	}
+
 	testcases := []struct {
 		name       string
 		projection *syncagentv1alpha1.ResourceProjection
@@ -106,7 +123,10 @@ func TestPublishedResourceProjectedGVK(t *testing.T) {
 			pr := pubRes.DeepCopy()
 			pr.Spec.Projection = testcase.projection
 
-			gvk := PublishedResourceProjectedGVK(pr)
+			gvk, err := PublishedResourceProjectedGVK(crd, pr)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
 
 			if gvk.Group != testcase.expected.Group {
 				t.Errorf("Expected API group to be %q, but got %q.", testcase.expected.Group, gvk.Group)

@@ -39,32 +39,49 @@ func PublishedResourceSourceGK(pubRes *syncagentv1alpha1.PublishedResource) sche
 	}
 }
 
+func PublishedResourceSourceGVK(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (schema.GroupVersionKind, error) {
+	storageVersion := getStorageVersion(crd)
+	if storageVersion == "" {
+		return schema.GroupVersionKind{}, errors.New("CRD does not contain a storage version")
+	}
+
+	sourceGV := PublishedResourceSourceGK(pubRes)
+
+	return schema.GroupVersionKind{
+		Group:   sourceGV.Group,
+		Version: storageVersion,
+		Kind:    sourceGV.Kind,
+	}, nil
+}
+
+func getStorageVersion(crd *apiextensionsv1.CustomResourceDefinition) string {
+	for _, version := range crd.Spec.Versions {
+		if version.Storage {
+			return version.Name
+		}
+	}
+
+	return ""
+}
+
 // PublishedResourceProjectedGVK returns the effective GVK after the projection
 // rules have been applied according to the PublishedResource.
-func PublishedResourceProjectedGVK(pubRes *syncagentv1alpha1.PublishedResource) schema.GroupVersionKind {
-	apiGroup := pubRes.Spec.Resource.APIGroup
-	apiVersion := pubRes.Spec.Resource.Version
-	kind := pubRes.Spec.Resource.Kind
+func PublishedResourceProjectedGVK(originalCRD *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (schema.GroupVersionKind, error) {
+	projectedCRD, err := ApplyProjection(originalCRD, pubRes)
+	if err != nil {
+		return schema.GroupVersionKind{}, fmt.Errorf("failed to project CRD: %w", err)
+	}
 
-	if projection := pubRes.Spec.Projection; projection != nil {
-		if v := projection.Group; v != "" {
-			apiGroup = v
-		}
-
-		if v := projection.Version; v != "" {
-			apiVersion = v
-		}
-
-		if k := projection.Kind; k != "" {
-			kind = k
-		}
+	storageVersion := getStorageVersion(projectedCRD)
+	if storageVersion == "" {
+		return schema.GroupVersionKind{}, errors.New("projected CRD does not contain a storage version")
 	}
 
 	return schema.GroupVersionKind{
-		Group:   apiGroup,
-		Version: apiVersion,
-		Kind:    kind,
-	}
+		Group:   projectedCRD.Spec.Group,
+		Version: storageVersion,
+		Kind:    projectedCRD.Spec.Names.Kind,
+	}, nil
 }
 
 func ApplyProjection(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (*apiextensionsv1.CustomResourceDefinition, error) {
