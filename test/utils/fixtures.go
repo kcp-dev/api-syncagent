@@ -164,6 +164,11 @@ func CreateAPIExport(t *testing.T, ctx context.Context, client ctrlruntimeclient
 					Verbs:     []string{"get", "list", "watch", "create"},
 				},
 				{
+					APIGroups: []string{"apis.kcp.io"},
+					Resources: []string{"apiconversions"},
+					Verbs:     []string{"get", "list", "watch", "create", "patch", "update"},
+				},
+				{
 					APIGroups:     []string{"apis.kcp.io"},
 					Resources:     []string{"apiexports/content"},
 					ResourceNames: []string{name},
