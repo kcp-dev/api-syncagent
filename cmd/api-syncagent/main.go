@@ -27,6 +27,7 @@ import (
 	"github.com/kcp-dev/logicalcluster/v3"
 	"github.com/spf13/pflag"
 	"go.uber.org/zap"
+	reconcilerlog "k8c.io/reconciler/pkg/log"
 
 	"github.com/kcp-dev/api-syncagent/internal/controller/apiexport"
 	"github.com/kcp-dev/api-syncagent/internal/controller/apiresourceschema"
@@ -80,6 +81,7 @@ func main() {
 
 	// set the logger used by sigs.k8s.io/controller-runtime
 	ctrlruntimelog.SetLogger(zapr.NewLogger(log.WithOptions(zap.AddCallerSkip(1))))
+	reconcilerlog.SetLogger(sugar)
 
 	if err := run(ctx, sugar, opts); err != nil {
 		sugar.Fatalw("Sync Agent has encountered an error", zap.Error(err))
