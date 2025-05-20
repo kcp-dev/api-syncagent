@@ -20,6 +20,9 @@ const (
 	// AgentNameAnnotation records which Sync Agent has created an APIResourceSchema.
 	AgentNameAnnotation = "syncagent.kcp.io/agent-name"
 
+	// AgentNameLabel records which Sync Agent has created an APIResourceSchema.
+	AgentNameLabel = "syncagent.kcp.io/agent-name"
+
 	// SourceGenerationAnnotation is the annotation on APIResourceSchemas that tells us
 	// what generation of the CRD it was based on. This can be helpful in debugging,
 	// as ARS resources cannot be updated, i.e. changes to CRDs are not reflected in ARS.

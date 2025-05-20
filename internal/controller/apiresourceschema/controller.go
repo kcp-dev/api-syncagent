@@ -225,6 +225,9 @@ func (r *Reconciler) createAPIResourceSchema(ctx context.Context, log *zap.Sugar
 		syncagentv1alpha1.SourceGenerationAnnotation: fmt.Sprintf("%d", projectedCRD.Generation),
 		syncagentv1alpha1.AgentNameAnnotation:        r.agentName,
 	}
+	ars.Labels = map[string]string{
+		syncagentv1alpha1.AgentNameLabel: r.agentName,
+	}
 	ars.Spec.Group = converted.Spec.Group
 	ars.Spec.Names = converted.Spec.Names
 	ars.Spec.Scope = converted.Spec.Scope
