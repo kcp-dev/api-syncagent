@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
+	kcpapisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -477,5 +478,100 @@ func compareSchemalessCRDs(t *testing.T, expected, actual *apiextensionsv1.Custo
 
 	if diff := cmp.Diff(expected.Spec.Versions, actual.Spec.Versions); diff != "" {
 		t.Errorf("Actual CRD versions do not match expectations:\n\n%s", diff)
+	}
+}
+
+func TestProjectConversions(t *testing.T) {
+	testcases := []struct {
+		name        string
+		conversions []kcpapisv1alpha1.APIVersionConversion
+		projection  *syncagentv1alpha1.ResourceProjection
+		expected    []kcpapisv1alpha1.APIVersionConversion
+		expectErr   bool
+	}{
+		{
+			name: "no projections at all",
+			conversions: []kcpapisv1alpha1.APIVersionConversion{{
+				From:  "v1",
+				To:    "v2",
+				Rules: []kcpapisv1alpha1.APIConversionRule{},
+			}},
+			expected: []kcpapisv1alpha1.APIVersionConversion{{
+				From:  "v1",
+				To:    "v2",
+				Rules: []kcpapisv1alpha1.APIConversionRule{},
+			}},
+		},
+		{
+			name: "project versions",
+			conversions: []kcpapisv1alpha1.APIVersionConversion{{
+				From:  "v1",
+				To:    "v2",
+				Rules: []kcpapisv1alpha1.APIConversionRule{{Field: "a"}},
+			}, {
+				From:  "v2",
+				To:    "v3",
+				Rules: []kcpapisv1alpha1.APIConversionRule{{Field: "b"}},
+			}, {
+				From:  "v3",
+				To:    "v1",
+				Rules: []kcpapisv1alpha1.APIConversionRule{{Field: "c"}},
+			}, {
+				From:  "v4",
+				To:    "v2",
+				Rules: []kcpapisv1alpha1.APIConversionRule{{Field: "d"}},
+			}},
+			projection: &syncagentv1alpha1.ResourceProjection{
+				Versions: map[string]string{
+					"v1": "v4",
+					"v2": "v1",
+					"v3": "v3", // project to itself
+					"v4": "v2",
+				},
+			},
+			expected: []kcpapisv1alpha1.APIVersionConversion{{
+				From:  "v4",
+				To:    "v1",
+				Rules: []kcpapisv1alpha1.APIConversionRule{{Field: "a"}},
+			}, {
+				From:  "v1",
+				To:    "v3",
+				Rules: []kcpapisv1alpha1.APIConversionRule{{Field: "b"}},
+			}, {
+				From:  "v3",
+				To:    "v4",
+				Rules: []kcpapisv1alpha1.APIConversionRule{{Field: "c"}},
+			}, {
+				From:  "v2",
+				To:    "v1",
+				Rules: []kcpapisv1alpha1.APIConversionRule{{Field: "d"}},
+			}},
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			pr := &syncagentv1alpha1.PublishedResource{
+				Spec: syncagentv1alpha1.PublishedResourceSpec{
+					Conversions: testcase.conversions,
+					Projection:  testcase.projection,
+				},
+			}
+
+			rules, err := ProjectConversionRules(pr)
+			if err != nil {
+				if !testcase.expectErr {
+					t.Fatalf("Unexpected error: %v", err)
+				}
+
+				return
+			} else if testcase.expectErr {
+				t.Fatalf("Expected an error, but got rules instead:\n\n%+v", rules)
+			}
+
+			if diff := cmp.Diff(testcase.expected, rules); diff != "" {
+				t.Fatalf("Result does not match expectations:\n\n%s", diff)
+			}
+		})
 	}
 }
