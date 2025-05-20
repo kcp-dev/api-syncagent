@@ -32,6 +32,11 @@ func (r *Reconciler) createAPIConversionReconciler(name string, agentName string
 			}
 			existing.Annotations[syncagentv1alpha1.AgentNameAnnotation] = agentName
 
+			if existing.Labels == nil {
+				existing.Labels = map[string]string{}
+			}
+			existing.Labels[syncagentv1alpha1.AgentNameLabel] = agentName
+
 			existing.Spec = kcpdevv1alpha1.APIConversionSpec{
 				Conversions: rules,
 			}
