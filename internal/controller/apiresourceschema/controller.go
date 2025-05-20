@@ -38,12 +38,14 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/kontext"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -88,8 +90,31 @@ func Add(
 		WithOptions(controller.Options{MaxConcurrentReconciles: numWorkers}).
 		// Watch for changes to PublishedResources on the local service cluster
 		For(&syncagentv1alpha1.PublishedResource{}, builder.WithPredicates(predicate.ByLabels(prFilter))).
+		Watches(&apiextensionsv1.CustomResourceDefinition{}, handler.TypedEnqueueRequestsFromMapFunc(reconciler.enqueueMatchingPublishedResources)).
 		Build(reconciler)
+
 	return err
+}
+
+func (r *Reconciler) enqueueMatchingPublishedResources(ctx context.Context, obj ctrlruntimeclient.Object) []reconcile.Request {
+	crd := obj.(*apiextensionsv1.CustomResourceDefinition)
+
+	pubResources := &syncagentv1alpha1.PublishedResourceList{}
+	if err := r.localClient.List(ctx, pubResources); err != nil {
+		runtime.HandleError(err)
+		return nil
+	}
+
+	var requests []reconcile.Request
+	for _, pr := range pubResources.Items {
+		if pr.Spec.Resource.APIGroup == crd.Spec.Group && pr.Spec.Resource.Kind == crd.Spec.Names.Kind {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: ctrlruntimeclient.ObjectKeyFromObject(&pr),
+			})
+		}
+	}
+
+	return requests
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
