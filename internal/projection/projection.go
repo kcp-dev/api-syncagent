@@ -102,6 +102,11 @@ func ProjectCRD(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagent
 	}
 
 	// now we get to actually project something, if desired
+	result, err = projectCRDVersions(result, pubRes)
+	if err != nil {
+		return nil, err
+	}
+
 	result, err = projectCRDNames(result, pubRes)
 	if err != nil {
 		return nil, err
@@ -170,14 +175,10 @@ func adjustStorageVersion(crd *apiextensionsv1.CustomResourceDefinition) (*apiex
 	return crd, nil
 }
 
-func projectCRDNames(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (*apiextensionsv1.CustomResourceDefinition, error) {
+func projectCRDVersions(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (*apiextensionsv1.CustomResourceDefinition, error) {
 	projection := pubRes.Spec.Projection
 	if projection == nil {
 		return crd, nil
-	}
-
-	if projection.Group != "" {
-		crd.Spec.Group = projection.Group
 	}
 
 	// We already validated that Version and Versions can be set at the same time.
@@ -205,12 +206,26 @@ func projectCRDNames(crd *apiextensionsv1.CustomResourceDefinition, pubRes *sync
 			if knownVersions.Has(version.Name) {
 				return nil, fmt.Errorf("CRD contains multiple entries for %s after applying mutation rules", version.Name)
 			}
+			knownVersions.Insert(version.Name)
 		}
 
 		// ensure proper Kubernetes-style version order
 		slices.SortFunc(crd.Spec.Versions, func(a, b apiextensionsv1.CustomResourceDefinitionVersion) int {
 			return version.CompareKubeAwareVersionStrings(a.Name, b.Name)
 		})
+	}
+
+	return crd, nil
+}
+
+func projectCRDNames(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (*apiextensionsv1.CustomResourceDefinition, error) {
+	projection := pubRes.Spec.Projection
+	if projection == nil {
+		return crd, nil
+	}
+
+	if projection.Group != "" {
+		crd.Spec.Group = projection.Group
 	}
 
 	if projection.Kind != "" {
@@ -236,6 +251,9 @@ func projectCRDNames(crd *apiextensionsv1.CustomResourceDefinition, pubRes *sync
 	if projection.ShortNames != nil {
 		crd.Spec.Names.ShortNames = projection.ShortNames
 	}
+
+	// re-calculate CRD name
+	crd.Name = fmt.Sprintf("%s.%s", crd.Spec.Names.Plural, crd.Spec.Group)
 
 	return crd, nil
 }
