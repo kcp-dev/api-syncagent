@@ -17,18 +17,18 @@ Only if you have distinct API groups (and therefore also distinct `PublishedReso
 You cannot currently publish the same API group onto multiple kcp setups. See issue #13 for more
 information.
 
-## What happens when CRDs are updated?
+## Can I have additional resources in APIExports, unmanaged by the Sync Agent?
 
-At the moment, nothing. `APIResourceSchemas` in kcp are immutable and the Sync Agent currently does
-not attempt to update existing schemas in an `APIExport`. If you add a _new_ CRD that you want to
-publish, that's fine, it will be added to the `APIExport`. But changes to existing CRDs require
-manual work.
+Yes, you can. The agent will only ever change those resourceSchemas that match group/resource of
+the configured `PublishedResources`. So if you configure the agent to publish
+`cert-manager.io/Certificate`, this would "claim" all resource schemas ending in
+`.certificates.cert-manager.io`. When updating the `APIExport`, the agent will only touch schemas
+with this suffix and leave all others alone.
 
-To trigger an update:
-
-* remove the `APIResourceSchema` from the `latestResourceSchemas`,
-* delete the `APIResourceSchema` object in kcp,
-* restart the api-syncagent
+This is also used when a `PublishedResource` is deleted: Since the `APIResourceSchema` remains in kcp,
+but is no longer configured in the agent, the agent will simply ignore the schema in the `APIExport`.
+This allows for async cleanup processes to happen before an admin ultimately removes the old
+schema from the `APIExport`.
 
 ## Does the Sync Agent handle permission claims?
 
