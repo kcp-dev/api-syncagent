@@ -18,8 +18,10 @@ For each of the CRDs on the service cluster that should be published, the servic
 `PublishedResource` object, which will contain both which CRD to publish, as well as numerous other
 important settings that influence the behaviour around handling the CRD.
 
-When publishing a resource (CRD), exactly one version is published. All others are ignored from the
-standpoint of the resource synchronization logic.
+When publishing a resource (CRD), service owners can choose to restrict it to a subset of available
+versions and even change API group, versions and names in transit (for example published a v1 from
+the service cluster as v1beta1 within kcp). This process of changing the identity of a CRD is called
+"projection" in the agent.
 
 All published resources together form the APIExport. When a service is enabled in a workspace
 (i.e. it is bound to it), users can manage objects for the projected resources described by the
@@ -46,10 +48,17 @@ spec:
   resource:
     kind: Certificate
     apiGroup: cert-manager.io
-    version: v1
+    versions: [v1]
 ```
 
 However, you will most likely apply more configuration and use features described below.
+
+You always have to select at least one version, and all selected versions must be marked as `served`
+on the service cluster. If the storage version is selected to be published, it stays the storage
+version in kcp. If no storage version is selected, the latest selected version becomes the storage
+version.
+
+For more information refer to the [API lifecycle](api-lifecycle.md).
 
 ### Filtering
 
@@ -70,16 +79,18 @@ spec:
         foo: bar
 ```
 
+The configuration above would mean the agent only synchronizes objects from `my-app` namespaces (in
+each of the kcp workspaces) that also have a `foo=bar` label on them.
+
 ### Schema
 
-**Warning:** The actual CRD schema is always copied verbatim. All projections <!--, mutations -->
-etc. have to take into account that the resource contents must be expressible without changes to the
-schema, so you cannot define entirely new fields in an object that are not defined by the original
-CRD.
+**Warning:** The actual CRD schema is always copied verbatim. All projections, mutations etc. have
+to take into account that the resource contents must be expressible without changes to the schema,
+so you cannot define entirely new fields in an object that are not defined by the original CRD.
 
 ### Projection
 
-For stronger separation of concerns and to enable whitelabelling of services, the type meta for
+For stronger separation of concerns and to enable whitelabelling of services, the type meta for CRDs
 can be projected, i.e. changed between the local service cluster and kcp. You could for example
 rename `Certificate` from cert-manager to `Sertifikat` inside kcp.
 
@@ -103,10 +114,14 @@ metadata:
 spec:
   resource: ...
   projection:
-    version: v1beta1
+    # all of these options are optional
     kind: Sertifikat
     plural: Sertifikater
     shortNames: [serts]
+    versions:
+      # old version => new version;
+      # this must not map multiple versions to the same new version.
+      v1: v1beta1
     # categories: [management]
     # scope: Namespaced # change only when you know what you're doing
 ```
@@ -114,7 +129,7 @@ spec:
 Consumers (end users) in kcp would then ultimately see projected names only. Note that GVK
 projection applies only to the synced object itself and has no effect on the contents of these
 objects. To change the contents, use external solutions like Crossplane to transform objects.
-<!-- To change the contents, use *Mutations*. -->
+To change the contents, use *Mutations*.
 
 ### (Re-)Naming
 
@@ -274,7 +289,7 @@ spec:
   resource:
     kind: Certificate
     apiGroup: cert-manager.io
-    version: v1
+    versions: [v1]
 
   naming:
     # this is where our CA and Issuer live in this example
@@ -360,7 +375,7 @@ spec:
   resource:
     kind: Certificate
     apiGroup: cert-manager.io
-    version: v1
+    versions: [v1]
 
   naming:
     namespace: kube-system
@@ -445,7 +460,7 @@ spec:
   resource:
     kind: Certificate
     apiGroup: cert-manager.io
-    version: v1
+    versions: [v1]
 
   naming:
     # this is where our CA and Issuer live in this example
