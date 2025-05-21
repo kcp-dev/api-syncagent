@@ -34,6 +34,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrlruntime "sigs.k8s.io/controller-runtime"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -284,6 +285,98 @@ func TestARSOnlyContainsSelectedCRDVersion(t *testing.T) {
 
 	if name := ars.Spec.Versions[0].Name; name != theVersion {
 		t.Fatalf("Expected ARS to contain %q, but contains %q.", theVersion, name)
+	}
+}
+
+func TestMultiVersionCRD(t *testing.T) {
+	const (
+		apiExportName = "example.com"
+	)
+
+	// force a non-standard order, because it should not matter for the sync
+	var selectedVersions = []string{"v2", "v1"}
+
+	ctx := context.Background()
+	ctrlruntime.SetLogger(logr.Discard())
+
+	// setup a test environment in kcp
+	orgKubconfig := utils.CreateOrganization(t, ctx, "ars-multi-versions", apiExportName)
+
+	// start a service cluster
+	envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
+		"test/crds/crontab-multi-versions.yaml",
+	})
+
+	// publish Crontabs
+	t.Logf("Publishing CronTabs…")
+	pr := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "publish-crontabs",
+		},
+		Spec: syncagentv1alpha1.PublishedResourceSpec{
+			Resource: syncagentv1alpha1.SourceResourceDescriptor{
+				APIGroup: "example.com",
+				Versions: selectedVersions,
+				Kind:     "CronTab",
+			},
+		},
+	}
+
+	if err := envtestClient.Create(ctx, pr); err != nil {
+		t.Fatalf("Failed to create PublishedResource: %v", err)
+	}
+
+	// let the agent do its thing
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+
+	// wait for the APIExport to be updated
+	t.Logf("Waiting for APIExport to be updated…")
+	orgClient := utils.GetClient(t, orgKubconfig)
+	apiExportKey := types.NamespacedName{Name: apiExportName}
+
+	var arsName string
+	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute, false, func(ctx context.Context) (done bool, err error) {
+		apiExport := &kcpapisv1alpha1.APIExport{}
+		err = orgClient.Get(ctx, apiExportKey, apiExport)
+		if err != nil {
+			return false, err
+		}
+
+		if len(apiExport.Spec.LatestResourceSchemas) == 0 {
+			return false, nil
+		}
+
+		arsName = apiExport.Spec.LatestResourceSchemas[0]
+
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for APIExport to be updated: %v", err)
+	}
+
+	// check the APIResourceSchema
+	ars := &kcpapisv1alpha1.APIResourceSchema{}
+	err = orgClient.Get(ctx, types.NamespacedName{Name: arsName}, ars)
+	if err != nil {
+		t.Fatalf("APIResourceSchema does not exist: %v", err)
+	}
+
+	if len(ars.Spec.Versions) != len(selectedVersions) {
+		t.Fatalf("Expected %d versions to remain in the ARS, but found %d.", len(selectedVersions), len(ars.Spec.Versions))
+	}
+
+	// Projection tests already ensure the correct order, all we have to check
+	// here is that all versions are present (and more importantly that creating
+	// the multi-version ARS has worked at all).
+	expectedVersions := sets.New(selectedVersions...)
+	foundVersions := sets.New[string]()
+
+	for _, v := range ars.Spec.Versions {
+		foundVersions.Insert(v.Name)
+	}
+
+	if !expectedVersions.Equal(foundVersions) {
+		t.Fatalf("Expected versions %v, but ARS contains %v.", sets.List(expectedVersions), sets.List(foundVersions))
 	}
 }
 

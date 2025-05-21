@@ -218,6 +218,13 @@ func (r *Reconciler) createAPIResourceSchema(ctx context.Context, log *zap.Sugar
 	ars.Spec.Scope = converted.Spec.Scope
 	ars.Spec.Versions = converted.Spec.Versions
 
+	if len(converted.Spec.Versions) > 1 {
+		ars.Spec.Conversion = &kcpdevv1alpha1.CustomResourceConversion{
+			// as of kcp 0.27, there is no constant for this
+			Strategy: kcpdevv1alpha1.ConversionStrategyType("None"),
+		}
+	}
+
 	log.With("name", arsName).Info("Creating APIResourceSchema…")
 
 	return r.kcpClient.Create(ctx, ars)
