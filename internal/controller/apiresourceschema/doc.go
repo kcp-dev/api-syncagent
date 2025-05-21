@@ -16,7 +16,7 @@ limitations under the License.
 
 /*
 Package apiresourceschema contains a controller that watches for PublishedResources and CRDs
-and creates a matching APIResourceSchema (ARS) and, optionally, an APIConversion in kcp.
+and creates a matching APIResourceSchema (ARS) in kcp.
 The name of the generated ARS is stored in the PublishedResource's status, so that the
 apiexport controller can find and include it in the generated APIExport.
 
