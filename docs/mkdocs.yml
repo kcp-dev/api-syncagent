@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 site_name: api-syncagent
 repo_url: https://github.com/kcp-dev/api-syncagent
 repo_name: kcp-dev/api-syncagent
@@ -24,6 +23,7 @@ nav:
   - Getting Started: getting-started.md
   - Publishing Resources: publish-resources.md
   - Consuming Services: consuming-services.md
+  - API Lifecycle: api-lifecycle.md
   - FAQ: faq.md
   - Release Process: releasing.md
 
