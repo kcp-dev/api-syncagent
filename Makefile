@@ -53,12 +53,12 @@ $(GOLANGCI_LINT):
 	  ${GOLANGCI_LINT_VERSION}
 
 GIMPS = _tools/gimps
-GIMPS_VERSION = 0.6.0
+GIMPS_VERSION = 0.6.3
 
 .PHONY: $(GIMPS)
 $(GIMPS):
 	@hack/download-tool.sh \
-	  https://github.com/xrstf/gimps/releases/download/v${GIMPS_VERSION}/gimps_${GIMPS_VERSION}_${GOOS}_${GOARCH}.tar.gz \
+	  https://codeberg.org/xrstf/gimps/releases/download/v${GIMPS_VERSION}/gimps_${GIMPS_VERSION}_${GOOS}_${GOARCH}.tar.gz \
 	  gimps \
 	  ${GIMPS_VERSION}
 
