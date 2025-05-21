@@ -160,7 +160,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubR
 	}
 
 	// project the CRD (i.e. strip unwanted versions, rename values etc.)
-	projectedCRD, err := projection.ApplyProjection(crd, pubResource)
+	projectedCRD, err := projection.ProjectCRD(crd, pubResource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply projection rules: %w", err)
 	}

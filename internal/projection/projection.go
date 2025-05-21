@@ -67,7 +67,7 @@ func getStorageVersion(crd *apiextensionsv1.CustomResourceDefinition) string {
 // PublishedResourceProjectedGVK returns the effective GVK after the projection
 // rules have been applied according to the PublishedResource.
 func PublishedResourceProjectedGVK(originalCRD *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (schema.GroupVersionKind, error) {
-	projectedCRD, err := ApplyProjection(originalCRD, pubRes)
+	projectedCRD, err := ProjectCRD(originalCRD, pubRes)
 	if err != nil {
 		return schema.GroupVersionKind{}, fmt.Errorf("failed to project CRD: %w", err)
 	}
@@ -84,7 +84,7 @@ func PublishedResourceProjectedGVK(originalCRD *apiextensionsv1.CustomResourceDe
 	}, nil
 }
 
-func ApplyProjection(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (*apiextensionsv1.CustomResourceDefinition, error) {
+func ProjectCRD(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (*apiextensionsv1.CustomResourceDefinition, error) {
 	result := crd.DeepCopy()
 
 	// reduce the CRD down to the selected versions
