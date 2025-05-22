@@ -516,14 +516,14 @@ func applyTemplateBothSides(relatedOrigin, relatedDest syncSide, origin syncagen
 	_, remoteSide := remapSyncSides(relatedOrigin, relatedDest, origin)
 
 	// evaluate the template for the origin object side
-	ctx := templating.NewRelatedObjectContext(relatedOrigin.object, remoteSide.clusterName, remoteSide.workspacePath)
+	ctx := templating.NewRelatedObjectContext(relatedOrigin.object, origin, remoteSide.clusterName, remoteSide.workspacePath)
 	originValue, err = templating.Render(tpl.Template, ctx)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to evaluate template on origin side: %w", err)
 	}
 
 	// and once more on the other side
-	ctx = templating.NewRelatedObjectContext(relatedDest.object, remoteSide.clusterName, remoteSide.workspacePath)
+	ctx = templating.NewRelatedObjectContext(relatedDest.object, oppositeSide(origin), remoteSide.clusterName, remoteSide.workspacePath)
 	destValue, err = templating.Render(tpl.Template, ctx)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to evaluate template on destination side: %w", err)
@@ -573,4 +573,12 @@ func remapSyncSides(relatedOrigin, relatedDest syncSide, origin syncagentv1alpha
 	}
 
 	return relatedDest, relatedOrigin
+}
+
+func oppositeSide(origin syncagentv1alpha1.RelatedResourceOrigin) syncagentv1alpha1.RelatedResourceOrigin {
+	if origin == syncagentv1alpha1.RelatedResourceOriginKcp {
+		return syncagentv1alpha1.RelatedResourceOriginService
+	}
+
+	return syncagentv1alpha1.RelatedResourceOriginKcp
 }

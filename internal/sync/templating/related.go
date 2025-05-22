@@ -19,12 +19,17 @@ package templating
 import (
 	"github.com/kcp-dev/logicalcluster/v3"
 
+	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// relatedObjectContext is the data available to Go templates when determining
-// the local object name (the `naming` section of a PublishedResource).
+// relatedObjectContext is the data available to Go templates when evaluating
+// the origin of a related object.
 type relatedObjectContext struct {
+	// Side is set to either one of the possible origin values to indicate for
+	// which cluster the template is currently being evaluated for.
+	Side syncagentv1alpha1.RelatedResourceOrigin
 	// Object is the primary object belonging to the related object. Since related
 	// object templates are evaluated twice (once for the origin side and once
 	// for the destination side), object is the primary object on the side the
@@ -39,8 +44,9 @@ type relatedObjectContext struct {
 	ClusterPath logicalcluster.Path
 }
 
-func NewRelatedObjectContext(object *unstructured.Unstructured, clusterName logicalcluster.Name, clusterPath logicalcluster.Path) relatedObjectContext {
+func NewRelatedObjectContext(object *unstructured.Unstructured, side syncagentv1alpha1.RelatedResourceOrigin, clusterName logicalcluster.Name, clusterPath logicalcluster.Path) relatedObjectContext {
 	return relatedObjectContext{
+		Side:        side,
 		Object:      object.Object,
 		ClusterName: clusterName,
 		ClusterPath: clusterPath,
