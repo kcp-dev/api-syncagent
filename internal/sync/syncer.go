@@ -63,21 +63,25 @@ func NewResourceSyncer(
 	agentName string,
 ) (*ResourceSyncer, error) {
 	// create a dummy that represents the type used on the local service cluster
-	localGVK := projection.PublishedResourceSourceGVK(pubRes)
+	localGVK, err := projection.PublishedResourceSourceGVK(localCRD, pubRes)
+	if err != nil {
+		return nil, err
+	}
+
+	// create a dummy that represents the type used on the local service cluster
 	localDummy := &unstructured.Unstructured{}
 	localDummy.SetGroupVersionKind(localGVK)
 
 	// create a dummy unstructured object with the projected GVK inside the workspace
-	remoteGVK := projection.PublishedResourceProjectedGVK(pubRes)
+	remoteGVK, err := projection.PublishedResourceProjectedGVK(localCRD, pubRes)
+	if err != nil {
+		return nil, err
+	}
 
 	// determine whether the CRD has a status subresource in the relevant version
 	subresources := []string{}
-	versionFound := false
-
 	for _, version := range localCRD.Spec.Versions {
-		if version.Name == pubRes.Spec.Resource.Version {
-			versionFound = true
-
+		if version.Name == localGVK.Version {
 			if sr := version.Subresources; sr != nil {
 				if sr.Scale != nil {
 					subresources = append(subresources, "scale")
@@ -87,10 +91,6 @@ func NewResourceSyncer(
 				}
 			}
 		}
-	}
-
-	if !versionFound {
-		return nil, fmt.Errorf("CRD %s does not define version %s requested by PublishedResource", pubRes.Spec.Resource.APIGroup, pubRes.Spec.Resource.Version)
 	}
 
 	return &ResourceSyncer{

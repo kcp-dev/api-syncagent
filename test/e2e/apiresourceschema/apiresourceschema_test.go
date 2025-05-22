@@ -34,8 +34,10 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrlruntime "sigs.k8s.io/controller-runtime"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TestARSAreCreated(t *testing.T) {
@@ -147,51 +149,62 @@ func TestARSAreNotUpdated(t *testing.T) {
 	// let the agent do its thing
 	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
 
-	// wait for the APIExport to be updated
-	t.Logf("Waiting for APIExport to be updated…")
+	// check ARS
+	t.Logf("Waiting for APIResourceSchema to be created…")
 	orgClient := utils.GetClient(t, orgKubconfig)
-	apiExportKey := types.NamespacedName{Name: apiExportName}
 
-	var arsName string
 	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute, false, func(ctx context.Context) (done bool, err error) {
-		apiExport := &kcpapisv1alpha1.APIExport{}
-		err = orgClient.Get(ctx, apiExportKey, apiExport)
+		schemas := &kcpapisv1alpha1.APIResourceSchemaList{}
+		err = orgClient.List(ctx, schemas, ctrlruntimeclient.HasLabels{syncagentv1alpha1.AgentNameLabel})
 		if err != nil {
 			return false, err
 		}
 
-		if len(apiExport.Spec.LatestResourceSchemas) == 0 {
-			return false, nil
-		}
-
-		arsName = apiExport.Spec.LatestResourceSchemas[0]
-
-		return true, nil
+		return len(schemas.Items) == 1, nil
 	})
 	if err != nil {
-		t.Fatalf("Failed to wait for APIExport to be updated: %v", err)
+		t.Fatalf("Failed to wait for APIResourceSchema to be created: %v", err)
+	}
+
+	if err := envtestClient.Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(pr), pr); err != nil {
+		t.Fatalf("Failed to fetch PublishedResource: %v", err)
+	}
+
+	arsName := pr.Status.ResourceSchemaName
+	if arsName == "" {
+		t.Fatal("Expected PublishedResource status to contain ARS name, but value is empty.")
 	}
 
 	// update the CRD
 	t.Logf("Updating CRD (same version, but new schema)…")
 	utils.ApplyCRD(t, ctx, envtestClient, "test/crds/crontab-improved.yaml")
 
-	// give the agent some time to do nothing
-	time.Sleep(3 * time.Second)
+	// wait for the 2nd ARS to appear
+	t.Logf("Waiting for 2nd APIResourceSchema to be created…")
+	err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute, false, func(ctx context.Context) (done bool, err error) {
+		schemas := &kcpapisv1alpha1.APIResourceSchemaList{}
+		err = orgClient.List(ctx, schemas, ctrlruntimeclient.HasLabels{syncagentv1alpha1.AgentNameLabel})
+		if err != nil {
+			return false, err
+		}
 
-	// validate that the APIExport has *not* changed
-	apiExport := &kcpapisv1alpha1.APIExport{}
-	err = orgClient.Get(ctx, apiExportKey, apiExport)
+		return len(schemas.Items) == 2, nil
+	})
 	if err != nil {
-		t.Fatalf("APIExport disappeared: %v", err)
+		t.Fatalf("Failed to wait for 2nd APIResourceSchema to be created: %v", err)
 	}
 
-	if l := len(apiExport.Spec.LatestResourceSchemas); l != 1 {
-		t.Fatalf("APIExport should still have 1 resource schema, but has %d.", l)
+	if err := envtestClient.Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(pr), pr); err != nil {
+		t.Fatalf("Failed to fetch PublishedResource: %v", err)
 	}
 
-	if currentName := apiExport.Spec.LatestResourceSchemas[0]; currentName != arsName {
-		t.Fatalf("APIExport should still refer to the original ARS %q, but now contains %q.", arsName, currentName)
+	newARSName := pr.Status.ResourceSchemaName
+	if newARSName == "" {
+		t.Fatal("Expected PublishedResource status to contain ARS name, but value is empty.")
+	}
+
+	if newARSName == arsName {
+		t.Fatalf("Expected PublishedResource status to have been updated with new ARS name, but still contains %q.", arsName)
 	}
 }
 
@@ -272,6 +285,98 @@ func TestARSOnlyContainsSelectedCRDVersion(t *testing.T) {
 
 	if name := ars.Spec.Versions[0].Name; name != theVersion {
 		t.Fatalf("Expected ARS to contain %q, but contains %q.", theVersion, name)
+	}
+}
+
+func TestMultiVersionCRD(t *testing.T) {
+	const (
+		apiExportName = "example.com"
+	)
+
+	// force a non-standard order, because it should not matter for the sync
+	var selectedVersions = []string{"v2", "v1"}
+
+	ctx := context.Background()
+	ctrlruntime.SetLogger(logr.Discard())
+
+	// setup a test environment in kcp
+	orgKubconfig := utils.CreateOrganization(t, ctx, "ars-multi-versions", apiExportName)
+
+	// start a service cluster
+	envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
+		"test/crds/crontab-multi-versions.yaml",
+	})
+
+	// publish Crontabs
+	t.Logf("Publishing CronTabs…")
+	pr := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "publish-crontabs",
+		},
+		Spec: syncagentv1alpha1.PublishedResourceSpec{
+			Resource: syncagentv1alpha1.SourceResourceDescriptor{
+				APIGroup: "example.com",
+				Versions: selectedVersions,
+				Kind:     "CronTab",
+			},
+		},
+	}
+
+	if err := envtestClient.Create(ctx, pr); err != nil {
+		t.Fatalf("Failed to create PublishedResource: %v", err)
+	}
+
+	// let the agent do its thing
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+
+	// wait for the APIExport to be updated
+	t.Logf("Waiting for APIExport to be updated…")
+	orgClient := utils.GetClient(t, orgKubconfig)
+	apiExportKey := types.NamespacedName{Name: apiExportName}
+
+	var arsName string
+	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute, false, func(ctx context.Context) (done bool, err error) {
+		apiExport := &kcpapisv1alpha1.APIExport{}
+		err = orgClient.Get(ctx, apiExportKey, apiExport)
+		if err != nil {
+			return false, err
+		}
+
+		if len(apiExport.Spec.LatestResourceSchemas) == 0 {
+			return false, nil
+		}
+
+		arsName = apiExport.Spec.LatestResourceSchemas[0]
+
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for APIExport to be updated: %v", err)
+	}
+
+	// check the APIResourceSchema
+	ars := &kcpapisv1alpha1.APIResourceSchema{}
+	err = orgClient.Get(ctx, types.NamespacedName{Name: arsName}, ars)
+	if err != nil {
+		t.Fatalf("APIResourceSchema does not exist: %v", err)
+	}
+
+	if len(ars.Spec.Versions) != len(selectedVersions) {
+		t.Fatalf("Expected %d versions to remain in the ARS, but found %d.", len(selectedVersions), len(ars.Spec.Versions))
+	}
+
+	// Projection tests already ensure the correct order, all we have to check
+	// here is that all versions are present (and more importantly that creating
+	// the multi-version ARS has worked at all).
+	expectedVersions := sets.New(selectedVersions...)
+	foundVersions := sets.New[string]()
+
+	for _, v := range ars.Spec.Versions {
+		foundVersions.Insert(v.Name)
+	}
+
+	if !expectedVersions.Equal(foundVersions) {
+		t.Fatalf("Expected versions %v, but ARS contains %v.", sets.List(expectedVersions), sets.List(foundVersions))
 	}
 }
 

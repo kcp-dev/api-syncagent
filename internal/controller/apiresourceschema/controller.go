@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 
 	"github.com/kcp-dev/logicalcluster/v3"
 	"go.uber.org/zap"
@@ -38,12 +37,14 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/kontext"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -88,8 +89,31 @@ func Add(
 		WithOptions(controller.Options{MaxConcurrentReconciles: numWorkers}).
 		// Watch for changes to PublishedResources on the local service cluster
 		For(&syncagentv1alpha1.PublishedResource{}, builder.WithPredicates(predicate.ByLabels(prFilter))).
+		Watches(&apiextensionsv1.CustomResourceDefinition{}, handler.TypedEnqueueRequestsFromMapFunc(reconciler.enqueueMatchingPublishedResources)).
 		Build(reconciler)
+
 	return err
+}
+
+func (r *Reconciler) enqueueMatchingPublishedResources(ctx context.Context, obj ctrlruntimeclient.Object) []reconcile.Request {
+	crd := obj.(*apiextensionsv1.CustomResourceDefinition)
+
+	pubResources := &syncagentv1alpha1.PublishedResourceList{}
+	if err := r.localClient.List(ctx, pubResources); err != nil {
+		runtime.HandleError(err)
+		return nil
+	}
+
+	var requests []reconcile.Request
+	for _, pr := range pubResources.Items {
+		if pr.Spec.Resource.APIGroup == crd.Spec.Group && pr.Spec.Resource.Kind == crd.Spec.Names.Kind {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: ctrlruntimeclient.ObjectKeyFromObject(&pr),
+			})
+		}
+	}
+
+	return requests
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -122,31 +146,29 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 
 func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubResource *syncagentv1alpha1.PublishedResource) (*reconcile.Result, error) {
 	// find the resource that the PublishedResource is referring to
-	localGVK := projection.PublishedResourceSourceGVK(pubResource)
+	localGK := projection.PublishedResourceSourceGK(pubResource)
 
 	client, err := discovery.NewClient(r.restConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create discovery client: %w", err)
 	}
 
-	crd, err := client.RetrieveCRD(ctx, localGVK)
+	// fetch the original, full CRD from the cluster
+	crd, err := client.RetrieveCRD(ctx, localGK)
 	if err != nil {
 		return nil, fmt.Errorf("failed to discover resource defined in PublishedResource: %w", err)
 	}
 
-	// project the CRD
-	projectedCRD, err := r.applyProjection(crd, pubResource)
+	// project the CRD (i.e. strip unwanted versions, rename values etc.)
+	projectedCRD, err := projection.ProjectCRD(crd, pubResource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply projection rules: %w", err)
 	}
 
-	// to prevent changing the source GVK e.g. from "apps/v1 Daemonset" to "core/v1 Pod",
-	// we include the source GVK in hashed form in the final APIResourceSchema name.
+	// generate a unique name for this exact state of the CRD
 	arsName := r.getAPIResourceSchemaName(projectedCRD)
 
-	// ARS'es cannot be updated, their entire spec is immutable. For now we do not care about
-	// CRDs being updated on the service cluster, but in the future (TODO) we must allow
-	// service owners to somehow publish updated CRDs without changing their API version.
+	// ensure ARS exists (don't try to reconcile it, it's basically entirely immutable)
 	wsCtx := kontext.WithCluster(ctx, r.lcName)
 	ars := &kcpdevv1alpha1.APIResourceSchema{}
 	err = r.kcpClient.Get(wsCtx, types.NamespacedName{Name: arsName}, ars, &ctrlruntimeclient.GetOptions{})
@@ -159,7 +181,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubR
 		return nil, fmt.Errorf("failed to check for APIResourceSchema: %w", err)
 	}
 
-	// Update Status with ARS name
+	// update Status with ARS name
 	if pubResource.Status.ResourceSchemaName != arsName {
 		original := pubResource.DeepCopy()
 		pubResource.Status.ResourceSchemaName = arsName
@@ -176,7 +198,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubR
 }
 
 func (r *Reconciler) createAPIResourceSchema(ctx context.Context, log *zap.SugaredLogger, projectedCRD *apiextensionsv1.CustomResourceDefinition, arsName string) error {
-	// prefix is irrelevant as the reconciling framework will use arsName anyway
+	// prefix is irrelevant as the name is overridden later
 	converted, err := kcpdevv1alpha1.CRDToAPIResourceSchema(projectedCRD, "irrelevant")
 	if err != nil {
 		return fmt.Errorf("failed to convert CRD: %w", err)
@@ -188,69 +210,33 @@ func (r *Reconciler) createAPIResourceSchema(ctx context.Context, log *zap.Sugar
 		syncagentv1alpha1.SourceGenerationAnnotation: fmt.Sprintf("%d", projectedCRD.Generation),
 		syncagentv1alpha1.AgentNameAnnotation:        r.agentName,
 	}
+	ars.Labels = map[string]string{
+		syncagentv1alpha1.AgentNameLabel: r.agentName,
+	}
 	ars.Spec.Group = converted.Spec.Group
 	ars.Spec.Names = converted.Spec.Names
 	ars.Spec.Scope = converted.Spec.Scope
 	ars.Spec.Versions = converted.Spec.Versions
+
+	if len(converted.Spec.Versions) > 1 {
+		ars.Spec.Conversion = &kcpdevv1alpha1.CustomResourceConversion{
+			// as of kcp 0.27, there is no constant for this
+			Strategy: kcpdevv1alpha1.ConversionStrategyType("None"),
+		}
+	}
 
 	log.With("name", arsName).Info("Creating APIResourceSchema…")
 
 	return r.kcpClient.Create(ctx, ars)
 }
 
-func (r *Reconciler) applyProjection(crd *apiextensionsv1.CustomResourceDefinition, pr *syncagentv1alpha1.PublishedResource) (*apiextensionsv1.CustomResourceDefinition, error) {
-	result := crd.DeepCopy()
-
-	// Currently CRDs generated by our discovery mechanism already set these to true, but that's just
-	// because it doesn't care to set them correctly; we keep this code here because from here on,
-	// in kcp, we definitely want them to be true.
-	result.Spec.Versions[0].Served = true
-	result.Spec.Versions[0].Storage = true
-
-	projection := pr.Spec.Projection
-	if projection == nil {
-		return result, nil
-	}
-
-	if projection.Group != "" {
-		result.Spec.Group = projection.Group
-	}
-
-	if projection.Version != "" {
-		result.Spec.Versions[0].Name = projection.Version
-	}
-
-	if projection.Kind != "" {
-		result.Spec.Names.Kind = projection.Kind
-		result.Spec.Names.ListKind = projection.Kind + "List"
-
-		result.Spec.Names.Singular = strings.ToLower(result.Spec.Names.Kind)
-		result.Spec.Names.Plural = result.Spec.Names.Singular + "s"
-	}
-
-	if projection.Plural != "" {
-		result.Spec.Names.Plural = projection.Plural
-	}
-
-	if projection.Scope != "" {
-		result.Spec.Scope = apiextensionsv1.ResourceScope(projection.Scope)
-	}
-
-	if projection.Categories != nil {
-		result.Spec.Names.Categories = projection.Categories
-	}
-
-	if projection.ShortNames != nil {
-		result.Spec.Names.ShortNames = projection.ShortNames
-	}
-
-	return result, nil
-}
-
 // getAPIResourceSchemaName generates the name for the ARS in kcp. Note that
 // kcp requires, just like CRDs, that ARS are named following a specific pattern.
 func (r *Reconciler) getAPIResourceSchemaName(crd *apiextensionsv1.CustomResourceDefinition) string {
-	checksum := crypto.Hash(crd.Spec.Names)
+	crd = crd.DeepCopy()
+	crd.Spec.Conversion = nil
+
+	checksum := crypto.Hash(crd.Spec)
 
 	// include a leading "v" to prevent SHA-1 hashes with digits to break the name
 	return fmt.Sprintf("v%s.%s.%s", checksum[:8], crd.Spec.Names.Plural, crd.Spec.Group)

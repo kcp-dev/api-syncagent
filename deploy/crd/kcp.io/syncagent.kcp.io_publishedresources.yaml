@@ -286,7 +286,7 @@ spec:
                         type: string
                       type: array
                     group:
-                      description: The API group, for example "myservice.example.com".
+                      description: The API group, for example "myservice.example.com". Leave empty to not modify the API group.
                       type: string
                     kind:
                       description: |-
@@ -316,8 +316,20 @@ spec:
                         type: string
                       type: array
                     version:
-                      description: The API version, for example "v1beta1".
+                      description: |-
+                        The API version, for example "v1beta1". Leave empty to not modify the version.
+
+                        This field must not be set when multiple versions have been selected.
+
+                        Deprecated: Use .versions instead.
                       type: string
+                    versions:
+                      additionalProperties:
+                        type: string
+                      description: |-
+                        Versions allows to map API versions onto new values in kcp. Leave empty to not modify the
+                        versions.
+                      type: object
                   type: object
                 related:
                   items:
@@ -674,12 +686,23 @@ spec:
                       description: The resource Kind, for example "Database".
                       type: string
                     version:
-                      description: The API version, for example "v1beta1".
+                      description: |-
+                        The API version, for example "v1beta1". Setting this field will only publish
+                        the given version, otherwise all versions for the group/kind will be
+                        published.
+
+                        Deprecated: Use .versions instead.
                       type: string
+                    versions:
+                      description: |-
+                        Versions allows to select a subset of versions to publish. Leave empty
+                        to publish all available versions.
+                      items:
+                        type: string
+                      type: array
                   required:
                     - apiGroup
                     - kind
-                    - version
                   type: object
               required:
                 - resource

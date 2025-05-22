@@ -15,15 +15,13 @@ limitations under the License.
 */
 
 /*
-Package apiresourceschema contains a controller that watches for PublishedResources
-and creates a matching APIResourceSchema (ARS) in kcp. The name of the generated
-ARS is stored in the PublishedResource's status, so that the apiexport controller
-can find and include it in the generated APIExport.
+Package apiresourceschema contains a controller that watches for PublishedResources and CRDs
+and creates a matching APIResourceSchema (ARS) in kcp.
+The name of the generated ARS is stored in the PublishedResource's status, so that the
+apiexport controller can find and include it in the generated APIExport.
 
-The ARS name contains a hash over the GVK that the PublishedResource is pointing
-to. This is to ensure that if an PublishedResource is created, then deleted, modified
-with an editor and re-applied, it won't turn into the same ARS, as we cannot simply
-turn an ARS for a Pod into an ARS for a StorageClass.
+The ARS name contains a hash over the Group, Kind and spec of the projected CRD. This way any
+changes to the original CRD or projection rules will result in a new ARS.
 
 There is no extra cleanup procedure in either of the clusters when a PublishedResource
 is deleted. This is to prevent accidental data loss in kcp in case a service owner

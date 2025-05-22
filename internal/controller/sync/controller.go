@@ -78,21 +78,29 @@ func Create(
 ) (controller.Controller, error) {
 	log = log.Named(ControllerName)
 
+	// find the local CRD so we know the actual local object scope
+	localCRD, err := discoveryClient.RetrieveCRD(ctx, projection.PublishedResourceSourceGK(pubRes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to find local CRD: %w", err)
+	}
+
 	// create a dummy that represents the type used on the local service cluster
-	localGVK := projection.PublishedResourceSourceGVK(pubRes)
+	localGVK, err := projection.PublishedResourceSourceGVK(localCRD, pubRes)
+	if err != nil {
+		return nil, err
+	}
+
 	localDummy := &unstructured.Unstructured{}
 	localDummy.SetGroupVersionKind(localGVK)
 
 	// create a dummy unstructured object with the projected GVK inside the workspace
-	remoteGVK := projection.PublishedResourceProjectedGVK(pubRes)
+	remoteGVK, err := projection.PublishedResourceProjectedGVK(localCRD, pubRes)
+	if err != nil {
+		return nil, err
+	}
+
 	remoteDummy := &unstructured.Unstructured{}
 	remoteDummy.SetGroupVersionKind(remoteGVK)
-
-	// find the local CRD so we know the actual local object scope
-	localCRD, err := discoveryClient.RetrieveCRD(ctx, localGVK)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find local CRD: %w", err)
-	}
 
 	// create the syncer that holds the meat&potatoes of the synchronization logic
 	mutator := mutation.NewMutator(pubRes.Spec.Mutation)
