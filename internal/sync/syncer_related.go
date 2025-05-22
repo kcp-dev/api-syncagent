@@ -364,8 +364,9 @@ func resolveRelatedResourceObjectsInNamespaces(relatedOrigin, relatedDest syncSi
 
 func resolveRelatedResourceObjectsInNamespace(relatedOrigin, relatedDest syncSide, relRes syncagentv1alpha1.RelatedResourceSpec, spec syncagentv1alpha1.RelatedResourceObjectSpec, namespace string) (map[string]string, error) {
 	switch {
+	//nolint:staticcheck
 	case spec.Reference != nil:
-		originName, err := resolveObjectReference(relatedOrigin.object, *spec.Reference)
+		originName, err := resolveObjectReference(relatedOrigin.object, *spec.Reference) //nolint:staticcheck
 		if err != nil {
 			return nil, err
 		}
@@ -374,7 +375,7 @@ func resolveRelatedResourceObjectsInNamespace(relatedOrigin, relatedDest syncSid
 			return nil, nil
 		}
 
-		destName, err := resolveObjectReference(relatedDest.object, *spec.Reference)
+		destName, err := resolveObjectReference(relatedDest.object, *spec.Reference) //nolint:staticcheck
 		if err != nil {
 			return nil, err
 		}
