@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package projection
+package templating
 
 import (
 	"testing"
@@ -23,12 +23,11 @@ import (
 
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func createNewObject(name, namespace string) metav1.Object {
+func createNewObject(name, namespace string) *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{}
 	obj.SetName(name)
 	obj.SetNamespace(namespace)
@@ -40,7 +39,8 @@ func TestGenerateLocalObjectName(t *testing.T) {
 	testcases := []struct {
 		name         string
 		clusterName  string
-		remoteObject metav1.Object
+		clusterPath  string
+		remoteObject *unstructured.Unstructured
 		namingConfig *syncagentv1alpha1.ResourceNaming
 		expected     types.NamespacedName
 	}{
@@ -96,7 +96,10 @@ func TestGenerateLocalObjectName(t *testing.T) {
 				},
 			}
 
-			generatedName := GenerateLocalObjectName(pubRes, testcase.remoteObject, logicalcluster.Name(testcase.clusterName))
+			generatedName, err := GenerateLocalObjectName(pubRes, testcase.remoteObject, logicalcluster.Name(testcase.clusterName), logicalcluster.NewPath(testcase.clusterPath))
+			if err != nil {
+				t.Fatalf("Unexpected error: %v.", err)
+			}
 
 			if generatedName.String() != testcase.expected.String() {
 				t.Errorf("Expected %q, but got %q.", testcase.expected, generatedName)

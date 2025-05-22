@@ -20,12 +20,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// All of these constants are used in the deprecated local naming scheme for
+// PublishedResources. New code should not use them, but instead rely on
+// Go templated expressions.
+
 const (
-	PlaceholderRemoteClusterName   = "$remoteClusterName"
-	PlaceholderRemoteNamespace     = "$remoteNamespace"
+	// Deprecated: Use Go templates instead.
+	PlaceholderRemoteClusterName = "$remoteClusterName"
+	// Deprecated: Use Go templates instead.
+	PlaceholderRemoteNamespace = "$remoteNamespace"
+	// Deprecated: Use Go templates instead.
 	PlaceholderRemoteNamespaceHash = "$remoteNamespaceHash"
-	PlaceholderRemoteName          = "$remoteName"
-	PlaceholderRemoteNameHash      = "$remoteNameHash"
+	// Deprecated: Use Go templates instead.
+	PlaceholderRemoteName = "$remoteName"
+	// Deprecated: Use Go templates instead.
+	PlaceholderRemoteNameHash = "$remoteNameHash"
 )
 
 // +genclient

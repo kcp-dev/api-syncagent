@@ -35,7 +35,7 @@ import (
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type objectCreatorFunc func(source *unstructured.Unstructured) *unstructured.Unstructured
+type objectCreatorFunc func(source *unstructured.Unstructured) (*unstructured.Unstructured, error)
 
 type objectSyncer struct {
 	// When set, the syncer will create a label on the destination object that contains
@@ -134,7 +134,11 @@ func (s *objectSyncer) applyMutations(source, dest syncSide) (syncSide, syncSide
 	// the mutated names available.
 	destObject := dest.object
 	if destObject == nil {
-		destObject = s.destCreator(source.object)
+		var err error
+		destObject, err = s.destCreator(source.object)
+		if err != nil {
+			return source, dest, fmt.Errorf("failed to create destination object: %w", err)
+		}
 	}
 
 	sourceObj, err := s.mutator.MutateSpec(source.object.DeepCopy(), destObject)
@@ -287,7 +291,10 @@ func (s *objectSyncer) syncObjectStatus(log *zap.SugaredLogger, source, dest syn
 
 func (s *objectSyncer) ensureDestinationObject(log *zap.SugaredLogger, source, dest syncSide) error {
 	// create a copy of the source with GVK projected and renaming rules applied
-	destObj := s.destCreator(source.object)
+	destObj, err := s.destCreator(source.object)
+	if err != nil {
+		return fmt.Errorf("failed to create destination object: %w", err)
+	}
 
 	// make sure the target namespace on the destination cluster exists
 	if err := s.ensureNamespace(dest.ctx, log, dest.client, destObj.GetNamespace()); err != nil {

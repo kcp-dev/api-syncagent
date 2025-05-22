@@ -481,8 +481,8 @@ func TestSyncRelatedObjects(t *testing.T) {
 					},
 					// These rules make finding the local object easier, but should not be used in production.
 					Naming: &syncagentv1alpha1.ResourceNaming{
-						Name:      "$remoteName",
-						Namespace: "synced-$remoteNamespace",
+						Name:      "{{ .Object.metadata.name }}",
+						Namespace: "synced-{{ .Object.metadata.namespace }}",
 					},
 					Projection: &syncagentv1alpha1.ResourceProjection{
 						Group: "kcp.example.com",

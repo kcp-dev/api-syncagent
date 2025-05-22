@@ -124,12 +124,12 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 			// in one place, on the service cluster side
 			stateStore: stateStore,
 			// how to create a new destination object
-			destCreator: func(source *unstructured.Unstructured) *unstructured.Unstructured {
+			destCreator: func(source *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 				dest := source.DeepCopy()
 				dest.SetName(resolved.destination.Name)
 				dest.SetNamespace(resolved.destination.Namespace)
 
-				return dest
+				return dest, nil
 			},
 			// ConfigMaps and Secrets have no subresources
 			subresources: nil,
