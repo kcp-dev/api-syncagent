@@ -86,6 +86,14 @@ func TestGenerateLocalObjectName(t *testing.T) {
 			namingConfig: &syncagentv1alpha1.ResourceNaming{Name: "foobar-$remoteName"},
 			expected:     types.NamespacedName{Namespace: "testcluster", Name: "foobar-objname"},
 		},
+		{
+			name:         "Go templates",
+			clusterName:  "testcluster",
+			clusterPath:  "root:test:team",
+			remoteObject: createNewObject("objname", "objnamespace"),
+			namingConfig: &syncagentv1alpha1.ResourceNaming{Name: "{{ .ClusterPath }}-{{ .Object.metadata.name }}"},
+			expected:     types.NamespacedName{Namespace: "testcluster", Name: "root:test:team-objname"},
+		},
 	}
 
 	for _, testcase := range testcases {
