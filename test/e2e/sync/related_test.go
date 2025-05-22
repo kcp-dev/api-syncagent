@@ -457,7 +457,7 @@ func TestSyncRelatedObjects(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 
 			// setup a test environment in kcp
 			orgKubconfig := utils.CreateOrganization(t, ctx, testcase.workspace, apiExportName)

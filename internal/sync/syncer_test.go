@@ -907,7 +907,7 @@ func TestSyncerProcessingSingleResourceWithoutStatus(t *testing.T) {
 				t.Fatalf("Failed to create syncer: %v", err)
 			}
 
-			localCtx := context.Background()
+			localCtx := t.Context()
 			remoteCtx := kontext.WithCluster(localCtx, clusterName)
 			ctx := NewContext(localCtx, remoteCtx)
 
@@ -1213,7 +1213,7 @@ func TestSyncerProcessingSingleResourceWithStatus(t *testing.T) {
 				t.Fatalf("Failed to create syncer: %v", err)
 			}
 
-			localCtx := context.Background()
+			localCtx := t.Context()
 			remoteCtx := kontext.WithCluster(localCtx, clusterName)
 			ctx := NewContext(localCtx, remoteCtx)
 

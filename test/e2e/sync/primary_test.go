@@ -53,7 +53,7 @@ func TestSyncSimpleObject(t *testing.T) {
 		orgWorkspace  = "sync-simple"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -143,7 +143,7 @@ func TestSyncSimpleObjectOldNaming(t *testing.T) {
 		orgWorkspace  = "sync-simple-deprecated"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -232,7 +232,7 @@ func TestSyncWithDefaultNamingRules(t *testing.T) {
 		orgWorkspace  = "sync-default-naming-rules"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -327,7 +327,7 @@ func TestLocalChangesAreKept(t *testing.T) {
 		orgWorkspace  = "sync-undo-local-changes"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -533,7 +533,7 @@ func TestResourceFilter(t *testing.T) {
 		orgWorkspace  = "sync-resource-filter"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -654,7 +654,7 @@ func TestSyncingOverlyLongNames(t *testing.T) {
 		orgWorkspace  = "sync-long-names"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
