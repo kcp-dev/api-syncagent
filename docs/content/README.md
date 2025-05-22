@@ -109,7 +109,7 @@ able to delete and recreate objects to follow this GVK change, which is a level 
 simply do not want to deal with at this point in time. Also, `APIResourceSchemas` are immutable
 themselves.
 
-More information is available in the [Publishing Resources](./publish-resources.md) guide.
+More information is available in the [Publishing Resources](./publish-resources/index.md) guide.
 
 ### APIExports
 

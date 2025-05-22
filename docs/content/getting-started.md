@@ -47,7 +47,7 @@ to, but that is the common setup. Ultimately the Sync Agent synchronizes data be
 endpoints.
 
 Now that the `APIExport` is created, switch to the Kubernetes cluster from which you wish to
-[publish resources](publish-resources.md). You will need to ensure that a kubeconfig with access to
+[publish resources](./publish-resources/index.md). You will need to ensure that a kubeconfig with access to
 the kcp workspace that the `APIExport` has been created in is stored as a `Secret` on this cluster.
 Make sure that the kubeconfig points to the right workspace (not necessarily the `root` workspace).
 
@@ -237,7 +237,7 @@ subjects:
 ## Publish Resources
 
 Once the Sync Agent Pods are up and running, you should be able to follow the
-[Publishing Resources](publish-resources.md) guide.
+[Publishing Resources](./publish-resources/index.md) guide.
 
 ## Consume Service
 
