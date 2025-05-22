@@ -46,3 +46,28 @@ func NewRelatedObjectContext(object *unstructured.Unstructured, clusterName logi
 		ClusterPath: clusterPath,
 	}
 }
+
+// relatedObjectContext is the data available to Go templates in the keys and values
+// of a label selector for a related object.
+type relatedObjectLabelContext struct {
+	// LocalObject ist the primary object copy on the local side of the sync
+	// (i.e. on the service cluster).
+	LocalObject map[string]any
+	// RemoteObject is the primary object original, in kcp.
+	RemoteObject map[string]any
+	// ClusterName is the internal cluster identifier (e.g. "34hg2j4gh24jdfgf")
+	// of the kcp workspace that the synchronization is currently processing
+	// (where the remote object exists).
+	ClusterName logicalcluster.Name
+	// ClusterPath is the workspace path (e.g. "root:customer:projectx").
+	ClusterPath logicalcluster.Path
+}
+
+func NewRelatedObjectLabelContext(localObject, remoteObject *unstructured.Unstructured, clusterName logicalcluster.Name, clusterPath logicalcluster.Path) relatedObjectLabelContext {
+	return relatedObjectLabelContext{
+		LocalObject:  localObject.Object,
+		RemoteObject: remoteObject.Object,
+		ClusterName:  clusterName,
+		ClusterPath:  clusterPath,
+	}
+}

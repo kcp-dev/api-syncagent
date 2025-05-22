@@ -167,6 +167,13 @@ type ResourceTemplateMutation struct {
 	Template string `json:"template"`
 }
 
+type RelatedResourceOrigin string
+
+const (
+	RelatedResourceOriginService RelatedResourceOrigin = "service"
+	RelatedResourceOriginKcp     RelatedResourceOrigin = "kcp"
+)
+
 type RelatedResourceSpec struct {
 	// Identifier is a unique name for this related resource. The name must be unique within one
 	// PublishedResource and is the key by which consumers (end users) can identify and consume the
@@ -174,8 +181,8 @@ type RelatedResourceSpec struct {
 	// The identifier must be an alphanumeric string.
 	Identifier string `json:"identifier"`
 
-	// "service" or "kcp"
-	Origin string `json:"origin"`
+	// +kubebuilder:validation:Enum=service;kcp
+	Origin RelatedResourceOrigin `json:"origin"`
 
 	// ConfigMap or Secret
 	Kind string `json:"kind"`
