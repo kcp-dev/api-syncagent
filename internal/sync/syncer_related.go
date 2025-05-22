@@ -28,6 +28,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/kcp-dev/api-syncagent/internal/mutation"
+	"github.com/kcp-dev/api-syncagent/internal/sync/templating"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
@@ -249,8 +250,9 @@ func resolveRelatedResourceObjects(relatedOrigin, relatedDest syncSide, relRes s
 
 func resolveRelatedResourceOriginNamespaces(relatedOrigin, relatedDest syncSide, spec syncagentv1alpha1.RelatedResourceObjectSpec) (map[string]string, error) {
 	switch {
+	//nolint:staticcheck
 	case spec.Reference != nil:
-		originNamespace, err := resolveObjectReference(relatedOrigin.object, *spec.Reference)
+		originNamespace, err := resolveObjectReference(relatedOrigin.object, *spec.Reference) //nolint:staticcheck
 		if err != nil {
 			return nil, err
 		}
@@ -259,7 +261,7 @@ func resolveRelatedResourceOriginNamespaces(relatedOrigin, relatedDest syncSide,
 			return nil, nil
 		}
 
-		destNamespace, err := resolveObjectReference(relatedDest.object, *spec.Reference)
+		destNamespace, err := resolveObjectReference(relatedDest.object, *spec.Reference) //nolint:staticcheck
 		if err != nil {
 			return nil, err
 		}
@@ -495,5 +497,27 @@ func applyTemplate(relatedOrigin, relatedDest syncSide, tpl syncagentv1alpha1.Te
 }
 
 func applyTemplateBothSides(relatedOrigin, relatedDest syncSide, tpl syncagentv1alpha1.TemplateExpression) (originValue, destValue string, err error) {
-	return "", "", errors.New("not yet implemented")
+	// clusterName and workspacePath are only set on the kcp side of the sync.
+	clusterName := relatedDest.clusterName
+	workspacePath := relatedDest.workspacePath
+	if clusterName == "" {
+		clusterName = relatedOrigin.clusterName
+		workspacePath = relatedOrigin.workspacePath
+	}
+
+	// evaluate the template for the origin object side
+	ctx := templating.NewRelatedObjectContext(relatedOrigin.object, clusterName, workspacePath)
+	originValue, err = templating.Render(tpl.Template, ctx)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to evaluate template on origin side: %w", err)
+	}
+
+	// and once more on the other side
+	ctx = templating.NewRelatedObjectContext(relatedDest.object, clusterName, workspacePath)
+	destValue, err = templating.Render(tpl.Template, ctx)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to evaluate template on destination side: %w", err)
+	}
+
+	return originValue, destValue, nil
 }

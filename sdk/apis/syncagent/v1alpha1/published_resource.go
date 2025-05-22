@@ -210,6 +210,8 @@ type RelatedResourceObjectSpec struct {
 	Selector *RelatedResourceObjectSelector `json:"selector,omitempty"`
 	// Reference points to a field inside the main object. This reference is
 	// evaluated on both source and destination sides to find the related object.
+	//
+	// Deprecated: Use Go templates instead.
 	Reference *RelatedResourceObjectReference `json:"reference,omitempty"`
 	// Template is a Go templated string that can make use of variables to
 	// construct the resulting string.
