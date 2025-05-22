@@ -43,7 +43,7 @@ $(BUILD_DEST)/%: cmd/%
 	go build $(GOTOOLFLAGS) -o $@ ./cmd/$*
 
 GOLANGCI_LINT = _tools/golangci-lint
-GOLANGCI_LINT_VERSION = 1.64.2
+GOLANGCI_LINT_VERSION = 2.1.6
 
 .PHONY: $(GOLANGCI_LINT)
 $(GOLANGCI_LINT):
@@ -53,17 +53,18 @@ $(GOLANGCI_LINT):
 	  ${GOLANGCI_LINT_VERSION}
 
 GIMPS = _tools/gimps
-GIMPS_VERSION = 0.6.0
+GIMPS_VERSION = 0.6.3
 
 .PHONY: $(GIMPS)
 $(GIMPS):
 	@hack/download-tool.sh \
-	  https://github.com/xrstf/gimps/releases/download/v${GIMPS_VERSION}/gimps_${GIMPS_VERSION}_${GOOS}_${GOARCH}.tar.gz \
+	  https://codeberg.org/xrstf/gimps/releases/download/v${GIMPS_VERSION}/gimps_${GIMPS_VERSION}_${GOOS}_${GOARCH}.tar.gz \
 	  gimps \
 	  ${GIMPS_VERSION}
 
 # wwhrd is installed as a Go module rather than from the provided
 # binaries because there is no arm64 binary available from the author.
+# See https://github.com/frapposelli/wwhrd/issues/141
 
 WWHRD = _tools/wwhrd
 WWHRD_VERSION = 06b99400ca6db678386ba5dc39bbbdcdadb664ff
@@ -135,6 +136,7 @@ clean:
 lint: $(GOLANGCI_LINT)
 	$(GOLANGCI_LINT) run \
 		--verbose \
+		--timeout 20m \
 		--print-resources-usage \
 		./...
 
@@ -146,7 +148,6 @@ imports: $(GIMPS)
 verify:
 	./hack/verify-boilerplate.sh
 	./hack/verify-licenses.sh
-
 
 ### docs
 

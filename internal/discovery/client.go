@@ -84,7 +84,7 @@ func (c *Client) RetrieveCRD(ctx context.Context, gk schema.GroupKind) (*apiexte
 		// parse and check GroupVersion of the entire list.
 		gv, err := schema.ParseGroupVersion(resList.GroupVersion)
 		if err != nil {
-			return nil, fmt.Errorf("Kubernetes reported invalid API group version %q: %w", resList.GroupVersion, err)
+			return nil, fmt.Errorf("invalid API group version %q reported by Kubernetes: %w", resList.GroupVersion, err)
 		}
 
 		if gv.Group != gk.Group {
@@ -315,7 +315,7 @@ func (c *Client) getPreferredVersion(resource *metav1.APIResource) (string, erro
 		// parse and check GroupVersion of the entire list.
 		gv, err := schema.ParseGroupVersion(resList.GroupVersion)
 		if err != nil {
-			return "", fmt.Errorf("Kubernetes reported invalid API group version %q: %w", resList.GroupVersion, err)
+			return "", fmt.Errorf("invalid API group version %q reported by Kubernetes: %w", resList.GroupVersion, err)
 		}
 
 		if gv.Group != resource.Group {
