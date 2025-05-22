@@ -39,6 +39,32 @@ $ kubectl create --filename apiexport.yaml
 apiexport/test.example.com created
 ```
 
+### Optional: Create Initial APIBinding
+
+To save resources, kcp doesn't start API endpoints for `APIExports` that are not in use (i.e. that don't
+have an active `APIBinding`). To avoid cryptic errors in the Sync Agent logs about resources not being found,
+you can create an initial `APIBinding` in the same (or another) workspace as your `APIExport`.
+
+It could look like this:
+
+```yaml
+apiVersion: apis.kcp.io/v1alpha1
+kind: APIBinding
+metadata:
+  name: test.example.com
+spec:
+  reference:
+    export:
+      name: test.example.com
+```
+
+While still being in your `:workspace:you:want:to:create:it` workspace, you could create the `APIBinding` like this:
+
+```sh
+$ kubectl create --filename apibinding.yaml
+apibinding/test.example.com created
+```
+
 ## Sync Agent Installation
 
 The Sync Agent can be installed into any namespace, but in our example we are going with `kcp-system`.
