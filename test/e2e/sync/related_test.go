@@ -177,216 +177,168 @@ func TestSyncRelatedObjects(t *testing.T) {
 
 		//////////////////////////////////////////////////////////////////////////////////////////////
 
-		// {
-		// 	name:      "sync referenced Secret up into a new namespace",
-		// 	workspace: "sync-referenced-secret-up-namespace",
-		// 	mainResource: crds.Crontab{
-		// 		ObjectMeta: metav1.ObjectMeta{
-		// 			Name:      "my-crontab",
-		// 			Namespace: "default",
-		// 		},
-		// 		Spec: crds.CrontabSpec{
-		// 			CronSpec: "* * *",
-		// 			Image:    "ubuntu:latest",
-		// 		},
-		// 	},
-		// 	relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
-		// 		Identifier: "credentials",
-		// 		Origin:     "service",
-		// 		Kind:       "Secret",
-		// 		Object: syncagentv1alpha1.RelatedResourceObject{
-		// 			RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
-		// 				Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
-		// 					Path: "metadata.name", // irrelevant
-		// 					Regex: &syncagentv1alpha1.RegularExpression{
-		// 						Replacement: "my-credentials",
-		// 					},
-		// 				},
-		// 			},
-		// 		},
-		// 		Destination: syncagentv1alpha1.RelatedResourceDestination{
-		// 			RelatedResourceDestinationSpec: syncagentv1alpha1.RelatedResourceDestinationSpec{
-		// 				Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
-		// 					Path: "metadata.name", // irrelevant
-		// 					Regex: &syncagentv1alpha1.RegularExpression{
-		// 						Replacement: "my-credentials",
-		// 					},
-		// 				},
-		// 			},
-		// 			Namespace: &syncagentv1alpha1.RelatedResourceDestinationSpec{
-		// 				Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
-		// 					Path: "metadata.name", // irrelevant
-		// 					Regex: &syncagentv1alpha1.RegularExpression{
-		// 						Replacement: "new-namespace",
-		// 					},
-		// 				},
-		// 			},
-		// 		},
-		// 	},
-		// 	sourceRelatedObject: corev1.Secret{
-		// 		ObjectMeta: metav1.ObjectMeta{
-		// 			Name:      "my-credentials",
-		// 			Namespace: "synced-default",
-		// 		},
-		// 		Data: map[string][]byte{
-		// 			"password": []byte("hunter2"),
-		// 		},
-		// 		Type: corev1.SecretTypeOpaque,
-		// 	},
+		{
+			name:      "sync referenced Secret up into a new namespace",
+			workspace: "sync-referenced-secret-up-namespace",
+			mainResource: crds.Crontab{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-crontab",
+					Namespace: "default",
+				},
+				Spec: crds.CrontabSpec{
+					CronSpec: "* * *",
+					Image:    "ubuntu:latest",
+				},
+			},
+			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
+				Identifier: "credentials",
+				Origin:     "service",
+				Kind:       "Secret",
+				Object: syncagentv1alpha1.RelatedResourceObject{
+					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
+						Template: &syncagentv1alpha1.TemplateExpression{
+							Template: "my-credentials",
+						},
+					},
+					Namespace: &syncagentv1alpha1.RelatedResourceObjectSpec{
+						Template: &syncagentv1alpha1.TemplateExpression{
+							Template: `{{ if eq .Side "kcp" }}new-namespace{{ else }}{{ .Object.metadata.namespace }}{{ end }}`,
+						},
+					},
+				},
+			},
+			sourceRelatedObject: corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-credentials",
+					Namespace: "synced-default",
+				},
+				Data: map[string][]byte{
+					"password": []byte("hunter2"),
+				},
+				Type: corev1.SecretTypeOpaque,
+			},
 
-		// 	expectedSyncedRelatedObject: corev1.Secret{
-		// 		ObjectMeta: metav1.ObjectMeta{
-		// 			Name:      "my-credentials",
-		// 			Namespace: "new-namespace",
-		// 		},
-		// 		Data: map[string][]byte{
-		// 			"password": []byte("hunter2"),
-		// 		},
-		// 		Type: corev1.SecretTypeOpaque,
-		// 	},
-		// },
+			expectedSyncedRelatedObject: corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-credentials",
+					Namespace: "new-namespace",
+				},
+				Data: map[string][]byte{
+					"password": []byte("hunter2"),
+				},
+				Type: corev1.SecretTypeOpaque,
+			},
+		},
 
-		// //////////////////////////////////////////////////////////////////////////////////////////////
+		//////////////////////////////////////////////////////////////////////////////////////////////
 
-		// {
-		// 	name:      "sync referenced Secret down into a new namespace",
-		// 	workspace: "sync-referenced-secret-down-namespace",
-		// 	mainResource: crds.Crontab{
-		// 		ObjectMeta: metav1.ObjectMeta{
-		// 			Name:      "my-crontab",
-		// 			Namespace: "default",
-		// 		},
-		// 		Spec: crds.CrontabSpec{
-		// 			CronSpec: "* * *",
-		// 			Image:    "ubuntu:latest",
-		// 		},
-		// 	},
-		// 	relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
-		// 		Identifier: "credentials",
-		// 		Origin:     "kcp",
-		// 		Kind:       "Secret",
-		// 		Object: syncagentv1alpha1.RelatedResourceObject{
-		// 			RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
-		// 				Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
-		// 					Path: "metadata.name", // irrelevant
-		// 					Regex: &syncagentv1alpha1.RegularExpression{
-		// 						Replacement: "my-credentials",
-		// 					},
-		// 				},
-		// 			},
-		// 		},
-		// 		Destination: syncagentv1alpha1.RelatedResourceDestination{
-		// 			RelatedResourceDestinationSpec: syncagentv1alpha1.RelatedResourceDestinationSpec{
-		// 				Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
-		// 					Path: "metadata.name", // irrelevant
-		// 					Regex: &syncagentv1alpha1.RegularExpression{
-		// 						Replacement: "my-credentials",
-		// 					},
-		// 				},
-		// 			},
-		// 			Namespace: &syncagentv1alpha1.RelatedResourceDestinationSpec{
-		// 				Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
-		// 					Path: "metadata.name", // irrelevant
-		// 					Regex: &syncagentv1alpha1.RegularExpression{
-		// 						Replacement: "new-namespace",
-		// 					},
-		// 				},
-		// 			},
-		// 		},
-		// 	},
-		// 	sourceRelatedObject: corev1.Secret{
-		// 		ObjectMeta: metav1.ObjectMeta{
-		// 			Name:      "my-credentials",
-		// 			Namespace: "default",
-		// 		},
-		// 		Data: map[string][]byte{
-		// 			"password": []byte("hunter2"),
-		// 		},
-		// 		Type: corev1.SecretTypeOpaque,
-		// 	},
+		{
+			name:      "sync referenced Secret down into a new namespace",
+			workspace: "sync-referenced-secret-down-namespace",
+			mainResource: crds.Crontab{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-crontab",
+					Namespace: "default",
+				},
+				Spec: crds.CrontabSpec{
+					CronSpec: "* * *",
+					Image:    "ubuntu:latest",
+				},
+			},
+			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
+				Identifier: "credentials",
+				Origin:     "kcp",
+				Kind:       "Secret",
+				Object: syncagentv1alpha1.RelatedResourceObject{
+					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
+						Template: &syncagentv1alpha1.TemplateExpression{
+							Template: "my-credentials",
+						},
+					},
+					Namespace: &syncagentv1alpha1.RelatedResourceObjectSpec{
+						Template: &syncagentv1alpha1.TemplateExpression{
+							Template: `{{ if eq .Side "kcp" }}{{ .Object.metadata.namespace }}{{ else }}new-namespace{{ end }}`,
+						},
+					},
+				},
+			},
+			sourceRelatedObject: corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-credentials",
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"password": []byte("hunter2"),
+				},
+				Type: corev1.SecretTypeOpaque,
+			},
 
-		// 	expectedSyncedRelatedObject: corev1.Secret{
-		// 		ObjectMeta: metav1.ObjectMeta{
-		// 			Name:      "my-credentials",
-		// 			Namespace: "new-namespace",
-		// 		},
-		// 		Data: map[string][]byte{
-		// 			"password": []byte("hunter2"),
-		// 		},
-		// 		Type: corev1.SecretTypeOpaque,
-		// 	},
-		// },
+			expectedSyncedRelatedObject: corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-credentials",
+					Namespace: "new-namespace",
+				},
+				Data: map[string][]byte{
+					"password": []byte("hunter2"),
+				},
+				Type: corev1.SecretTypeOpaque,
+			},
+		},
 
-		// //////////////////////////////////////////////////////////////////////////////////////////////
+		//////////////////////////////////////////////////////////////////////////////////////////////
 
-		// {
-		// 	name:      "sync referenced Secret up from a foreign namespace",
-		// 	workspace: "sync-referenced-secret-up-foreign-namespace",
-		// 	mainResource: crds.Crontab{
-		// 		ObjectMeta: metav1.ObjectMeta{
-		// 			Name:      "my-crontab",
-		// 			Namespace: "default",
-		// 		},
-		// 		Spec: crds.CrontabSpec{
-		// 			CronSpec: "* * *",
-		// 			Image:    "ubuntu:latest",
-		// 		},
-		// 	},
-		// 	relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
-		// 		Identifier: "credentials",
-		// 		Origin:     "service",
-		// 		Kind:       "Secret",
-		// 		Object: syncagentv1alpha1.RelatedResourceObject{
-		// 			RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
-		// 				Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
-		// 					Path: "metadata.name", // irrelevant
-		// 					Regex: &syncagentv1alpha1.RegularExpression{
-		// 						Replacement: "my-credentials",
-		// 					},
-		// 				},
-		// 			},
-		// 			Namespace: &syncagentv1alpha1.RelatedResourceObjectSpec{
-		// 				Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
-		// 					Path: "metadata.name", // irrelevant
-		// 					Regex: &syncagentv1alpha1.RegularExpression{
-		// 						Replacement: "other-namespace",
-		// 					},
-		// 				},
-		// 			},
-		// 		},
-		// 		Destination: syncagentv1alpha1.RelatedResourceDestination{
-		// 			RelatedResourceDestinationSpec: syncagentv1alpha1.RelatedResourceDestinationSpec{
-		// 				Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
-		// 					Path: "metadata.name", // irrelevant
-		// 					Regex: &syncagentv1alpha1.RegularExpression{
-		// 						Replacement: "my-credentials",
-		// 					},
-		// 				},
-		// 			},
-		// 		},
-		// 	},
-		// 	sourceRelatedObject: corev1.Secret{
-		// 		ObjectMeta: metav1.ObjectMeta{
-		// 			Name:      "my-credentials",
-		// 			Namespace: "other-namespace",
-		// 		},
-		// 		Data: map[string][]byte{
-		// 			"password": []byte("hunter2"),
-		// 		},
-		// 		Type: corev1.SecretTypeOpaque,
-		// 	},
+		{
+			name:      "sync referenced Secret up from a foreign namespace",
+			workspace: "sync-referenced-secret-up-foreign-namespace",
+			mainResource: crds.Crontab{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-crontab",
+					Namespace: "default",
+				},
+				Spec: crds.CrontabSpec{
+					CronSpec: "* * *",
+					Image:    "ubuntu:latest",
+				},
+			},
+			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
+				Identifier: "credentials",
+				Origin:     "service",
+				Kind:       "Secret",
+				Object: syncagentv1alpha1.RelatedResourceObject{
+					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
+						Template: &syncagentv1alpha1.TemplateExpression{
+							Template: "my-credentials",
+						},
+					},
+					Namespace: &syncagentv1alpha1.RelatedResourceObjectSpec{
+						Template: &syncagentv1alpha1.TemplateExpression{
+							Template: `{{ if eq .Side "kcp" }}{{ .Object.metadata.namespace }}{{ else }}other-namespace{{ end }}`,
+						},
+					},
+				},
+			},
+			sourceRelatedObject: corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-credentials",
+					Namespace: "other-namespace",
+				},
+				Data: map[string][]byte{
+					"password": []byte("hunter2"),
+				},
+				Type: corev1.SecretTypeOpaque,
+			},
 
-		// 	expectedSyncedRelatedObject: corev1.Secret{
-		// 		ObjectMeta: metav1.ObjectMeta{
-		// 			Name:      "my-credentials",
-		// 			Namespace: "default",
-		// 		},
-		// 		Data: map[string][]byte{
-		// 			"password": []byte("hunter2"),
-		// 		},
-		// 		Type: corev1.SecretTypeOpaque,
-		// 	},
-		// },
+			expectedSyncedRelatedObject: corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-credentials",
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"password": []byte("hunter2"),
+				},
+				Type: corev1.SecretTypeOpaque,
+			},
+		},
 
 		//////////////////////////////////////////////////////////////////////////////////////////////
 
