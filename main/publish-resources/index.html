@@ -300,6 +300,23 @@
   
   
     <li class="md-tabs__item">
+      <a href="../api-lifecycle/" class="md-tabs__link">
+        
+  
+    
+  
+  API Lifecycle
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
       <a href="../faq/" class="md-tabs__link">
         
   
@@ -761,6 +778,26 @@
   
   
     <li class="md-nav__item">
+      <a href="../api-lifecycle/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    API Lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../faq/" class="md-nav__link">
         
   
@@ -1113,8 +1150,10 @@ of resources (i.e. a subset of CRDs) available for use in kcp.</p>
 <p>For each of the CRDs on the service cluster that should be published, the service owner creates a
 <code>PublishedResource</code> object, which will contain both which CRD to publish, as well as numerous other
 important settings that influence the behaviour around handling the CRD.</p>
-<p>When publishing a resource (CRD), exactly one version is published. All others are ignored from the
-standpoint of the resource synchronization logic.</p>
+<p>When publishing a resource (CRD), service owners can choose to restrict it to a subset of available
+versions and even change API group, versions and names in transit (for example published a v1 from
+the service cluster as v1beta1 within kcp). This process of changing the identity of a CRD is called
+"projection" in the agent.</p>
 <p>All published resources together form the APIExport. When a service is enabled in a workspace
 (i.e. it is bound to it), users can manage objects for the projected resources described by the
 published resources. These objects will be synced from the workspace onto the service cluster,
@@ -1135,9 +1174,14 @@ resources that need to be synced down to the service cluster.</p>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">resource</span><span class="p">:</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Certificate</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cert-manager.io</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="nt">versions</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">v1</span><span class="p p-Indicator">]</span>
 </code></pre></div>
 <p>However, you will most likely apply more configuration and use features described below.</p>
+<p>You always have to select at least one version, and all selected versions must be marked as <code>served</code>
+on the service cluster. If the storage version is selected to be published, it stays the storage
+version in kcp. If no storage version is selected, the latest selected version becomes the storage
+version.</p>
+<p>For more information refer to the <a href="../api-lifecycle/">API lifecycle</a>.</p>
 <h3 id="filtering">Filtering</h3>
 <p>The Sync Agent can be instructed to only work on a subset of resources in kcp. This can be restricted
 by namespace and/or label selector.</p>
@@ -1153,13 +1197,14 @@ by namespace and/or label selector.</p>
 <a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">      </span><span class="nt">matchLabels</span><span class="p">:</span>
 <a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">        </span><span class="nt">foo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bar</span>
 </code></pre></div>
+<p>The configuration above would mean the agent only synchronizes objects from <code>my-app</code> namespaces (in
+each of the kcp workspaces) that also have a <code>foo=bar</code> label on them.</p>
 <h3 id="schema">Schema</h3>
-<p><strong>Warning:</strong> The actual CRD schema is always copied verbatim. All projections <!--, mutations -->
-etc. have to take into account that the resource contents must be expressible without changes to the
-schema, so you cannot define entirely new fields in an object that are not defined by the original
-CRD.</p>
+<p><strong>Warning:</strong> The actual CRD schema is always copied verbatim. All projections, mutations etc. have
+to take into account that the resource contents must be expressible without changes to the schema,
+so you cannot define entirely new fields in an object that are not defined by the original CRD.</p>
 <h3 id="projection">Projection</h3>
-<p>For stronger separation of concerns and to enable whitelabelling of services, the type meta for
+<p>For stronger separation of concerns and to enable whitelabelling of services, the type meta for CRDs
 can be projected, i.e. changed between the local service cluster and kcp. You could for example
 rename <code>Certificate</code> from cert-manager to <code>Sertifikat</code> inside kcp.</p>
 <p>Note that the API group of all published resources is always changed to the one defined in the
@@ -1178,18 +1223,21 @@ cluster-wide. This should be used carefully and might require extensive mutation
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nt">spec</span><span class="p">:</span>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">resource</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">projection</span><span class="p">:</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1beta1</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="c1"># all of these options are optional</span>
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Sertifikat</span>
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nt">plural</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Sertifikater</span>
 <a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="nt">shortNames</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">serts</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="c1"># categories: [management]</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">    </span><span class="c1"># scope: Namespaced # change only when you know what you&#39;re doing</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="nt">versions</span><span class="p">:</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">      </span><span class="c1"># old version =&gt; new version;</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">      </span><span class="c1"># this must not map multiple versions to the same new version.</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">      </span><span class="nt">v1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1beta1</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">    </span><span class="c1"># categories: [management]</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">    </span><span class="c1"># scope: Namespaced # change only when you know what you&#39;re doing</span>
 </code></pre></div>
 <p>Consumers (end users) in kcp would then ultimately see projected names only. Note that GVK
 projection applies only to the synced object itself and has no effect on the contents of these
-objects. To change the contents, use external solutions like Crossplane to transform objects.</p>
-<!-- To change the contents, use *Mutations*. -->
-
+objects. To change the contents, use external solutions like Crossplane to transform objects.
+To change the contents, use <em>Mutations</em>.</p>
 <h3 id="re-naming">(Re-)Naming</h3>
 <p>Since the Sync Agent ingests resources from many different Kubernetes clusters (workspaces) and combines
 them onto a single cluster, resources have to be renamed to prevent collisions and also follow the
@@ -1310,7 +1358,7 @@ and easy to use, but require a "link" in the primary object that would point to 
 <a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">resource</span><span class="p">:</span>
 <a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Certificate</span>
 <a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cert-manager.io</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="nt">versions</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">v1</span><span class="p p-Indicator">]</span>
 <a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>
 <a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span><span class="nt">naming</span><span class="p">:</span>
 <a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">    </span><span class="c1"># this is where our CA and Issuer live in this example</span>
@@ -1388,7 +1436,7 @@ how crazy the underlying operators on the service clusters are.</p>
 <a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span><span class="nt">resource</span><span class="p">:</span>
 <a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Certificate</span>
 <a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">    </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cert-manager.io</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">    </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">    </span><span class="nt">versions</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">v1</span><span class="p p-Indicator">]</span>
 <a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
 <a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">  </span><span class="nt">naming</span><span class="p">:</span>
 <a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">    </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kube-system</span>
@@ -1463,7 +1511,7 @@ The <code>PublishedResource</code> is created wherever the Sync Agent and cert-m
 <a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">  </span><span class="nt">resource</span><span class="p">:</span>
 <a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Certificate</span>
 <a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">    </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cert-manager.io</span>
-<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">    </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">    </span><span class="nt">versions</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">v1</span><span class="p p-Indicator">]</span>
 <a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>
 <a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">  </span><span class="nt">naming</span><span class="p">:</span>
 <a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">    </span><span class="c1"># this is where our CA and Issuer live in this example</span>
