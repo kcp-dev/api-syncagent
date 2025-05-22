@@ -24,7 +24,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/kcp-dev/logicalcluster/v3"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 
@@ -296,7 +295,7 @@ func resolveRelatedResourceOriginNamespaces(relatedOrigin, relatedDest syncSide,
 		for _, namespace := range namespaces.Items {
 			name := namespace.Name
 
-			destinationName, err := applySelectorRewrites(relatedOrigin, relatedDest, name, spec.Selector.Rewrite)
+			destinationName, err := applySelectorRewrites(relatedOrigin, relatedDest, origin, name, nil, spec.Selector.Rewrite)
 			if err != nil {
 				return nil, fmt.Errorf("failed to rewrite origin namespace: %w", err)
 			}
@@ -416,7 +415,7 @@ func resolveRelatedResourceObjectsInNamespace(relatedOrigin, relatedDest syncSid
 		for _, originObject := range originObjects.Items {
 			name := originObject.GetName()
 
-			destinationName, err := applySelectorRewrites(relatedOrigin, relatedDest, name, spec.Selector.Rewrite)
+			destinationName, err := applySelectorRewrites(relatedOrigin, relatedDest, relRes.Origin, name, &originObject, spec.Selector.Rewrite)
 			if err != nil {
 				return nil, fmt.Errorf("failed to rewrite origin name: %w", err)
 			}
@@ -475,12 +474,18 @@ func resolveReference(jsonData []byte, ref syncagentv1alpha1.RelatedResourceObje
 	return strVal, nil
 }
 
-func applySelectorRewrites(relatedOrigin, relatedDest syncSide, value string, rewrite syncagentv1alpha1.RelatedResourceSelectorRewrite) (string, error) {
+// applyTemplate is used after a label selector has been applied and a list of namespaces or objects
+// has been selected. To map these to the destination side, rewrites can be applied, and these are
+// first applied to all found namespaces (in which case, the value parameter here is the namespace
+// name and originRelatedObject is nil) and then again to all found objects (in which case the value
+// parameter is the object's name and originRelatedObject is set). In both cases the rewrite is supposed
+// to return a string.
+func applySelectorRewrites(relatedOrigin, relatedDest syncSide, origin syncagentv1alpha1.RelatedResourceOrigin, value string, originRelatedObject *unstructured.Unstructured, rewrite syncagentv1alpha1.RelatedResourceSelectorRewrite) (string, error) {
 	switch {
 	case rewrite.Regex != nil:
 		return applyRegularExpression(value, *rewrite.Regex)
 	case rewrite.Template != nil:
-		return applyTemplate(relatedOrigin, relatedDest, *rewrite.Template, value)
+		return applyTemplate(relatedOrigin, relatedDest, origin, *rewrite.Template, value, originRelatedObject)
 	default:
 		return "", errors.New("invalid rewrite: no mechanism configured")
 	}
@@ -499,22 +504,25 @@ func applyRegularExpression(value string, re syncagentv1alpha1.RegularExpression
 	return expr.ReplaceAllString(value, re.Replacement), nil
 }
 
-func applyTemplate(relatedOrigin, relatedDest syncSide, tpl syncagentv1alpha1.TemplateExpression, value string) (string, error) {
-	return "", errors.New("not yet implemented")
+func applyTemplate(relatedOrigin, relatedDest syncSide, origin syncagentv1alpha1.RelatedResourceOrigin, tpl syncagentv1alpha1.TemplateExpression, value string, originRelatedObject *unstructured.Unstructured) (string, error) {
+	localSide, remoteSide := remapSyncSides(relatedOrigin, relatedDest, origin)
+	ctx := templating.NewRelatedObjectLabelRewriteContext(value, localSide.object, remoteSide.object, originRelatedObject, remoteSide.clusterName, remoteSide.workspacePath)
+
+	return templating.Render(tpl.Template, ctx)
 }
 
 func applyTemplateBothSides(relatedOrigin, relatedDest syncSide, origin syncagentv1alpha1.RelatedResourceOrigin, tpl syncagentv1alpha1.TemplateExpression) (originValue, destValue string, err error) {
-	clusterName, workspacePath := clusterIdent(relatedOrigin, relatedDest, origin)
+	_, remoteSide := remapSyncSides(relatedOrigin, relatedDest, origin)
 
 	// evaluate the template for the origin object side
-	ctx := templating.NewRelatedObjectContext(relatedOrigin.object, clusterName, workspacePath)
+	ctx := templating.NewRelatedObjectContext(relatedOrigin.object, remoteSide.clusterName, remoteSide.workspacePath)
 	originValue, err = templating.Render(tpl.Template, ctx)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to evaluate template on origin side: %w", err)
 	}
 
 	// and once more on the other side
-	ctx = templating.NewRelatedObjectContext(relatedDest.object, clusterName, workspacePath)
+	ctx = templating.NewRelatedObjectContext(relatedDest.object, remoteSide.clusterName, remoteSide.workspacePath)
 	destValue, err = templating.Render(tpl.Template, ctx)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to evaluate template on destination side: %w", err)
@@ -526,16 +534,9 @@ func applyTemplateBothSides(relatedOrigin, relatedDest syncSide, origin syncagen
 // templateLabelSelector applies Go templating logic to all keys and values in the MatchLabels of
 // a label selector.
 func templateLabelSelector(relatedOrigin, relatedDest syncSide, origin syncagentv1alpha1.RelatedResourceOrigin, selector *metav1.LabelSelector) (*metav1.LabelSelector, error) {
-	clusterName, workspacePath := clusterIdent(relatedOrigin, relatedDest, origin)
+	localSide, remoteSide := remapSyncSides(relatedOrigin, relatedDest, origin)
 
-	localObject := relatedOrigin.object
-	remoteObject := relatedDest.object
-	if origin == syncagentv1alpha1.RelatedResourceOriginKcp {
-		localObject = relatedDest.object
-		remoteObject = relatedOrigin.object
-	}
-
-	ctx := templating.NewRelatedObjectLabelContext(localObject, remoteObject, clusterName, workspacePath)
+	ctx := templating.NewRelatedObjectLabelContext(localSide.object, remoteSide.object, remoteSide.clusterName, remoteSide.workspacePath)
 
 	newMatchLabels := map[string]string{}
 	for key, value := range selector.MatchLabels {
@@ -565,10 +566,10 @@ func templateLabelSelector(relatedOrigin, relatedDest syncSide, origin syncagent
 	return selector, nil
 }
 
-func clusterIdent(relatedOrigin, relatedDest syncSide, origin syncagentv1alpha1.RelatedResourceOrigin) (logicalcluster.Name, logicalcluster.Path) {
+func remapSyncSides(relatedOrigin, relatedDest syncSide, origin syncagentv1alpha1.RelatedResourceOrigin) (localSide, remoteSide syncSide) {
 	if origin == syncagentv1alpha1.RelatedResourceOriginKcp {
-		return relatedOrigin.clusterName, relatedOrigin.workspacePath
+		return relatedOrigin, relatedDest
 	}
 
-	return relatedDest.clusterName, relatedDest.workspacePath
+	return relatedDest, relatedOrigin
 }

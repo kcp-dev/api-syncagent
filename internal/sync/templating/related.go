@@ -71,3 +71,49 @@ func NewRelatedObjectLabelContext(localObject, remoteObject *unstructured.Unstru
 		ClusterPath:  clusterPath,
 	}
 }
+
+// relatedObjectLabelRewriteContext is the data available to Go templates when
+// mapping the found namespace names and objects names from having evaluated a
+// label selector previously.
+type relatedObjectLabelRewriteContext struct {
+	// Value is either the a found namespace name (when a label selector was
+	// used to select the source namespaces for related objects) or the name of
+	// a found object (when a label selector was used to find objects). In the
+	// former case, the template should return the new namespace to use on the
+	// destination side, in the latter case it should return the new object name
+	// to use on the destination side.
+	Value string
+	// When a rewrite is used to rewrite object names, RelatedObject is the
+	// original related object (found on the origin side). This enables you to
+	// ignore the given Value entirely and just select anything from the object
+	// itself.
+	// RelatedObject is nil when the rewrite is performed for a namespace.
+	RelatedObject map[string]any
+	// LocalObject ist the primary object copy on the local side of the sync
+	// (i.e. on the service cluster).
+	LocalObject map[string]any
+	// RemoteObject is the primary object original, in kcp.
+	RemoteObject map[string]any
+	// ClusterName is the internal cluster identifier (e.g. "34hg2j4gh24jdfgf")
+	// of the kcp workspace that the synchronization is currently processing
+	// (where the remote object exists).
+	ClusterName logicalcluster.Name
+	// ClusterPath is the workspace path (e.g. "root:customer:projectx").
+	ClusterPath logicalcluster.Path
+}
+
+func NewRelatedObjectLabelRewriteContext(value string, localObject, remoteObject, relatedObject *unstructured.Unstructured, clusterName logicalcluster.Name, clusterPath logicalcluster.Path) relatedObjectLabelRewriteContext {
+	ctx := relatedObjectLabelRewriteContext{
+		Value:        value,
+		LocalObject:  localObject.Object,
+		RemoteObject: remoteObject.Object,
+		ClusterName:  clusterName,
+		ClusterPath:  clusterPath,
+	}
+
+	if relatedObject != nil {
+		ctx.RelatedObject = relatedObject.Object
+	}
+
+	return ctx
+}
