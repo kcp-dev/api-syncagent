@@ -17,16 +17,6 @@ repo_url: https://github.com/kcp-dev/api-syncagent
 repo_name: kcp-dev/api-syncagent
 site_url: https://docs.kcp.io/api-syncagent/
 
-# Site navigation
-nav:
-  - Home: README.md
-  - Getting Started: getting-started.md
-  - Publishing Resources: publish-resources.md
-  - Consuming Services: consuming-services.md
-  - API Lifecycle: api-lifecycle.md
-  - FAQ: faq.md
-  - Release Process: releasing.md
-
 # Site content
 docs_dir: 'content'
 # Where to generate

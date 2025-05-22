@@ -1,0 +1,7 @@
+nav:
+  - Home: README.md
+  - Getting Started: getting-started.md
+  - Publishing Resources: publish-resources
+  - Consuming Services: consuming-services.md
+  - FAQ: faq.md
+  - Contributing: contributing

@@ -39,6 +39,32 @@ $ kubectl create --filename apiexport.yaml
 apiexport/test.example.com created
 ```
 
+### Optional: Create Initial APIBinding
+
+To save resources, kcp doesn't start API endpoints for `APIExports` that are not in use (i.e. that don't
+have an active `APIBinding`). To avoid cryptic errors in the Sync Agent logs about resources not being found,
+you can create an initial `APIBinding` in the same (or another) workspace as your `APIExport`.
+
+It could look like this:
+
+```yaml
+apiVersion: apis.kcp.io/v1alpha1
+kind: APIBinding
+metadata:
+  name: test.example.com
+spec:
+  reference:
+    export:
+      name: test.example.com
+```
+
+While still being in your `:workspace:you:want:to:create:it` workspace, you could create the `APIBinding` like this:
+
+```sh
+$ kubectl create --filename apibinding.yaml
+apibinding/test.example.com created
+```
+
 ## Sync Agent Installation
 
 The Sync Agent can be installed into any namespace, but in our example we are going with `kcp-system`.
@@ -47,7 +73,7 @@ to, but that is the common setup. Ultimately the Sync Agent synchronizes data be
 endpoints.
 
 Now that the `APIExport` is created, switch to the Kubernetes cluster from which you wish to
-[publish resources](publish-resources.md). You will need to ensure that a kubeconfig with access to
+[publish resources](./publish-resources/index.md). You will need to ensure that a kubeconfig with access to
 the kcp workspace that the `APIExport` has been created in is stored as a `Secret` on this cluster.
 Make sure that the kubeconfig points to the right workspace (not necessarily the `root` workspace).
 
@@ -237,7 +263,7 @@ subjects:
 ## Publish Resources
 
 Once the Sync Agent Pods are up and running, you should be able to follow the
-[Publishing Resources](publish-resources.md) guide.
+[Publishing Resources](./publish-resources/index.md) guide.
 
 ## Consume Service
 
