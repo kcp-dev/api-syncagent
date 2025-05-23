@@ -438,6 +438,8 @@ spec:
                                 description: |-
                                   Reference points to a field inside the main object. This reference is
                                   evaluated on both source and destination sides to find the related object.
+
+                                  Deprecated: Use Go templates instead.
                                 properties:
                                   path:
                                     description: |-
@@ -553,6 +555,8 @@ spec:
                             description: |-
                               Reference points to a field inside the main object. This reference is
                               evaluated on both source and destination sides to find the related object.
+
+                              Deprecated: Use Go templates instead.
                             properties:
                               path:
                                 description: |-
@@ -665,7 +669,9 @@ spec:
                             type: object
                         type: object
                       origin:
-                        description: '"service" or "kcp"'
+                        enum:
+                          - service
+                          - kcp
                         type: string
                     required:
                       - identifier

@@ -19,7 +19,6 @@ limitations under the License.
 package discovery
 
 import (
-	"context"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -95,7 +94,7 @@ func TestDiscoverSingleVersionCRD(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			ctrlruntime.SetLogger(logr.Discard())
 
 			kubeconfigFile, _, _ := utils.RunEnvtest(t, testcase.crdFiles)

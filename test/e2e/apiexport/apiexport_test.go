@@ -45,7 +45,7 @@ func TestPermissionsClaims(t *testing.T) {
 		apiExportName = "kcp.example.com"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -247,7 +247,7 @@ func TestExistingPermissionsClaimsAreKept(t *testing.T) {
 		apiExportName = "kcp.example.com"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -367,7 +367,7 @@ func TestSchemasAreMerged(t *testing.T) {
 		apiExportName = "kcp.example.com"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -476,7 +476,7 @@ func TestSchemaIsKeptWhenDeletingPublishedResource(t *testing.T) {
 		apiExportName = "kcp.example.com"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -614,7 +614,7 @@ func TestNewSchemasAreCreatedAsNeeded(t *testing.T) {
 		apiExportName = "kcp.example.com"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp

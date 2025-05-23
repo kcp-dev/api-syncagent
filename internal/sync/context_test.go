@@ -17,7 +17,6 @@ limitations under the License.
 package sync
 
 import (
-	"context"
 	"testing"
 
 	"github.com/kcp-dev/logicalcluster/v3"
@@ -27,9 +26,9 @@ import (
 
 func TestNewContext(t *testing.T) {
 	clusterName := logicalcluster.Name("foo")
-	ctx := kontext.WithCluster(context.Background(), clusterName)
+	ctx := kontext.WithCluster(t.Context(), clusterName)
 
-	combinedCtx := NewContext(context.Background(), ctx)
+	combinedCtx := NewContext(t.Context(), ctx)
 
 	if combinedCtx.clusterName != clusterName {
 		t.Fatalf("Expected function to recognize the cluster name in the context, but got %q", combinedCtx.clusterName)

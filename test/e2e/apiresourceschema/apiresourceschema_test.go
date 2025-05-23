@@ -45,7 +45,7 @@ func TestARSAreCreated(t *testing.T) {
 		apiExportName = "example.com"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -116,7 +116,7 @@ func TestARSAreNotUpdated(t *testing.T) {
 		apiExportName = "example.com"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -214,7 +214,7 @@ func TestARSOnlyContainsSelectedCRDVersion(t *testing.T) {
 		theVersion    = "v1"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -296,7 +296,7 @@ func TestMultiVersionCRD(t *testing.T) {
 	// force a non-standard order, because it should not matter for the sync
 	var selectedVersions = []string{"v2", "v1"}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -386,7 +386,7 @@ func TestProjection(t *testing.T) {
 		originalVersion = "v1"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -489,7 +489,7 @@ func TestNonCRDResource(t *testing.T) {
 		originalVersion = "v1"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp

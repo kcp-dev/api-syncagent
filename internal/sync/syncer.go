@@ -23,6 +23,7 @@ import (
 
 	"github.com/kcp-dev/api-syncagent/internal/mutation"
 	"github.com/kcp-dev/api-syncagent/internal/projection"
+	"github.com/kcp-dev/api-syncagent/internal/sync/templating"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -152,7 +153,7 @@ func (s *ResourceSyncer) Process(ctx Context, remoteObj *unstructured.Unstructur
 		agentName:    s.agentName,
 		subresources: s.subresources,
 		// use the projection and renaming rules configured in the PublishedResource
-		destCreator: s.createLocalObjectCreator(ctx),
+		destCreator: s.newLocalObjectCreator(ctx),
 		// for the main resource, status subresource handling is enabled (this
 		// means _allowing_ status back-syncing, it still depends on whether the
 		// status subresource even exists whether an update happens)
@@ -214,8 +215,8 @@ func (s *ResourceSyncer) findLocalObject(ctx Context, remoteObj *unstructured.Un
 	}
 }
 
-func (s *ResourceSyncer) createLocalObjectCreator(ctx Context) objectCreatorFunc {
-	return func(remoteObj *unstructured.Unstructured) *unstructured.Unstructured {
+func (s *ResourceSyncer) newLocalObjectCreator(ctx Context) objectCreatorFunc {
+	return func(remoteObj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 		// map from the remote API into the actual, local API group
 		destObj := remoteObj.DeepCopy()
 		destObj.SetGroupVersionKind(s.destDummy.GroupVersionKind())
@@ -224,7 +225,10 @@ func (s *ResourceSyncer) createLocalObjectCreator(ctx Context) objectCreatorFunc
 		destScope := syncagentv1alpha1.ResourceScope(s.localCRD.Spec.Scope)
 
 		// map namespace/name
-		mappedName := projection.GenerateLocalObjectName(s.pubRes, remoteObj, ctx.clusterName)
+		mappedName, err := templating.GenerateLocalObjectName(s.pubRes, remoteObj, ctx.clusterName, ctx.workspacePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate local object name: %w", err)
+		}
 
 		switch destScope {
 		case syncagentv1alpha1.ClusterScoped:
@@ -236,6 +240,6 @@ func (s *ResourceSyncer) createLocalObjectCreator(ctx Context) objectCreatorFunc
 			destObj.SetName(mappedName.Name)
 		}
 
-		return destObj
+		return destObj, nil
 	}
 }

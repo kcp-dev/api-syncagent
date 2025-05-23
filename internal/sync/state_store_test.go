@@ -17,7 +17,6 @@ limitations under the License.
 package sync
 
 import (
-	"context"
 	"testing"
 
 	dummyv1alpha1 "github.com/kcp-dev/api-syncagent/internal/sync/apis/dummy/v1alpha1"
@@ -37,7 +36,7 @@ func TestStateStoreBasics(t *testing.T) {
 	}, withKind("RemoteThing"))
 
 	serviceClusterClient := buildFakeClient()
-	ctx := context.Background()
+	ctx := t.Context()
 	stateNamespace := "kcp-system"
 
 	primaryObjectSide := syncSide{

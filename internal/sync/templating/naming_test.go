@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package projection
+package templating
 
 import (
 	"testing"
@@ -23,12 +23,11 @@ import (
 
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func createNewObject(name, namespace string) metav1.Object {
+func createNewObject(name, namespace string) *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{}
 	obj.SetName(name)
 	obj.SetNamespace(namespace)
@@ -40,7 +39,8 @@ func TestGenerateLocalObjectName(t *testing.T) {
 	testcases := []struct {
 		name         string
 		clusterName  string
-		remoteObject metav1.Object
+		clusterPath  string
+		remoteObject *unstructured.Unstructured
 		namingConfig *syncagentv1alpha1.ResourceNaming
 		expected     types.NamespacedName
 	}{
@@ -49,35 +49,35 @@ func TestGenerateLocalObjectName(t *testing.T) {
 			clusterName:  "testcluster",
 			remoteObject: createNewObject("objname", "objnamespace"),
 			namingConfig: nil,
-			expected:     types.NamespacedName{Namespace: "testcluster", Name: "e75ee3d444e238331f6a-8b09d63c82efb771a2c5"},
+			expected:     types.NamespacedName{Namespace: "testcluster", Name: "2928c2aa0e510f017f07-73d08a1ba188f1340dae"},
 		},
 		{
 			name:         "custom static namespace pattern",
 			clusterName:  "testcluster",
 			remoteObject: createNewObject("objname", "objnamespace"),
 			namingConfig: &syncagentv1alpha1.ResourceNaming{Namespace: "foobar"},
-			expected:     types.NamespacedName{Namespace: "foobar", Name: "e75ee3d444e238331f6a-8b09d63c82efb771a2c5"},
+			expected:     types.NamespacedName{Namespace: "foobar", Name: "2928c2aa0e510f017f07-73d08a1ba188f1340dae"},
 		},
 		{
 			name:         "custom dynamic namespace pattern",
 			clusterName:  "testcluster",
 			remoteObject: createNewObject("objname", "objnamespace"),
 			namingConfig: &syncagentv1alpha1.ResourceNaming{Namespace: "foobar-$remoteClusterName"},
-			expected:     types.NamespacedName{Namespace: "foobar-testcluster", Name: "e75ee3d444e238331f6a-8b09d63c82efb771a2c5"},
+			expected:     types.NamespacedName{Namespace: "foobar-testcluster", Name: "2928c2aa0e510f017f07-73d08a1ba188f1340dae"},
 		},
 		{
 			name:         "plain, unhashed values should be available in patterns",
 			clusterName:  "testcluster",
 			remoteObject: createNewObject("objname", "objnamespace"),
 			namingConfig: &syncagentv1alpha1.ResourceNaming{Namespace: "$remoteNamespace"},
-			expected:     types.NamespacedName{Namespace: "objnamespace", Name: "e75ee3d444e238331f6a-8b09d63c82efb771a2c5"},
+			expected:     types.NamespacedName{Namespace: "objnamespace", Name: "2928c2aa0e510f017f07-73d08a1ba188f1340dae"},
 		},
 		{
 			name:         "configured but empty patterns",
 			clusterName:  "testcluster",
 			remoteObject: createNewObject("objname", "objnamespace"),
 			namingConfig: &syncagentv1alpha1.ResourceNaming{Namespace: "", Name: ""},
-			expected:     types.NamespacedName{Namespace: "testcluster", Name: "e75ee3d444e238331f6a-8b09d63c82efb771a2c5"},
+			expected:     types.NamespacedName{Namespace: "testcluster", Name: "2928c2aa0e510f017f07-73d08a1ba188f1340dae"},
 		},
 		{
 			name:         "custom dynamic name pattern",
@@ -85,6 +85,14 @@ func TestGenerateLocalObjectName(t *testing.T) {
 			remoteObject: createNewObject("objname", "objnamespace"),
 			namingConfig: &syncagentv1alpha1.ResourceNaming{Name: "foobar-$remoteName"},
 			expected:     types.NamespacedName{Namespace: "testcluster", Name: "foobar-objname"},
+		},
+		{
+			name:         "Go templates",
+			clusterName:  "testcluster",
+			clusterPath:  "root:test:team",
+			remoteObject: createNewObject("objname", "objnamespace"),
+			namingConfig: &syncagentv1alpha1.ResourceNaming{Name: "{{ .ClusterPath }}-{{ .Object.metadata.name }}"},
+			expected:     types.NamespacedName{Namespace: "testcluster", Name: "root:test:team-objname"},
 		},
 	}
 
@@ -96,7 +104,10 @@ func TestGenerateLocalObjectName(t *testing.T) {
 				},
 			}
 
-			generatedName := GenerateLocalObjectName(pubRes, testcase.remoteObject, logicalcluster.Name(testcase.clusterName))
+			generatedName, err := GenerateLocalObjectName(pubRes, testcase.remoteObject, logicalcluster.Name(testcase.clusterName), logicalcluster.NewPath(testcase.clusterPath))
+			if err != nil {
+				t.Fatalf("Unexpected error: %v.", err)
+			}
 
 			if generatedName.String() != testcase.expected.String() {
 				t.Errorf("Expected %q, but got %q.", testcase.expected, generatedName)

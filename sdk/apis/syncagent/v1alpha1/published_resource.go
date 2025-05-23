@@ -20,12 +20,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// All of these constants are used in the deprecated local naming scheme for
+// PublishedResources. New code should not use them, but instead rely on
+// Go templated expressions.
+
 const (
-	PlaceholderRemoteClusterName   = "$remoteClusterName"
-	PlaceholderRemoteNamespace     = "$remoteNamespace"
+	// Deprecated: Use Go templates instead.
+	PlaceholderRemoteClusterName = "$remoteClusterName"
+	// Deprecated: Use Go templates instead.
+	PlaceholderRemoteNamespace = "$remoteNamespace"
+	// Deprecated: Use Go templates instead.
 	PlaceholderRemoteNamespaceHash = "$remoteNamespaceHash"
-	PlaceholderRemoteName          = "$remoteName"
-	PlaceholderRemoteNameHash      = "$remoteNameHash"
+	// Deprecated: Use Go templates instead.
+	PlaceholderRemoteName = "$remoteName"
+	// Deprecated: Use Go templates instead.
+	PlaceholderRemoteNameHash = "$remoteNameHash"
 )
 
 // +genclient
@@ -158,6 +167,13 @@ type ResourceTemplateMutation struct {
 	Template string `json:"template"`
 }
 
+type RelatedResourceOrigin string
+
+const (
+	RelatedResourceOriginService RelatedResourceOrigin = "service"
+	RelatedResourceOriginKcp     RelatedResourceOrigin = "kcp"
+)
+
 type RelatedResourceSpec struct {
 	// Identifier is a unique name for this related resource. The name must be unique within one
 	// PublishedResource and is the key by which consumers (end users) can identify and consume the
@@ -165,8 +181,8 @@ type RelatedResourceSpec struct {
 	// The identifier must be an alphanumeric string.
 	Identifier string `json:"identifier"`
 
-	// "service" or "kcp"
-	Origin string `json:"origin"`
+	// +kubebuilder:validation:Enum=service;kcp
+	Origin RelatedResourceOrigin `json:"origin"`
 
 	// ConfigMap or Secret
 	Kind string `json:"kind"`
@@ -201,6 +217,8 @@ type RelatedResourceObjectSpec struct {
 	Selector *RelatedResourceObjectSelector `json:"selector,omitempty"`
 	// Reference points to a field inside the main object. This reference is
 	// evaluated on both source and destination sides to find the related object.
+	//
+	// Deprecated: Use Go templates instead.
 	Reference *RelatedResourceObjectReference `json:"reference,omitempty"`
 	// Template is a Go templated string that can make use of variables to
 	// construct the resulting string.
