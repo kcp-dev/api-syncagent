@@ -45,7 +45,6 @@ func Render(tpl string, data any) (string, error) {
 
 func templateFuncMap() template.FuncMap {
 	funcs := sprig.TxtFuncMap()
-	funcs["join"] = strings.Join
 	funcs["sha3sum"] = sha3sum
 	funcs["sha3short"] = sha3short
 

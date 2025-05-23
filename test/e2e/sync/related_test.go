@@ -90,11 +90,9 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Kind:       "Secret",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
-						Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
-							Path: "metadata.name", // irrelevant
-							Regex: &syncagentv1alpha1.RegularExpression{
-								Replacement: "my-credentials",
-							},
+						Template: &syncagentv1alpha1.TemplateExpression{
+							// same fixed value on both sides
+							Template: "my-credentials",
 						},
 					},
 				},
@@ -143,11 +141,9 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Kind:       "Secret",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
-						Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
-							Path: "metadata.name", // irrelevant
-							Regex: &syncagentv1alpha1.RegularExpression{
-								Replacement: "my-credentials",
-							},
+						Template: &syncagentv1alpha1.TemplateExpression{
+							// same fixed value on both sides
+							Template: "my-credentials",
 						},
 					},
 				},
@@ -368,9 +364,9 @@ func TestSyncRelatedObjects(t *testing.T) {
 								},
 							},
 							Rewrite: syncagentv1alpha1.RelatedResourceSelectorRewrite{
-								// TODO: Use template instead of regex once that is implemented.
-								Regex: &syncagentv1alpha1.RegularExpression{
-									Replacement: "my-credentials",
+								Template: &syncagentv1alpha1.TemplateExpression{
+									// same fixed name on both sides
+									Template: "my-credentials",
 								},
 							},
 						},
@@ -397,6 +393,75 @@ func TestSyncRelatedObjects(t *testing.T) {
 					Namespace: "default",
 					Labels: map[string]string{
 						"find": "me",
+					},
+				},
+				Data: map[string][]byte{
+					"password": []byte("hunter2"),
+				},
+				Type: corev1.SecretTypeOpaque,
+			},
+		},
+
+		//////////////////////////////////////////////////////////////////////////////////////////////
+
+		{
+			name:      "find Secret based on templated label selector",
+			workspace: "sync-templated-selected-secret-up",
+			mainResource: crds.Crontab{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-crontab",
+					Namespace: "default",
+				},
+				Spec: crds.CrontabSpec{
+					CronSpec: "* * *",
+					Image:    "ubuntu:latest",
+				},
+			},
+			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
+				Identifier: "credentials",
+				Origin:     "service",
+				Kind:       "Secret",
+				Object: syncagentv1alpha1.RelatedResourceObject{
+					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
+						Selector: &syncagentv1alpha1.RelatedResourceObjectSelector{
+							LabelSelector: metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									// include some nasty whitespace
+									`  {{ list "fi" "nd" | join "-" }} `: `
+{{ lower "ME" }}
+ `,
+								},
+							},
+							Rewrite: syncagentv1alpha1.RelatedResourceSelectorRewrite{
+								Template: &syncagentv1alpha1.TemplateExpression{
+									// same fixed name on both sides
+									Template: "my-credentials",
+								},
+							},
+						},
+					},
+				},
+			},
+			sourceRelatedObject: corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "unknown-name",
+					Namespace: "synced-default",
+					Labels: map[string]string{
+						"fi-nd": "me",
+					},
+				},
+				Data: map[string][]byte{
+					"password": []byte("hunter2"),
+				},
+				Type: corev1.SecretTypeOpaque,
+			},
+
+			expectedSyncedRelatedObject: corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-credentials",
+					Namespace: "default",
+					Labels: map[string]string{
+						"fi-nd": "me",
 					},
 				},
 				Data: map[string][]byte{
