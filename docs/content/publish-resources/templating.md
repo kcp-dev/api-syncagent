@@ -15,6 +15,8 @@ Specifically within the agent, the following rules apply when a template is eval
 * Templates should not output random values, as those can lead to reconcile loops and higher load
   on the service cluster.
 * Any leading and trailing whitespace will be automatically trimmed from the template's output.
+* All "objects" mentioned in this documentation refer technically to an `unstructured.Unstructured`
+  value's `.Object` field, i.e. the JSON-decoded representation of a Kubernetes object.
 
 ## Functions
 
