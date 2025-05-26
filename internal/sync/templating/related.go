@@ -56,7 +56,7 @@ func NewRelatedObjectContext(object *unstructured.Unstructured, side syncagentv1
 // relatedObjectContext is the data available to Go templates in the keys and values
 // of a label selector for a related object.
 type relatedObjectLabelContext struct {
-	// LocalObject ist the primary object copy on the local side of the sync
+	// LocalObject is the primary object copy on the local side of the sync
 	// (i.e. on the service cluster).
 	LocalObject map[string]any
 	// RemoteObject is the primary object original, in kcp.
@@ -95,7 +95,7 @@ type relatedObjectLabelRewriteContext struct {
 	// itself.
 	// RelatedObject is nil when the rewrite is performed for a namespace.
 	RelatedObject map[string]any
-	// LocalObject ist the primary object copy on the local side of the sync
+	// LocalObject is the primary object copy on the local side of the sync
 	// (i.e. on the service cluster).
 	LocalObject map[string]any
 	// RemoteObject is the primary object original, in kcp.
