@@ -559,7 +559,9 @@ func templateLabelSelector(relatedOrigin, relatedDest syncSide, origin syncagent
 			value = rendered
 		}
 
-		newMatchLabels[key] = value
+		if key != "" {
+			newMatchLabels[key] = value
+		}
 	}
 
 	selector.MatchLabels = newMatchLabels
