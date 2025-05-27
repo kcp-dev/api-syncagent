@@ -556,7 +556,7 @@ are determined using the rewrite mechanism (which might also be a Go template, s
 
 Each found related object on the origin side needs to have its own name on the destination side. To
 map from the origin to the destination side, regular expressions (see example snippet) or Go
-templatess can be used.
+templates can be used.
 
 If a template is configured, it is evaluated once for every found related object. The template gets
 the following data injected into it:
