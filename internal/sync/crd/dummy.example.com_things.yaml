@@ -40,9 +40,12 @@ spec:
               properties:
                 address:
                   type: string
+                kink:
+                  type: string
                 username:
                   type: string
               required:
+                - kink
                 - username
               type: object
           required:
