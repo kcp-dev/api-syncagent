@@ -166,14 +166,20 @@ func TestARSAreNotUpdated(t *testing.T) {
 		t.Fatalf("Failed to wait for APIResourceSchema to be created: %v", err)
 	}
 
-	if err := envtestClient.Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(pr), pr); err != nil {
-		t.Fatalf("Failed to fetch PublishedResource: %v", err)
+	// prevent race condition of the controller first creating the ARS, then updating the PR,
+	// by waiting again for the status to be updated.
+	err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
+		if err := envtestClient.Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(pr), pr); err != nil {
+			return false, nil
+		}
+
+		return pr.Status.ResourceSchemaName != "", nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for PublishedResource status to be updated: %v", err)
 	}
 
 	arsName := pr.Status.ResourceSchemaName
-	if arsName == "" {
-		t.Fatal("Expected PublishedResource status to contain ARS name, but value is empty.")
-	}
 
 	// update the CRD
 	t.Logf("Updating CRD (same version, but new schema)…")
@@ -194,17 +200,20 @@ func TestARSAreNotUpdated(t *testing.T) {
 		t.Fatalf("Failed to wait for 2nd APIResourceSchema to be created: %v", err)
 	}
 
-	if err := envtestClient.Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(pr), pr); err != nil {
-		t.Fatalf("Failed to fetch PublishedResource: %v", err)
+	// wait for the status to contain the new ARS name
+	err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute, false, func(ctx context.Context) (done bool, err error) {
+		if err := envtestClient.Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(pr), pr); err != nil {
+			return false, nil
+		}
+
+		return pr.Status.ResourceSchemaName != arsName, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for PublishedResource status to be updated: %v", err)
 	}
 
-	newARSName := pr.Status.ResourceSchemaName
-	if newARSName == "" {
+	if pr.Status.ResourceSchemaName == "" {
 		t.Fatal("Expected PublishedResource status to contain ARS name, but value is empty.")
-	}
-
-	if newARSName == arsName {
-		t.Fatalf("Expected PublishedResource status to have been updated with new ARS name, but still contains %q.", arsName)
 	}
 }
 
