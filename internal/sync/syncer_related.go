@@ -457,7 +457,7 @@ func resolveObjectReference(object *unstructured.Unstructured, ref syncagentv1al
 func resolveReference(jsonData []byte, ref syncagentv1alpha1.RelatedResourceObjectReference) (string, error) {
 	gval := gjson.Get(string(jsonData), ref.Path)
 	if !gval.Exists() {
-		return "", fmt.Errorf("cannot find %s in document", ref.Path)
+		return "", nil
 	}
 
 	// this does apply some coalescing, like turning numbers into strings
