@@ -116,7 +116,7 @@ func ProjectCRD(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagent
 func stripUnwantedVersions(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (*apiextensionsv1.CustomResourceDefinition, error) {
 	src := pubRes.Spec.Resource
 
-	//nolint:staticcheck
+	//nolint:staticcheck // .Version is deprecated, but we still support it for now.
 	if src.Version != "" && len(src.Versions) > 0 {
 		return nil, errors.New("cannot configure both .version and .versions in as the source of a PublishedResource")
 	}
@@ -181,7 +181,7 @@ func projectCRDVersions(crd *apiextensionsv1.CustomResourceDefinition, pubRes *s
 
 	// We already validated that Version and Versions can be set at the same time.
 
-	//nolint:staticcheck
+	//nolint:staticcheck // .Version is deprecated, but we still support it for now.
 	if projection.Version != "" {
 		if size := len(crd.Spec.Versions); size != 1 {
 			return nil, fmt.Errorf("cannot project CRD version to a single version %q because it contains %d versions", projection.Version, size)

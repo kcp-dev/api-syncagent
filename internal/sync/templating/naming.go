@@ -92,7 +92,8 @@ func generateLocalObjectIdentifier(pattern string, object *unstructured.Unstruct
 		return Render(pattern, newLocalObjectNamingContext(object, clusterName, clusterPath))
 	}
 
-	// legacy $variable style, does also not support clusterPath
+	// Legacy $variable style, does also not support clusterPath;
+	// note that all of these constants are deprecated already.
 	replacer := strings.NewReplacer(
 		// order of elements is important here, "$fooHash" needs to be defined before "$foo"
 		syncagentv1alpha1.PlaceholderRemoteClusterName, clusterName.String(), //nolint:staticcheck
