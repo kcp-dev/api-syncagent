@@ -14,7 +14,7 @@
         <link rel="prev" href="../getting-started/">
       
       
-        <link rel="next" href="api-lifecycle/">
+        <link rel="next" href="templating/">
       
       
       <link rel="icon" href="../favicons/favicon.ico">
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#publishing-resources" class="md-skip">
+        <a href="#macro-syntax-error" class="md-skip">
           Skip to content
         </a>
       
@@ -438,6 +438,8 @@
       
         
       
+        
+      
     
     
       
@@ -480,6 +482,27 @@
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="templating/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Templating
+  </span>
+  
+
+      </a>
+    </li>
+  
+
               
             
               
@@ -663,182 +686,6 @@
     
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#high-level-overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      High-level Overview
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="High-level Overview">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#publishedresource" class="md-nav__link">
-    <span class="md-ellipsis">
-      PublishedResource
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#filtering" class="md-nav__link">
-    <span class="md-ellipsis">
-      Filtering
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#schema" class="md-nav__link">
-    <span class="md-ellipsis">
-      Schema
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#projection" class="md-nav__link">
-    <span class="md-ellipsis">
-      Projection
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#re-naming" class="md-nav__link">
-    <span class="md-ellipsis">
-      (Re-)Naming
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mutation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Mutation
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Mutation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#regex" class="md-nav__link">
-    <span class="md-ellipsis">
-      Regex
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template" class="md-nav__link">
-    <span class="md-ellipsis">
-      Template
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#delete" class="md-nav__link">
-    <span class="md-ellipsis">
-      Delete
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#related-resources" class="md-nav__link">
-    <span class="md-ellipsis">
-      Related Resources
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Related Resources">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#references" class="md-nav__link">
-    <span class="md-ellipsis">
-      References
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#label-selectors" class="md-nav__link">
-    <span class="md-ellipsis">
-      Label Selectors
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#templates" class="md-nav__link">
-    <span class="md-ellipsis">
-      Templates
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      Examples
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Examples">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#provide-certificates" class="md-nav__link">
-    <span class="md-ellipsis">
-      Provide Certificates
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -855,411 +702,11 @@
   
 
 
-<h1 id="publishing-resources">Publishing Resources</h1>
-<p>The guide describes the process of making a resource (usually defined by a CustomResourceDefinition)
-of one Kubernetes cluster (the "service cluster" or "local cluster") available for use in kcp. This
-involves setting up an <code>APIExport</code> and then installing the Sync Agent and defining
-<code>PublishedResources</code> in the local cluster.</p>
-<p>All of the documentation and API types are worded and named from the perspective of a service owner,
-the person(s) who own a service and want to make it available to consumers in kcp.</p>
-<h2 id="high-level-overview">High-level Overview</h2>
-<p>A "service" comprises a set of resources within a single Kubernetes API group. It doesn't need to be
-<em>all</em> of the resources in that group, service owners are free and encouraged to only make a subset
-of resources (i.e. a subset of CRDs) available for use in kcp.</p>
-<p>For each of the CRDs on the service cluster that should be published, the service owner creates a
-<code>PublishedResource</code> object, which will contain both which CRD to publish, as well as numerous other
-important settings that influence the behaviour around handling the CRD.</p>
-<p>When publishing a resource (CRD), service owners can choose to restrict it to a subset of available
-versions and even change API group, versions and names in transit (for example published a v1 from
-the service cluster as v1beta1 within kcp). This process of changing the identity of a CRD is called
-"projection" in the agent.</p>
-<p>All published resources together form the APIExport. When a service is enabled in a workspace
-(i.e. it is bound to it), users can manage objects for the projected resources described by the
-published resources. These objects will be synced from the workspace onto the service cluster,
-where they are meant to be processed in whatever way the service owners desire. Any possible
-status information (in the <code>status</code> subresource) will in turn be synced back up into the workspace
-where the user can inspect it.</p>
-<p>Additionally, a published resource can describe additional so-called "related resources". These
-usually originate on the service cluster and could be for example connection detail secrets created
-by Crossplane, but could also originate in the user workspace and just be additional, auxiliary
-resources that need to be synced down to the service cluster.</p>
-<h3 id="publishedresource"><code>PublishedResource</code></h3>
-<p>In its simplest form (which is rarely practical) a <code>PublishedResource</code> looks like this:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">syncagent.kcp.io/v1alpha1</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PublishedResource</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">metadata</span><span class="p">:</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">publish-certmanager-certs</span><span class="w"> </span><span class="c1"># name can be freely chosen</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nt">spec</span><span class="p">:</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">resource</span><span class="p">:</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Certificate</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cert-manager.io</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="nt">versions</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">v1</span><span class="p p-Indicator">]</span>
-</code></pre></div>
-<p>However, you will most likely apply more configuration and use features described below.</p>
-<p>You always have to select at least one version, and all selected versions must be marked as <code>served</code>
-on the service cluster. If the storage version is selected to be published, it stays the storage
-version in kcp. If no storage version is selected, the latest selected version becomes the storage
-version.</p>
-<p>For more information refer to the <a href="api-lifecycle/">API lifecycle</a>.</p>
-<h3 id="filtering">Filtering</h3>
-<p>The Sync Agent can be instructed to only work on a subset of resources in kcp. This can be restricted
-by namespace and/or label selector.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">syncagent.kcp.io/v1alpha1</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PublishedResource</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">metadata</span><span class="p">:</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">publish-certmanager-certs</span><span class="w"> </span><span class="c1"># name can be freely chosen</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nt">spec</span><span class="p">:</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">resource</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nt">filter</span><span class="p">:</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-app</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">resource</span><span class="p">:</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">      </span><span class="nt">matchLabels</span><span class="p">:</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">        </span><span class="nt">foo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bar</span>
-</code></pre></div>
-<p>The configuration above would mean the agent only synchronizes objects from <code>my-app</code> namespaces (in
-each of the kcp workspaces) that also have a <code>foo=bar</code> label on them.</p>
-<h3 id="schema">Schema</h3>
-<p><strong>Warning:</strong> The actual CRD schema is always copied verbatim. All projections, mutations etc. have
-to take into account that the resource contents must be expressible without changes to the schema,
-so you cannot define entirely new fields in an object that are not defined by the original CRD.</p>
-<h3 id="projection">Projection</h3>
-<p>For stronger separation of concerns and to enable whitelabelling of services, the type meta for CRDs
-can be projected, i.e. changed between the local service cluster and kcp. You could for example
-rename <code>Certificate</code> from cert-manager to <code>Sertifikat</code> inside kcp.</p>
-<p>Note that the API group of all published resources is always changed to the one defined in the
-APIExport object (meaning 1 Sync Agent serves all the selected published resources under the same
-API group). That is why changing the API group cannot be configured in the projection.</p>
-<p>Besides renaming the Kind and Version, dependent fields like Plural, ShortNames and Categories
-can be adjusted to fit the desired naming scheme in kcp. The Plural name is computed
-automatically, but can be overridden. ShortNames and Categories are copied unless overwritten in the
-<code>PublishedResource</code>.</p>
-<p>It is also possible to change the scope of resources, i.e. turning a namespaced resource into a
-cluster-wide. This should be used carefully and might require extensive mutations.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">syncagent.kcp.io/v1alpha1</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PublishedResource</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">metadata</span><span class="p">:</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">publish-certmanager-certs</span><span class="w"> </span><span class="c1"># name can be freely chosen</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nt">spec</span><span class="p">:</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">resource</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">projection</span><span class="p">:</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="c1"># all of these options are optional</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Sertifikat</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nt">plural</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Sertifikater</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="nt">shortNames</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">serts</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="nt">versions</span><span class="p">:</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">      </span><span class="c1"># old version =&gt; new version;</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">      </span><span class="c1"># this must not map multiple versions to the same new version.</span>
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">      </span><span class="nt">v1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1beta1</span>
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">    </span><span class="c1"># categories: [management]</span>
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">    </span><span class="c1"># scope: Namespaced # change only when you know what you&#39;re doing</span>
-</code></pre></div>
-<p>Consumers (end users) in kcp would then ultimately see projected names only. Note that GVK
-projection applies only to the synced object itself and has no effect on the contents of these
-objects. To change the contents, use external solutions like Crossplane to transform objects.
-To change the contents, use <em>Mutations</em>.</p>
-<h3 id="re-naming">(Re-)Naming</h3>
-<p>Since the Sync Agent ingests resources from many different Kubernetes clusters (workspaces) and combines
-them onto a single cluster, resources have to be renamed to prevent collisions and also follow the
-conventions of whatever tooling ultimately processes the resources locally.</p>
-<p>The renaming is configured in <code>spec.naming</code>. In there, renaming patterns are configured, where
-pre-defined placeholders can be used, for example <code>foo-$placeholder</code>. The following placeholders
-are available:</p>
-<ul>
-<li><code>$remoteClusterName</code> – the workspace's cluster name (e.g. "1084s8ceexsehjm2")</li>
-<li><code>$remoteNamespace</code> – the original namespace used by the consumer inside the workspace</li>
-<li><code>$remoteNamespaceHash</code> – first 20 hex characters of the SHA-1 hash of <code>$remoteNamespace</code></li>
-<li><code>$remoteName</code> – the original name of the object inside the workspace (rarely used to construct
-  local namespace names)</li>
-<li><code>$remoteNameHash</code> – first 20 hex characters of the SHA-1 hash of <code>$remoteName</code></li>
-</ul>
-<p>If nothing is configured, the default ensures that no collisions will happen: Each workspace in
-kcp will create a namespace on the local cluster, with a combination of namespace and name hashes
-used for the actual resource names.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">syncagent.kcp.io/v1alpha1</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PublishedResource</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">metadata</span><span class="p">:</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">publish-certmanager-certs</span><span class="w"> </span><span class="c1"># name can be freely chosen</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nt">spec</span><span class="p">:</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">resource</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">naming</span><span class="p">:</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="c1"># This is the implicit default configuration.</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;$remoteClusterName&quot;</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;cert-$remoteNamespaceHash-$remoteNameHash&quot;</span>
-</code></pre></div>
-<h3 id="mutation">Mutation</h3>
-<p>Besides projecting the type meta, changes to object contents are also nearly always required.
-These can be configured in a number of way in the <code>PublishedResource</code>.</p>
-<p>Configuration happens <code>spec.mutation</code> and there are two fields:</p>
-<ul>
-<li><code>spec</code> contains the mutation rules when syncing the desired state (often in <code>spec</code>, but can also
-  be other top-level fields) from the remote side to the local side. Use this to apply defaulting,
-  normalising, and enforcing rules.</li>
-<li><code>status</code> contains the mutation rules when syncing the <code>status</code> subresource back from the local
-  cluster up into kcp. Use this to normalize names and values (e.g. if you rewrote
-  <code>.spec.secretName</code> from <code>"foo"</code> to <code>"dfkbssbfh"</code>, make sure the status does not "leak" this name
-  by accident).</li>
-</ul>
-<p>Mutation is always done as a series of steps. Each step does exactly one thing and only one must
-be configured per step.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">syncagent.kcp.io/v1alpha1</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PublishedResource</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">metadata</span><span class="p">:</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">publish-certmanager-certs</span><span class="w"> </span><span class="c1"># name can be freely chosen</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="nt">spec</span><span class="p">:</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">resource</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nt">mutation</span><span class="p">:</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="nt">spec</span><span class="p">:</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">      </span><span class="c1"># choose one per step</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">regex</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">        </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">        </span><span class="nt">delete</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
-</code></pre></div>
-<h4 id="regex">Regex</h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">regex</span><span class="p">:</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;json.path[expression]&quot;</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;(.+)&quot;</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">replacement</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;foo-\\1&quot;</span>
-</code></pre></div>
-<p>This mutation applies a regular expression to a single value inside the document. JSON path is the
-usual path, without a leading dot.</p>
-<h4 id="template">Template</h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">template</span><span class="p">:</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;json.path[expression]&quot;</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">.LocalObject.ObjectMeta.Namespace</span><span class="nv"> </span><span class="s">}}&quot;</span>
-</code></pre></div>
-<p>This mutation applies a Go template expression to a single value inside the document. JSON path is the
-usual path, without a leading dot.</p>
-<h4 id="delete">Delete</h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">delete</span><span class="p">:</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;json.path[expression]&quot;</span>
-</code></pre></div>
-<p>This mutation simply removes the value at the given path from the document. JSON path is the
-usual path, without a leading dot.</p>
-<h3 id="related-resources">Related Resources</h3>
-<p>The processing of resources on the service cluster often leads to additional resources being
-created, like a <code>Secret</code> for each cert-manager <code>Certificate</code> or a connection detail secret created
-by Crossplane. These need to be made available to the user in their workspaces.</p>
-<p>Likewise it's possible for auxiliary resources having to be created by the user, for example when
-the user has to provide credentials.</p>
-<p>To handle these cases, a <code>PublishedResource</code> can define multiple "related resources". Each related
-resource represents usually one, but can be multiple objects to synchronize between user workspace
-and service cluster. While the main published resource sync is always workspace-&gt;service cluster,
-related resources can originate on either side and so either can work as the source of truth.</p>
-<p>At the moment, only <code>ConfigMaps</code> and <code>Secrets</code> are allowed related resource kinds.</p>
-<p>For each related resource, the Sync Agent needs to be told how to find the object on the origin side
-and where to create it on the destination side. There are multiple options that you can choose from.</p>
-<p>By default all related objects live in the same namespace as the primary object (their owner/parent).
-If the primary object is cluster scoped, admins must configure additional rules to specify what
-namespace the ConfigMap/Secret shall be read from and created in.</p>
-<p>Related resources are always optional. Even if references (see below) are used and their path
-expression points to a non-existing field in the primary object (e.g. <code>spec.secretName</code> is configured,
-but that field does not exist in Certificate object), this will simply be treated as "not <em>yet</em>
-existing" and not create an error.</p>
-<h4 id="references">References</h4>
-<p>A reference is a JSONPath-like expression that are evaluated on both sides of the synchronization.
-You configure a single path expression (like <code>spec.secretName</code>) and the sync agent will evaluate it
-in the original primary object (in kcp) and again in the copied primary object (on the service
-cluster). Since the primary object has already been mutated, the <code>spec.secretName</code> is already
-rewritten/adjusted to work on the service cluster (for example it was changed from <code>my-secret</code> to
-<code>jk23h4wz47329rz2r72r92-secret</code> on the service cluster side). By doing it this way, admins only have
-to think about mutations and rewrites once (when configuring the primary object in the
-PublishedResource) and the path will yield 2 ready to use values (<code>my-secret</code> and the computed value).</p>
-<p>The value selected by the path expression must be a string (or number, but it will be coalesced into
-a string) and can then be further adjusted by applying a regular expression to it.</p>
-<p>References can only ever select 1 related object. Their upside is that they are simple to understand
-and easy to use, but require a "link" in the primary object that would point to the related object.</p>
-<p>Here's an example on how to use references to locate the related object.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">syncagent.kcp.io/v1alpha1</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PublishedResource</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="nt">metadata</span><span class="p">:</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">publish-certmanager-certs</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="nt">spec</span><span class="p">:</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">resource</span><span class="p">:</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Certificate</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cert-manager.io</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="nt">versions</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">v1</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>
-<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span><span class="nt">naming</span><span class="p">:</span>
-<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">    </span><span class="c1"># this is where our CA and Issuer live in this example</span>
-<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">    </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kube-system</span>
-<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="w">    </span><span class="c1"># need to adjust it to prevent collions (normally clustername is the namespace)</span>
-<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;$remoteClusterName-$remoteNamespaceHash-$remoteNameHash&quot;</span>
-<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>
-<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="w">  </span><span class="nt">related</span><span class="p">:</span>
-<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="c1"># unique name for this related resource. The name must be unique within</span>
-<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a><span class="w">      </span><span class="c1"># one PublishedResource and is the key by which consumers (end users)</span>
-<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a><span class="w">      </span><span class="c1"># can identify and consume the related resource. Common names are</span>
-<a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a><span class="w">      </span><span class="c1"># &quot;connection-details&quot; or &quot;credentials&quot;.</span>
-<a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a><span class="w">      </span><span class="nt">identifier</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tls-secret</span>
-<a id="__codelineno-8-23" name="__codelineno-8-23" href="#__codelineno-8-23"></a>
-<a id="__codelineno-8-24" name="__codelineno-8-24" href="#__codelineno-8-24"></a><span class="w">      </span><span class="c1"># &quot;service&quot; or &quot;kcp&quot;</span>
-<a id="__codelineno-8-25" name="__codelineno-8-25" href="#__codelineno-8-25"></a><span class="w">      </span><span class="nt">origin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service</span>
-<a id="__codelineno-8-26" name="__codelineno-8-26" href="#__codelineno-8-26"></a>
-<a id="__codelineno-8-27" name="__codelineno-8-27" href="#__codelineno-8-27"></a><span class="w">      </span><span class="c1"># for now, only &quot;Secret&quot; and &quot;ConfigMap&quot; are supported;</span>
-<a id="__codelineno-8-28" name="__codelineno-8-28" href="#__codelineno-8-28"></a><span class="w">      </span><span class="c1"># there is no GVK projection for related resources</span>
-<a id="__codelineno-8-29" name="__codelineno-8-29" href="#__codelineno-8-29"></a><span class="w">      </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Secret</span>
-<a id="__codelineno-8-30" name="__codelineno-8-30" href="#__codelineno-8-30"></a>
-<a id="__codelineno-8-31" name="__codelineno-8-31" href="#__codelineno-8-31"></a><span class="w">      </span><span class="c1"># configure where in the parent object we can find the child object</span>
-<a id="__codelineno-8-32" name="__codelineno-8-32" href="#__codelineno-8-32"></a><span class="w">      </span><span class="nt">object</span><span class="p">:</span>
-<a id="__codelineno-8-33" name="__codelineno-8-33" href="#__codelineno-8-33"></a><span class="w">        </span><span class="c1"># Object can use either reference, labelSelector or expressions. In this</span>
-<a id="__codelineno-8-34" name="__codelineno-8-34" href="#__codelineno-8-34"></a><span class="w">        </span><span class="c1"># example we use references.</span>
-<a id="__codelineno-8-35" name="__codelineno-8-35" href="#__codelineno-8-35"></a><span class="w">        </span><span class="nt">reference</span><span class="p">:</span>
-<a id="__codelineno-8-36" name="__codelineno-8-36" href="#__codelineno-8-36"></a><span class="w">          </span><span class="c1"># This path is evaluated in both the local and remote objects, to figure out</span>
-<a id="__codelineno-8-37" name="__codelineno-8-37" href="#__codelineno-8-37"></a><span class="w">          </span><span class="c1"># the local and remote names for the related object. This saves us from having</span>
-<a id="__codelineno-8-38" name="__codelineno-8-38" href="#__codelineno-8-38"></a><span class="w">          </span><span class="c1"># to remember mutated fields before their mutation (similar to the last-known</span>
-<a id="__codelineno-8-39" name="__codelineno-8-39" href="#__codelineno-8-39"></a><span class="w">          </span><span class="c1"># annotation).</span>
-<a id="__codelineno-8-40" name="__codelineno-8-40" href="#__codelineno-8-40"></a><span class="w">          </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">spec.secretName</span>
-<a id="__codelineno-8-41" name="__codelineno-8-41" href="#__codelineno-8-41"></a>
-<a id="__codelineno-8-42" name="__codelineno-8-42" href="#__codelineno-8-42"></a><span class="w">        </span><span class="c1"># namespace part is optional; if not configured,</span>
-<a id="__codelineno-8-43" name="__codelineno-8-43" href="#__codelineno-8-43"></a><span class="w">        </span><span class="c1"># Sync Agent assumes the same namespace as the owning resource</span>
-<a id="__codelineno-8-44" name="__codelineno-8-44" href="#__codelineno-8-44"></a><span class="w">        </span><span class="c1"># namespace:</span>
-<a id="__codelineno-8-45" name="__codelineno-8-45" href="#__codelineno-8-45"></a><span class="w">        </span><span class="c1">#   reference:</span>
-<a id="__codelineno-8-46" name="__codelineno-8-46" href="#__codelineno-8-46"></a><span class="w">        </span><span class="c1">#     path: spec.secretName</span>
-<a id="__codelineno-8-47" name="__codelineno-8-47" href="#__codelineno-8-47"></a><span class="w">        </span><span class="c1">#     regex:</span>
-<a id="__codelineno-8-48" name="__codelineno-8-48" href="#__codelineno-8-48"></a><span class="w">        </span><span class="c1">#       pattern: &#39;...&#39;</span>
-<a id="__codelineno-8-49" name="__codelineno-8-49" href="#__codelineno-8-49"></a><span class="w">        </span><span class="c1">#       replacement: &#39;...&#39;</span>
-</code></pre></div>
-<h4 id="label-selectors">Label Selectors</h4>
-<p>In some cases, the primary object does not have a link to its child/children objects. In these cases,
-a label selector can be used. This allows to configure the labels that any related object must have
-to be included.</p>
-<p>Notably, this allows for <em>multiple</em> objects that are synced for a single configured related resource.
-The sync agent will not prevent misconfigurations, so great care must be taken when configuring
-selectors to not accidentally include too many objects.</p>
-<p>Additionally, it is assumed that</p>
-<ul>
-<li>Primary objects synced from kcp to a service cluster will be renamed, to prevent naming collisions.</li>
-<li>The renamed objects on the service cluster might contain private, sensitive information that should
-  not be leaked into kcp workspaces.</li>
-<li>When there is no explicit name being requested (like by setting <code>spec.secretName</code>), it can be
-  assumed that the operator on the service cluster that is actually processing the primary object
-  will use the primary object's name (at least in parts) to construct the names of related objects,
-  for example a Certificate <code>yaddasupersecretyadda</code> might automatically get a Secret created named
-  <code>yaddasupersecretyadda-secret</code>.</li>
-</ul>
-<p>Since the name of the related object must not leak into a kcp workspace, admins who configure a
-label selector also always have to provide a naming scheme for the copies of the related objects on
-the destination side.</p>
-<p>Namespaces work the same as with references, i.e. by default the same namespace as the primary object
-is assumed. However you can actually also use label selectors to find the origin <em>namespaces</em>
-dynamically. So you can configure two label selectors, and then agent will first use the namespace
-selector to find all applicable namespaces, and then use the other label selector <em>in each of the
-applicable namespaces</em> to finally locate the related objects. How useful this is depends a lot on
-how crazy the underlying operators on the service clusters are.</p>
-<p>Here is an example on how to use label selectors:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">syncagent.kcp.io/v1alpha1</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PublishedResource</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="nt">metadata</span><span class="p">:</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">publish-certmanager-certs</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="nt">spec</span><span class="p">:</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span><span class="nt">resource</span><span class="p">:</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Certificate</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">    </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cert-manager.io</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">    </span><span class="nt">versions</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">v1</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">  </span><span class="nt">naming</span><span class="p">:</span>
-<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">    </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kube-system</span>
-<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;$remoteClusterName-$remoteNamespaceHash-$remoteNameHash&quot;</span>
-<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>
-<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">  </span><span class="nt">related</span><span class="p">:</span>
-<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">identifier</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tls-secrets</span>
-<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>
-<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="w">      </span><span class="c1"># &quot;service&quot; or &quot;kcp&quot;</span>
-<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="w">      </span><span class="nt">origin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service</span>
-<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>
-<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="w">      </span><span class="c1"># for now, only &quot;Secret&quot; and &quot;ConfigMap&quot; are supported;</span>
-<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="w">      </span><span class="c1"># there is no GVK projection for related resources</span>
-<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a><span class="w">      </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Secret</span>
-<a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a>
-<a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a><span class="w">      </span><span class="c1"># configure where in the parent object we can find the child object</span>
-<a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a><span class="w">      </span><span class="nt">object</span><span class="p">:</span>
-<a id="__codelineno-9-27" name="__codelineno-9-27" href="#__codelineno-9-27"></a><span class="w">        </span><span class="c1"># A selector is a standard Kubernetes label selector, supporting</span>
-<a id="__codelineno-9-28" name="__codelineno-9-28" href="#__codelineno-9-28"></a><span class="w">        </span><span class="c1"># matchLabels and matchExpressions.</span>
-<a id="__codelineno-9-29" name="__codelineno-9-29" href="#__codelineno-9-29"></a><span class="w">        </span><span class="nt">selector</span><span class="p">:</span>
-<a id="__codelineno-9-30" name="__codelineno-9-30" href="#__codelineno-9-30"></a><span class="w">          </span><span class="nt">matchLabels</span><span class="p">:</span>
-<a id="__codelineno-9-31" name="__codelineno-9-31" href="#__codelineno-9-31"></a><span class="w">            </span><span class="nt">my-key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-value</span>
-<a id="__codelineno-9-32" name="__codelineno-9-32" href="#__codelineno-9-32"></a><span class="w">            </span><span class="nt">another</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pair</span>
-<a id="__codelineno-9-33" name="__codelineno-9-33" href="#__codelineno-9-33"></a>
-<a id="__codelineno-9-34" name="__codelineno-9-34" href="#__codelineno-9-34"></a><span class="w">          </span><span class="c1"># You also need to provide rules on how objects found by this selector</span>
-<a id="__codelineno-9-35" name="__codelineno-9-35" href="#__codelineno-9-35"></a><span class="w">          </span><span class="c1"># should be named on the destination side of the sync.</span>
-<a id="__codelineno-9-36" name="__codelineno-9-36" href="#__codelineno-9-36"></a><span class="w">          </span><span class="c1"># Rewrites are either using regular expressions or templated strings,</span>
-<a id="__codelineno-9-37" name="__codelineno-9-37" href="#__codelineno-9-37"></a><span class="w">          </span><span class="c1"># never both.</span>
-<a id="__codelineno-9-38" name="__codelineno-9-38" href="#__codelineno-9-38"></a><span class="w">          </span><span class="c1"># The rewrite config is applied to each individual found object.</span>
-<a id="__codelineno-9-39" name="__codelineno-9-39" href="#__codelineno-9-39"></a><span class="w">          </span><span class="nt">rewrite</span><span class="p">:</span>
-<a id="__codelineno-9-40" name="__codelineno-9-40" href="#__codelineno-9-40"></a><span class="w">            </span><span class="nt">regex</span><span class="p">:</span>
-<a id="__codelineno-9-41" name="__codelineno-9-41" href="#__codelineno-9-41"></a><span class="w">              </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;foo-(.+)&quot;</span>
-<a id="__codelineno-9-42" name="__codelineno-9-42" href="#__codelineno-9-42"></a><span class="w">              </span><span class="nt">replacement</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;bar-\\1&quot;</span>
-<a id="__codelineno-9-43" name="__codelineno-9-43" href="#__codelineno-9-43"></a>
-<a id="__codelineno-9-44" name="__codelineno-9-44" href="#__codelineno-9-44"></a><span class="w">            </span><span class="c1"># or</span>
-<a id="__codelineno-9-45" name="__codelineno-9-45" href="#__codelineno-9-45"></a>
-<a id="__codelineno-9-46" name="__codelineno-9-46" href="#__codelineno-9-46"></a><span class="w">            </span><span class="nt">template</span><span class="p">:</span>
-<a id="__codelineno-9-47" name="__codelineno-9-47" href="#__codelineno-9-47"></a><span class="w">              </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">.Name</span><span class="nv"> </span><span class="s">}}-foo&quot;</span>
-<a id="__codelineno-9-48" name="__codelineno-9-48" href="#__codelineno-9-48"></a>
-<a id="__codelineno-9-49" name="__codelineno-9-49" href="#__codelineno-9-49"></a>
-<a id="__codelineno-9-50" name="__codelineno-9-50" href="#__codelineno-9-50"></a><span class="w">        </span><span class="c1"># Like with references, the namespace can (or must) be configured explicitly.</span>
-<a id="__codelineno-9-51" name="__codelineno-9-51" href="#__codelineno-9-51"></a><span class="w">        </span><span class="c1"># You do not need to also use label selectors here, you can mix and match</span>
-<a id="__codelineno-9-52" name="__codelineno-9-52" href="#__codelineno-9-52"></a><span class="w">        </span><span class="c1"># freely.</span>
-<a id="__codelineno-9-53" name="__codelineno-9-53" href="#__codelineno-9-53"></a><span class="w">        </span><span class="c1"># namespace:</span>
-<a id="__codelineno-9-54" name="__codelineno-9-54" href="#__codelineno-9-54"></a><span class="w">        </span><span class="c1">#   reference:</span>
-<a id="__codelineno-9-55" name="__codelineno-9-55" href="#__codelineno-9-55"></a><span class="w">        </span><span class="c1">#     path: metadata.namespace</span>
-<a id="__codelineno-9-56" name="__codelineno-9-56" href="#__codelineno-9-56"></a><span class="w">        </span><span class="c1">#     regex:</span>
-<a id="__codelineno-9-57" name="__codelineno-9-57" href="#__codelineno-9-57"></a><span class="w">        </span><span class="c1">#       pattern: &#39;...&#39;</span>
-<a id="__codelineno-9-58" name="__codelineno-9-58" href="#__codelineno-9-58"></a><span class="w">        </span><span class="c1">#       replacement: &#39;...&#39;</span>
-</code></pre></div>
-<h4 id="templates">Templates</h4>
-<p>The third option to configure how to find/create related objects are templates. These are simple
-Go template strings (like <code>{{ .Variable }}</code>) that allow to easily configure static values with a
-sprinkling of dynamic values.</p>
-<p>This feature has not been fully implemented yet.</p>
-<h2 id="examples">Examples</h2>
-<h3 id="provide-certificates">Provide Certificates</h3>
-<p>This combination of <code>APIExport</code> and <code>PublishedResource</code> make cert-manager certificates available in
-kcp. The <code>APIExport</code> needs to be created in a workspace, most likely in an organization workspace.
-The <code>PublishedResource</code> is created wherever the Sync Agent and cert-manager are running.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apis.kcp.io/v1alpha1</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">APIExport</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="nt">metadata</span><span class="p">:</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">certificates.example.corp</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="nt">spec</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">syncagent.kcp.io/v1alpha1</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PublishedResource</span>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="nt">metadata</span><span class="p">:</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">publish-certmanager-certs</span>
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="nt">spec</span><span class="p">:</span>
-<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">  </span><span class="nt">resource</span><span class="p">:</span>
-<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Certificate</span>
-<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">    </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cert-manager.io</span>
-<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">    </span><span class="nt">versions</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">v1</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>
-<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">  </span><span class="nt">naming</span><span class="p">:</span>
-<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">    </span><span class="c1"># this is where our CA and Issuer live in this example</span>
-<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">    </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kube-system</span>
-<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">    </span><span class="c1"># need to adjust it to prevent collions (normally clustername is the namespace)</span>
-<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;$remoteClusterName-$remoteNamespaceHash-$remoteNameHash&quot;</span>
-<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>
-<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="w">  </span><span class="nt">related</span><span class="p">:</span>
-<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">origin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service</span><span class="w"> </span><span class="c1"># service or kcp</span>
-<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="w">      </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Secret</span><span class="w"> </span><span class="c1"># for now, only &quot;Secret&quot; and &quot;ConfigMap&quot; are supported;</span>
-<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a><span class="w">                   </span><span class="c1"># there is no GVK projection for related resources</span>
-<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a>
-<a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="w">      </span><span class="c1"># configure where in the parent object we can find</span>
-<a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a><span class="w">      </span><span class="c1"># the name/namespace of the related resource (the child)</span>
-<a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a><span class="w">      </span><span class="nt">reference</span><span class="p">:</span>
-<a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a><span class="w">        </span><span class="nt">name</span><span class="p">:</span>
-<a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a><span class="w">          </span><span class="c1"># This path is evaluated in both the local and remote objects, to figure out</span>
-<a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a><span class="w">          </span><span class="c1"># the local and remote names for the related object. This saves us from having</span>
-<a id="__codelineno-11-28" name="__codelineno-11-28" href="#__codelineno-11-28"></a><span class="w">          </span><span class="c1"># to remember mutated fields before their mutation (similar to the last-known</span>
-<a id="__codelineno-11-29" name="__codelineno-11-29" href="#__codelineno-11-29"></a><span class="w">          </span><span class="c1"># annotation).</span>
-<a id="__codelineno-11-30" name="__codelineno-11-30" href="#__codelineno-11-30"></a><span class="w">          </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">spec.secretName</span>
-<a id="__codelineno-11-31" name="__codelineno-11-31" href="#__codelineno-11-31"></a><span class="w">        </span><span class="c1"># namespace part is optional; if not configured,</span>
-<a id="__codelineno-11-32" name="__codelineno-11-32" href="#__codelineno-11-32"></a><span class="w">        </span><span class="c1"># Sync Agent assumes the same namespace as the owning resource</span>
-<a id="__codelineno-11-33" name="__codelineno-11-33" href="#__codelineno-11-33"></a><span class="w">        </span><span class="c1"># namespace:</span>
-<a id="__codelineno-11-34" name="__codelineno-11-34" href="#__codelineno-11-34"></a><span class="w">        </span><span class="c1">#   path: spec.secretName</span>
-<a id="__codelineno-11-35" name="__codelineno-11-35" href="#__codelineno-11-35"></a><span class="w">        </span><span class="c1">#   regex:</span>
-<a id="__codelineno-11-36" name="__codelineno-11-36" href="#__codelineno-11-36"></a><span class="w">        </span><span class="c1">#     pattern: &#39;...&#39;</span>
-<a id="__codelineno-11-37" name="__codelineno-11-37" href="#__codelineno-11-37"></a><span class="w">        </span><span class="c1">#     replacement: &#39;...&#39;</span>
-</code></pre></div>
+<h1 id="macro-syntax-error"><em>Macro Syntax Error</em></h1>
+<p><em>File</em>: <code>publish-resources/index.md</code></p>
+<p><em>Line 150 in Markdown file:</em> <strong>unexpected '.'</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>    namespace: &#39;{{ .ClusterName }}&#39;
+</code></pre></div></p>
 
 
 

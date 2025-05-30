@@ -2,50 +2,56 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
     <url>
         <loc>https://docs.kcp.io/api-syncagent/main/</loc>
-        <lastmod>2025-05-23</lastmod>
+        <lastmod>2025-05-30</lastmod>
         <changefreq>daily</changefreq>
         <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/main/"/>
     </url>
     <url>
         <loc>https://docs.kcp.io/api-syncagent/main/consuming-services/</loc>
-        <lastmod>2025-05-23</lastmod>
+        <lastmod>2025-05-30</lastmod>
         <changefreq>daily</changefreq>
         <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/main/consuming-services/"/>
     </url>
     <url>
         <loc>https://docs.kcp.io/api-syncagent/main/faq/</loc>
-        <lastmod>2025-05-23</lastmod>
+        <lastmod>2025-05-30</lastmod>
         <changefreq>daily</changefreq>
         <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/main/faq/"/>
     </url>
     <url>
         <loc>https://docs.kcp.io/api-syncagent/main/getting-started/</loc>
-        <lastmod>2025-05-23</lastmod>
+        <lastmod>2025-05-30</lastmod>
         <changefreq>daily</changefreq>
         <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/main/getting-started/"/>
     </url>
     <url>
         <loc>https://docs.kcp.io/api-syncagent/main/contributing/releasing/</loc>
-        <lastmod>2025-05-23</lastmod>
+        <lastmod>2025-05-30</lastmod>
         <changefreq>daily</changefreq>
         <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/main/contributing/releasing/"/>
     </url>
     <url>
         <loc>https://docs.kcp.io/api-syncagent/main/publish-resources/</loc>
-        <lastmod>2025-05-23</lastmod>
+        <lastmod>2025-05-30</lastmod>
         <changefreq>daily</changefreq>
         <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/main/publish-resources/"/>
     </url>
     <url>
         <loc>https://docs.kcp.io/api-syncagent/main/publish-resources/api-lifecycle/</loc>
-        <lastmod>2025-05-23</lastmod>
+        <lastmod>2025-05-30</lastmod>
         <changefreq>daily</changefreq>
         <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/main/publish-resources/api-lifecycle/"/>
     </url>
     <url>
         <loc>https://docs.kcp.io/api-syncagent/main/publish-resources/technical-details/</loc>
-        <lastmod>2025-05-23</lastmod>
+        <lastmod>2025-05-30</lastmod>
         <changefreq>daily</changefreq>
         <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/main/publish-resources/technical-details/"/>
+    </url>
+    <url>
+        <loc>https://docs.kcp.io/api-syncagent/main/publish-resources/templating/</loc>
+        <lastmod>2025-05-30</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/main/publish-resources/templating/"/>
     </url>
 </urlset>
