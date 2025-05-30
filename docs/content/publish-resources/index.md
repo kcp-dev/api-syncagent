@@ -139,6 +139,7 @@ conventions of whatever tooling ultimately processes the resources locally.
 
 This snippet shows the implicit default configuration:
 
+{% raw %}
 ```yaml
 apiVersion: syncagent.kcp.io/v1alpha1
 kind: PublishedResource
@@ -150,6 +151,7 @@ spec:
     namespace: '{{ .ClusterName }}'
     name: '{{ .Object.metadata.namespace | sha3short }}-{{ .Object.metadata.name | sha3short }}'
 ```
+{% endraw %}
 
 This configuration ensures that no collisions will happen: Each workspace in
 kcp will create a namespace on the local cluster, with a combination of namespace and name hashes
@@ -185,6 +187,7 @@ PublishedResources over to Go templates.
 
 The following table shows the available variables and their modern replacements:
 
+{% raw %}
 | Deprecated Variable    | Go Template                                     | Description |
 | ---------------------- | ----------------------------------------------- | ----------- |
 | `$remoteClusterName`   | `{{ .ClusterName }}`                            | the workspace's cluster name (e.g. "1084s8ceexsehjm2") |
@@ -192,6 +195,7 @@ The following table shows the available variables and their modern replacements:
 | `$remoteNamespaceHash` | `{{ .Object.metadata.namespace \| shortHash }}` | first 20 hex characters of the SHA-1 hash of `$remoteNamespace` |
 | `$remoteName`          | `{{ .Object.metadata.name }}`                   | the original name of the object inside the workspace (rarely used to construct local namespace names) |
 | `$remoteNameHash`      | `{{ .Object.metadata.name \| shortHash }}`      | first 20 hex characters of the SHA-1 hash of `$remoteName` |
+{% endraw %}
 
 Note that `ClusterPath` was never available in `$variable` form.
 
@@ -316,6 +320,7 @@ and easy to use, but require a "link" in the primary object that would point to 
 
 Here's an example on how to use references to locate the related object.
 
+{% raw %}
 ```yaml
 apiVersion: syncagent.kcp.io/v1alpha1
 kind: PublishedResource
@@ -367,6 +372,7 @@ spec:
         #       pattern: '...'
         #       replacement: '...'
 ```
+{% endraw %}
 
 #### Templates
 
@@ -403,11 +409,12 @@ type localObjectNamingContext struct {
 In the simplest form, a template can replace a reference:
 
 * reference: `.spec.secretName`
-* Go template: `{{ .Object.spec.secretName }}`
+* Go template: {% raw %}`{{ .Object.spec.secretName }}`{% endraw %}
 
 Just like with references, the configured template is evaluated twice, once for each side of the
 synchronization. You can use the `Side` variable to allow for fully customized names on each side:
 
+{% raw %}
 ```yaml
 spec:
   ...
@@ -418,6 +425,7 @@ spec:
         template:
           template: `{{ if eq .Side "kcp" }}name-in-kcp{{ else }}name-on-service-cluster{{ end }}`
 ```
+{% endraw %}
 
 See [Templating](templating.md) for more information on how to use templates in PublishedResources.
 
@@ -455,6 +463,7 @@ how peculiar the underlying operators on the service clusters are.
 
 Here is an example on how to use label selectors:
 
+{% raw %}
 ```yaml
 apiVersion: syncagent.kcp.io/v1alpha1
 kind: PublishedResource
@@ -509,10 +518,8 @@ spec:
               replacement: "bar-\\1"
 
             # or
-{% raw %}
             template:
               template: "{{ .Name }}-foo"
-{% endraw %}
 
         # Like with references, the namespace can (or must) be configured explicitly.
         # You do not need to also use label selectors here, you can mix and match
@@ -524,6 +531,7 @@ spec:
         #       pattern: '...'
         #       replacement: '...'
 ```
+{% endraw %}
 
 There are two possible usages of Go templates when using label selectors. See [Templating](templating.md)
 for more information on how to use templates in PublishedResources in general.
@@ -620,6 +628,7 @@ metadata:
 spec: {}
 ```
 
+{% raw %}
 ```yaml
 apiVersion: syncagent.kcp.io/v1alpha1
 kind: PublishedResource
@@ -652,3 +661,4 @@ spec:
         template:
           template: '{{ .Object.spec.secretName }}'
 ```
+{% endraw %}

@@ -1,7 +1,9 @@
 # Templating
 
+{% raw %}
 `PublishedResources` allow to use [Go templates](https://pkg.go.dev/text/template) in a number of
 places. A simple template could look like `{{ .Object.spec.secretName | sha3sum }}`.
+{% endraw %}
 
 ## General Usage
 
