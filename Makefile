@@ -18,7 +18,7 @@ export GO111MODULE = on
 CMD ?= $(filter-out OWNERS, $(notdir $(wildcard ./cmd/*)))
 GOBUILDFLAGS ?= -v
 GIT_HEAD ?= $(shell git log -1 --format=%H)
-GIT_VERSION = $(shell git describe --tags --always)
+GIT_VERSION = $(shell git describe --tags --always --match='v*')
 LDFLAGS += -extldflags '-static' \
   -X github.com/kcp-dev/api-syncagent/internal/version.gitVersion=$(GIT_VERSION) \
   -X github.com/kcp-dev/api-syncagent/internal/version.gitHead=$(GIT_HEAD)
