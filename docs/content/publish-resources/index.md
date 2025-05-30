@@ -137,20 +137,7 @@ Since the Sync Agent ingests resources from many different Kubernetes clusters (
 them onto a single cluster, resources have to be renamed to prevent collisions and also follow the
 conventions of whatever tooling ultimately processes the resources locally.
 
-The renaming is configured in `spec.naming`. In there, renaming patterns are configured, where
-pre-defined placeholders can be used, for example `foo-$placeholder`. The following placeholders
-are available:
-
-* `$remoteClusterName` – the workspace's cluster name (e.g. "1084s8ceexsehjm2")
-* `$remoteNamespace` – the original namespace used by the consumer inside the workspace
-* `$remoteNamespaceHash` – first 20 hex characters of the SHA-1 hash of `$remoteNamespace`
-* `$remoteName` – the original name of the object inside the workspace (rarely used to construct
-  local namespace names)
-* `$remoteNameHash` – first 20 hex characters of the SHA-1 hash of `$remoteName`
-
-If nothing is configured, the default ensures that no collisions will happen: Each workspace in
-kcp will create a namespace on the local cluster, with a combination of namespace and name hashes
-used for the actual resource names.
+This snippet shows the implicit default configuration:
 
 ```yaml
 apiVersion: syncagent.kcp.io/v1alpha1
@@ -160,10 +147,59 @@ metadata:
 spec:
   resource: ...
   naming:
-    # This is the implicit default configuration.
-    namespace: "$remoteClusterName"
-    name: "cert-$remoteNamespaceHash-$remoteNameHash"
+    namespace: '{{ .ClusterName }}'
+    name: '{{ .Object.metadata.namespace | sha3short }}-{{ .Object.metadata.name | sha3short }}'
 ```
+
+This configuration ensures that no collisions will happen: Each workspace in
+kcp will create a namespace on the local cluster, with a combination of namespace and name hashes
+used for the actual resource names.
+
+You can override the name or namespaces rules, or both. It is your responsibility to ensure no
+naming conflicts can happen on the service cluster, as the agent cannot determine this automatically.
+
+#### Templating
+
+In `spec.naming`, [Go template expressions](https://pkg.go.dev/text/template) are used to construct
+the desired name of the object's copy. In the templates used here, the following data is injected by
+the agent:
+
+```go
+type localObjectNamingContext struct {
+	// Object is the full remote object found in a kcp workspace.
+	Object map[string]any
+	// ClusterName is the internal cluster identifier (e.g. "34hg2j4gh24jdfgf").
+	ClusterName logicalcluster.Name
+	// ClusterPath is the workspace path (e.g. "root:customer:projectx").
+	ClusterPath logicalcluster.Path
+}
+```
+
+For more details about the templating, see the [Templating](templating.md) documentation.
+
+#### Legacy Naming Rules
+
+Go templates for naming rules have been added in v0.3 of the agent. Previous versions used a
+`$variable`-based approach, which since has been deprecated. You are encouraged to migrate your
+PublishedResources over to Go templates.
+
+The following table shows the available variables and their modern replacements:
+
+| Deprecated Variable    | Go Template                                     | Description |
+| ---------------------- | ----------------------------------------------- | ----------- |
+| `$remoteClusterName`   | `{{ .ClusterName }}`                            | the workspace's cluster name (e.g. "1084s8ceexsehjm2") |
+| `$remoteNamespace`     | `{{ .Object.metadata.namespace }}`              | the original namespace used by the consumer inside the workspace |
+| `$remoteNamespaceHash` | `{{ .Object.metadata.namespace \| shortHash }}` | first 20 hex characters of the SHA-1 hash of `$remoteNamespace` |
+| `$remoteName`          | `{{ .Object.metadata.name }}`                   | the original name of the object inside the workspace (rarely used to construct local namespace names) |
+| `$remoteNameHash`      | `{{ .Object.metadata.name \| shortHash }}`      | first 20 hex characters of the SHA-1 hash of `$remoteName` |
+
+Note that `ClusterPath` was never available in `$variable` form.
+
+Note also that the `shortHash` function exists only for backwards compatibility with the old
+`$variable` syntax. The new default is to use SHA-3 instead (via the `sha3short` function). When
+migrating from the old syntax, you can use the `shortHash` function to ensure new objects are placed
+in the old locations. New setups should however use explicitly named functions for hashing, like
+`sha3sum` or `sha3short`. `sha3short` takes an optional length parameter that defaults to 20.
 
 ### Mutation
 
@@ -216,7 +252,7 @@ usual path, without a leading dot.
 ```yaml
 template:
   path: "json.path[expression]"
-  template: "{{ .LocalObject.ObjectMeta.Namespace }}"
+  template: "{{ .LocalObject.metadata.namespace }}"
 ```
 {% endraw %}
 
@@ -275,7 +311,7 @@ PublishedResource) and the path will yield 2 ready to use values (`my-secret` an
 The value selected by the path expression must be a string (or number, but it will be coalesced into
 a string) and can then be further adjusted by applying a regular expression to it.
 
-References can only ever select 1 related object. Their upside is that they are simple to understand
+References can only ever select one related object. Their upside is that they are simple to understand
 and easy to use, but require a "link" in the primary object that would point to the related object.
 
 Here's an example on how to use references to locate the related object.
@@ -295,7 +331,7 @@ spec:
     # this is where our CA and Issuer live in this example
     namespace: kube-system
     # need to adjust it to prevent collions (normally clustername is the namespace)
-    name: "$remoteClusterName-$remoteNamespaceHash-$remoteNameHash"
+    name: "{{ .ClusterName }}-{{ .Object.metadata.namespace | sha3short }}-{{ .Object.metadata.name | sha3short }}"
 
   related:
     - # unique name for this related resource. The name must be unique within
@@ -313,7 +349,7 @@ spec:
 
       # configure where in the parent object we can find the child object
       object:
-        # Object can use either reference, labelSelector or expressions. In this
+        # Object can use either reference, labelSelector or template. In this
         # example we use references.
         reference:
           # This path is evaluated in both the local and remote objects, to figure out
@@ -331,6 +367,59 @@ spec:
         #       pattern: '...'
         #       replacement: '...'
 ```
+
+#### Templates
+
+Similar to references, [Go templates](https://pkg.go.dev/text/template) can also be used to determine
+the names of related objects on both sides of the sync. In fact, templates can be thought of as more
+powerful references since they allow for minimal logic to be embedded in them. Templates also do not
+necessarily have to select a value from the object (like a reference does), but can use any kind of
+logic to determine the names.
+
+Like references, templates can also only be used to select a single object per related resource.
+
+A template gets the following data injected into it:
+
+```go
+type localObjectNamingContext struct {
+	// Side is set to either one of the possible origin values to indicate for
+	// which cluster the template is currently being evaluated for.
+	Side syncagentv1alpha1.RelatedResourceOrigin
+	// Object is the primary object belonging to the related object. Since related
+	// object templates are evaluated twice (once for the origin side and once
+	// for the destination side), object is the primary object on the side the
+	// template is evaluated for.
+	Object map[string]any
+	// ClusterName is the internal cluster identifier (e.g. "34hg2j4gh24jdfgf")
+	// of the kcp workspace that the synchronization is currently processing. This
+	// value is set for both evaluations, regardless of side.
+	ClusterName logicalcluster.Name
+	// ClusterPath is the workspace path (e.g. "root:customer:projectx"). This
+	// value is set for both evaluations, regardless of side.
+	ClusterPath logicalcluster.Path
+}
+```
+
+In the simplest form, a template can replace a reference:
+
+* reference: `.spec.secretName`
+* Go template: `{{ .Object.spec.secretName }}`
+
+Just like with references, the configured template is evaluated twice, once for each side of the
+synchronization. You can use the `Side` variable to allow for fully customized names on each side:
+
+```yaml
+spec:
+  ...
+  related:
+    - identifier: tls-secret
+      # ..omitting other fields..
+      object:
+        template:
+          template: `{{ if eq .Side "kcp" }}name-in-kcp{{ else }}name-on-service-cluster{{ end }}`
+```
+
+See [Templating](templating.md) for more information on how to use templates in PublishedResources.
 
 #### Label Selectors
 
@@ -362,7 +451,7 @@ is assumed. However you can actually also use label selectors to find the origin
 dynamically. So you can configure two label selectors, and then agent will first use the namespace
 selector to find all applicable namespaces, and then use the other label selector _in each of the
 applicable namespaces_ to finally locate the related objects. How useful this is depends a lot on
-how crazy the underlying operators on the service clusters are.
+how peculiar the underlying operators on the service clusters are.
 
 Here is an example on how to use label selectors:
 
@@ -379,7 +468,7 @@ spec:
 
   naming:
     namespace: kube-system
-    name: "$remoteClusterName-$remoteNamespaceHash-$remoteNameHash"
+    name: "{{ .ClusterName }}-{{ .Object.metadata.namespace | sha3short }}-{{ .Object.metadata.name | sha3short }}"
 
   related:
     - identifier: tls-secrets
@@ -399,9 +488,18 @@ spec:
           matchLabels:
             my-key: my-value
             another: pair
+            # Within matchLabels, keys and values are treated as Go templates.
+            # In this example, since the Secret originates on the service cluster
+            # (see "origin" above), we use LocalObject to determine the value
+            # for the selector. In case the object was heavily mutated during the
+            # sync, this will give access to the mutated values on the service
+            # cluster side.
+            '{{ shasum "test" }}': '{{ .LocalObject.spec.username }}'
 
           # You also need to provide rules on how objects found by this selector
-          # should be named on the destination side of the sync.
+          # should be named on the destination side of the sync. You can choose
+          # to define a rewrite rule that keeps the original name from the origin
+          # side, but this may leak undesirable internals to the users.
           # Rewrites are either using regular expressions or templated strings,
           # never both.
           # The rewrite config is applied to each individual found object.
@@ -427,13 +525,84 @@ spec:
         #       replacement: '...'
 ```
 
-#### Templates
+There are two possible usages of Go templates when using label selectors. See [Templating](templating.md)
+for more information on how to use templates in PublishedResources in general.
 
-The third option to configure how to find/create related objects are templates. These are simple
-Go template strings (like `{% raw %}{{ .Variable }}{% endraw %}`) that allow to easily configure static values with a
-sprinkling of dynamic values.
+##### Selector Templates
 
-This feature has not been fully implemented yet.
+Each template rendered as part of a `matchLabels` selector gets the following data injected:
+
+```go
+type relatedObjectLabelContext struct {
+	// LocalObject is the primary object copy on the local side of the sync
+	// (i.e. on the service cluster).
+	LocalObject map[string]any
+	// RemoteObject is the primary object original, in kcp.
+	RemoteObject map[string]any
+	// ClusterName is the internal cluster identifier (e.g. "34hg2j4gh24jdfgf")
+	// of the kcp workspace that the synchronization is currently processing
+	// (where the remote object exists).
+	ClusterName logicalcluster.Name
+	// ClusterPath is the workspace path (e.g. "root:customer:projectx").
+	ClusterPath logicalcluster.Path
+}
+```
+
+Note that in contrast to the `template` way of selecting objects, the templates here in the label
+selector are only evaluated once, on the origin side of the sync. The names of the destination side
+are determined using the rewrite mechanism (which might also be a Go template, see next section).
+
+##### Rewrite Rules
+
+Each found related object on the origin side needs to have its own name on the destination side. To
+map from the origin to the destination side, regular expressions (see example snippet) or Go
+templates can be used.
+
+If a template is configured, it is evaluated once for every found related object. The template gets
+the following data injected into it:
+
+```go
+type relatedObjectLabelRewriteContext struct {
+	// Value is either the a found namespace name (when a label selector was
+	// used to select the source namespaces for related objects) or the name of
+	// a found object (when a label selector was used to find objects). In the
+	// former case, the template should return the new namespace to use on the
+	// destination side, in the latter case it should return the new object name
+	// to use on the destination side.
+	Value string
+	// When a rewrite is used to rewrite object names, RelatedObject is the
+	// original related object (found on the origin side). This enables you to
+	// ignore the given Value entirely and just select anything from the object
+	// itself.
+	// RelatedObject is nil when the rewrite is performed for a namespace.
+	RelatedObject map[string]any
+	// LocalObject is the primary object copy on the local side of the sync
+	// (i.e. on the service cluster).
+	LocalObject map[string]any
+	// RemoteObject is the primary object original, in kcp.
+	RemoteObject map[string]any
+	// ClusterName is the internal cluster identifier (e.g. "34hg2j4gh24jdfgf")
+	// of the kcp workspace that the synchronization is currently processing
+	// (where the remote object exists).
+	ClusterName logicalcluster.Name
+	// ClusterPath is the workspace path (e.g. "root:customer:projectx").
+	ClusterPath logicalcluster.Path
+}
+```
+
+Regarding `Value`: The agent allows to individually configure rules for finding object _names_ and
+object _namespaces_. Often the namespace is not configured because the related objects live in the
+same namespace as their owning, primary object.
+
+When a label selector is configured to find namespaces, the rewrite template will be evaluated once
+for each found namespace. In this case the `.Value` is the name of the found namespace. Remember, the
+template's job is to map the found namespace to the new namespace on the destination side of the sync.
+
+Once the namespaces have been determined, the agent will look for matching objects in each namespace
+individually. For each namespace it will again follow the configured source, may it be a selector,
+template or reference. If again a label selector is used, it will be applied in each namespace and
+the configured rewrite rule will be evaluated once per found object. In this case, `.Value` is the
+name of found object.
 
 ## Examples
 
@@ -466,28 +635,20 @@ spec:
     # this is where our CA and Issuer live in this example
     namespace: kube-system
     # need to adjust it to prevent collions (normally clustername is the namespace)
-    name: "$remoteClusterName-$remoteNamespaceHash-$remoteNameHash"
+    name: "{{ .ClusterName }}-{{ .Object.metadata.namespace | sha3short }}-{{ .Object.metadata.name | sha3short }}"
 
   related:
     - origin: service # service or kcp
-      kind: Secret # for now, only "Secret" and "ConfigMap" are supported;
-                   # there is no GVK projection for related resources
+      kind: Secret    # for now, only "Secret" and "ConfigMap" are supported;
+                      # there is no GVK projection for related resources
 
       # configure where in the parent object we can find
       # the name/namespace of the related resource (the child)
-      reference:
-        name:
-          # This path is evaluated in both the local and remote objects, to figure out
-          # the local and remote names for the related object. This saves us from having
-          # to remember mutated fields before their mutation (similar to the last-known
-          # annotation).
-          path: spec.secretName
-        # namespace part is optional; if not configured,
-        # Sync Agent assumes the same namespace as the owning resource
-        # namespace:
-        #   path: spec.secretName
-        #   regex:
-        #     pattern: '...'
-        #     replacement: '...'
+      object:
+        # This template is evaluated in both the local and remote objects, to figure out
+        # the local and remote names for the related object. This saves us from having
+        # to remember mutated fields before their mutation (similar to the last-known
+        # annotation).
+        template:
+          template: '{{ .Object.spec.secretName }}'
 ```
-

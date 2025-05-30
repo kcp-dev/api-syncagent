@@ -34,6 +34,7 @@ type Thing struct {
 
 type ThingSpec struct {
 	Username string `json:"username"`
+	Kink     string `json:"kink"`
 	Address  string `json:"address,omitempty"`
 }
 

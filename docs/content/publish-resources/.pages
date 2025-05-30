@@ -1,4 +1,5 @@
 nav:
     - index.md
+    - templating.md
     - api-lifecycle.md
     - technical-details.md

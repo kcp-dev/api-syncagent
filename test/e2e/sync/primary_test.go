@@ -53,7 +53,97 @@ func TestSyncSimpleObject(t *testing.T) {
 		orgWorkspace  = "sync-simple"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
+	ctrlruntime.SetLogger(logr.Discard())
+
+	// setup a test environment in kcp
+	orgKubconfig := utils.CreateOrganization(t, ctx, orgWorkspace, apiExportName)
+
+	// start a service cluster
+	envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
+		"test/crds/crontab.yaml",
+	})
+
+	// publish Crontabs and Backups
+	t.Logf("Publishing CRDs…")
+	prCrontabs := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "publish-crontabs",
+		},
+		Spec: syncagentv1alpha1.PublishedResourceSpec{
+			Resource: syncagentv1alpha1.SourceResourceDescriptor{
+				APIGroup: "example.com",
+				Version:  "v1",
+				Kind:     "CronTab",
+			},
+			// These rules make finding the local object easier, but should not be used in production.
+			Naming: &syncagentv1alpha1.ResourceNaming{
+				Name:      "{{ .Object.metadata.name }}",
+				Namespace: "synced-{{ .Object.metadata.namespace }}",
+			},
+			Projection: &syncagentv1alpha1.ResourceProjection{
+				Group: kcpGroupName,
+			},
+		},
+	}
+
+	if err := envtestClient.Create(ctx, prCrontabs); err != nil {
+		t.Fatalf("Failed to create PublishedResource: %v", err)
+	}
+
+	// start the agent in the background to update the APIExport with the CronTabs API
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+
+	// wait until the API is available
+	teamCtx := kontext.WithCluster(ctx, logicalcluster.Name(fmt.Sprintf("root:%s:team-1", orgWorkspace)))
+	kcpClient := utils.GetKcpAdminClusterClient(t)
+	utils.WaitForBoundAPI(t, teamCtx, kcpClient, schema.GroupVersionResource{
+		Group:    kcpGroupName,
+		Version:  "v1",
+		Resource: "crontabs",
+	})
+
+	// create a Crontab object in a team workspace
+	t.Log("Creating CronTab in kcp…")
+	crontab := yamlToUnstructured(t, `
+apiVersion: kcp.example.com/v1
+kind: CronTab
+metadata:
+  namespace: default
+  name: my-crontab
+spec:
+  cronSpec: '* * *'
+  image: ubuntu:latest
+`)
+
+	if err := kcpClient.Create(teamCtx, crontab); err != nil {
+		t.Fatalf("Failed to create CronTab in kcp: %v", err)
+	}
+
+	// wait for the agent to sync the object down into the service cluster
+
+	t.Logf("Wait for CronTab to be synced…")
+	copy := &unstructured.Unstructured{}
+	copy.SetAPIVersion("example.com/v1")
+	copy.SetKind("CronTab")
+
+	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
+		copyKey := types.NamespacedName{Namespace: "synced-default", Name: "my-crontab"}
+		return envtestClient.Get(ctx, copyKey, copy) == nil, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for object to be synced down: %v", err)
+	}
+}
+
+func TestSyncSimpleObjectOldNaming(t *testing.T) {
+	const (
+		apiExportName = "kcp.example.com"
+		kcpGroupName  = "kcp.example.com"
+		orgWorkspace  = "sync-simple-deprecated"
+	)
+
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -136,6 +226,100 @@ spec:
 	}
 }
 
+func TestSyncWithDefaultNamingRules(t *testing.T) {
+	const (
+		apiExportName = "kcp.example.com"
+		orgWorkspace  = "sync-default-naming-rules"
+	)
+
+	ctx := t.Context()
+	ctrlruntime.SetLogger(logr.Discard())
+
+	// setup a test environment in kcp
+	orgKubconfig := utils.CreateOrganization(t, ctx, orgWorkspace, apiExportName)
+
+	// start a service cluster
+	envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
+		"test/crds/crontab.yaml",
+	})
+
+	// publish Crontabs and Backups
+	t.Logf("Publishing CRDs…")
+	prCrontabs := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "publish-crontabs",
+		},
+		Spec: syncagentv1alpha1.PublishedResourceSpec{
+			Resource: syncagentv1alpha1.SourceResourceDescriptor{
+				APIGroup: "example.com",
+				Version:  "v1",
+				Kind:     "CronTab",
+			},
+			Projection: &syncagentv1alpha1.ResourceProjection{
+				Group: "kcp.example.com",
+			},
+		},
+	}
+
+	if err := envtestClient.Create(ctx, prCrontabs); err != nil {
+		t.Fatalf("Failed to create PublishedResource: %v", err)
+	}
+
+	// start the agent in the background to update the APIExport with the CronTabs API
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+
+	// wait until the API is available
+	kcpClient := utils.GetKcpAdminClusterClient(t)
+	crontabsGVR := schema.GroupVersionResource{
+		Group:    "kcp.example.com",
+		Version:  "v1",
+		Resource: "crontabs",
+	}
+
+	// create a Crontab object in each team workspace, importantly using the same name and
+	// namespace in both workspaces
+	crontabYAML := `
+apiVersion: kcp.example.com/v1
+kind: CronTab
+metadata:
+  namespace: default
+  name: my-crontab
+spec:
+  cronSpec: '* * *'
+  image: ubuntu:latest
+`
+
+	t.Log("Creating CronTabs in kcp…")
+	for _, team := range []string{"team-1", "team-2"} {
+		teamCtx := kontext.WithCluster(ctx, logicalcluster.Name(fmt.Sprintf("root:%s:%s", orgWorkspace, team)))
+		utils.WaitForBoundAPI(t, teamCtx, kcpClient, crontabsGVR)
+
+		if err := kcpClient.Create(teamCtx, yamlToUnstructured(t, crontabYAML)); err != nil {
+			t.Fatalf("Failed to create %s's CronTab in kcp: %v", team, err)
+		}
+	}
+
+	// wait for the agent to sync both objects done, ensuring that we actually end
+	// up with 2 distinct objects
+
+	t.Logf("Wait for CronTabs to be synced…")
+	crontabs := &unstructured.UnstructuredList{}
+	crontabs.SetAPIVersion("example.com/v1")
+	crontabs.SetKind("CronTabList")
+
+	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
+		err = envtestClient.List(ctx, crontabs)
+		if err != nil {
+			return false, err
+		}
+
+		return len(crontabs.Items) == 2, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for objects to be synced down: %v", err)
+	}
+}
+
 func TestLocalChangesAreKept(t *testing.T) {
 	const (
 		apiExportName = "kcp.example.com"
@@ -143,7 +327,7 @@ func TestLocalChangesAreKept(t *testing.T) {
 		orgWorkspace  = "sync-undo-local-changes"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -168,8 +352,8 @@ func TestLocalChangesAreKept(t *testing.T) {
 			},
 			// These rules make finding the local object easier, but should not be used in production.
 			Naming: &syncagentv1alpha1.ResourceNaming{
-				Name:      "$remoteName",
-				Namespace: "synced-$remoteNamespace",
+				Name:      "{{ .Object.metadata.name }}",
+				Namespace: "synced-{{ .Object.metadata.namespace }}",
 			},
 			Projection: &syncagentv1alpha1.ResourceProjection{
 				Group: kcpGroupName,
@@ -349,7 +533,7 @@ func TestResourceFilter(t *testing.T) {
 		orgWorkspace  = "sync-resource-filter"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -374,8 +558,8 @@ func TestResourceFilter(t *testing.T) {
 			},
 			// These rules make finding the local object easier, but should not be used in production.
 			Naming: &syncagentv1alpha1.ResourceNaming{
-				Name:      "$remoteName",
-				Namespace: "synced-$remoteNamespace",
+				Name:      "{{ .Object.metadata.name }}",
+				Namespace: "synced-{{ .Object.metadata.namespace }}",
 			},
 			Projection: &syncagentv1alpha1.ResourceProjection{
 				Group: kcpGroupName,
@@ -470,7 +654,7 @@ func TestSyncingOverlyLongNames(t *testing.T) {
 		orgWorkspace  = "sync-long-names"
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctrlruntime.SetLogger(logr.Discard())
 
 	// setup a test environment in kcp
@@ -495,8 +679,8 @@ func TestSyncingOverlyLongNames(t *testing.T) {
 			},
 			// These rules make finding the local object easier, but should not be used in production.
 			Naming: &syncagentv1alpha1.ResourceNaming{
-				Name:      "$remoteName",
-				Namespace: "synced-$remoteNamespace",
+				Name:      "{{ .Object.metadata.name }}",
+				Namespace: "synced-{{ .Object.metadata.namespace }}",
 			},
 			Projection: &syncagentv1alpha1.ResourceProjection{
 				Group: kcpGroupName,
