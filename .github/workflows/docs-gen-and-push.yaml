@@ -42,4 +42,4 @@ jobs:
           python-version: '3.10'
           cache: 'pip'
 
-      - run: make deploy-docs
+      - run: make generate-api-docs deploy-docs

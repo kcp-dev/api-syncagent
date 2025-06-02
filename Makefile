@@ -154,6 +154,11 @@ verify:
 VENVDIR=$(abspath docs/venv)
 REQUIREMENTS_TXT=docs/requirements.txt
 
+.PHONY: generate-api-docs
+generate-api-docs: ## Generate api docs
+	git clean -fdX docs/content/reference
+	docs/generators/crd-ref/run-crd-ref-gen.sh
+
 .PHONY: local-docs
 local-docs: venv ## Run mkdocs serve
 	. $(VENV)/activate; \
