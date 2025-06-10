@@ -17,6 +17,7 @@ limitations under the License.
 package sync
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,9 +40,9 @@ import (
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (s *ResourceSyncer) processRelatedResources(log *zap.SugaredLogger, stateStore ObjectStateStore, remote, local syncSide) (requeue bool, err error) {
+func (s *ResourceSyncer) processRelatedResources(ctx context.Context, log *zap.SugaredLogger, stateStore ObjectStateStore, remote, local syncSide) (requeue bool, err error) {
 	for _, relatedResource := range s.pubRes.Spec.Related {
-		requeue, err := s.processRelatedResource(log.With("identifier", relatedResource.Identifier), stateStore, remote, local, relatedResource)
+		requeue, err := s.processRelatedResource(ctx, log.With("identifier", relatedResource.Identifier), stateStore, remote, local, relatedResource)
 		if err != nil {
 			return false, fmt.Errorf("failed to process related resource %s: %w", relatedResource.Identifier, err)
 		}
@@ -61,7 +62,7 @@ type relatedObjectAnnotation struct {
 	Kind       string `json:"kind"`
 }
 
-func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateStore ObjectStateStore, remote, local syncSide, relRes syncagentv1alpha1.RelatedResourceSpec) (requeue bool, err error) {
+func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.SugaredLogger, stateStore ObjectStateStore, remote, local syncSide, relRes syncagentv1alpha1.RelatedResourceSpec) (requeue bool, err error) {
 	// decide what direction to sync (local->remote vs. remote->local)
 	var (
 		origin syncSide
@@ -77,7 +78,7 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 	}
 
 	// find the all objects on the origin side that match the given criteria
-	resolvedObjects, err := resolveRelatedResourceObjects(origin, dest, relRes)
+	resolvedObjects, err := resolveRelatedResourceObjects(ctx, origin, dest, relRes)
 	if err != nil {
 		return false, fmt.Errorf("failed to get resolve origin objects: %w", err)
 	}
@@ -100,19 +101,17 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 		destObject.SetAPIVersion("v1") // we only support ConfigMaps and Secrets, both are in core/v1
 		destObject.SetKind(relRes.Kind)
 
-		if err = dest.client.Get(dest.ctx, resolved.destination, destObject); err != nil {
+		if err = dest.client.Get(ctx, resolved.destination, destObject); err != nil {
 			destObject = nil
 		}
 
 		sourceSide := syncSide{
-			ctx:         origin.ctx,
 			clusterName: origin.clusterName,
 			client:      origin.client,
 			object:      resolved.original,
 		}
 
 		destSide := syncSide{
-			ctx:         dest.ctx,
 			clusterName: dest.clusterName,
 			client:      dest.client,
 			object:      destObject,
@@ -147,7 +146,7 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 			metadataOnDestination: false,
 		}
 
-		req, err := syncer.Sync(log, sourceSide, destSide)
+		req, err := syncer.Sync(ctx, log, sourceSide, destSide)
 		if err != nil {
 			return false, fmt.Errorf("failed to sync related object: %w", err)
 		}
@@ -185,7 +184,7 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 				remote.object.SetAnnotations(annotations)
 
 				log.Debug("Remembering related object in main object…")
-				if err := remote.client.Patch(remote.ctx, remote.object, ctrlruntimeclient.MergeFrom(oldState)); err != nil {
+				if err := remote.client.Patch(ctx, remote.object, ctrlruntimeclient.MergeFrom(oldState)); err != nil {
 					return false, fmt.Errorf("failed to update related data in remote object: %w", err)
 				}
 
@@ -207,7 +206,7 @@ type resolvedObject struct {
 	destination types.NamespacedName
 }
 
-func resolveRelatedResourceObjects(relatedOrigin, relatedDest syncSide, relRes syncagentv1alpha1.RelatedResourceSpec) ([]resolvedObject, error) {
+func resolveRelatedResourceObjects(ctx context.Context, relatedOrigin, relatedDest syncSide, relRes syncagentv1alpha1.RelatedResourceSpec) ([]resolvedObject, error) {
 	// resolving the originNamespace first allows us to scope down any .List() calls later
 	originNamespace := relatedOrigin.object.GetNamespace()
 	destNamespace := relatedDest.object.GetNamespace()
@@ -219,7 +218,7 @@ func resolveRelatedResourceObjects(relatedOrigin, relatedDest syncSide, relRes s
 
 	if nsSpec := relRes.Object.Namespace; nsSpec != nil {
 		var err error
-		namespaceMap, err = resolveRelatedResourceOriginNamespaces(relatedOrigin, relatedDest, origin, *nsSpec)
+		namespaceMap, err = resolveRelatedResourceOriginNamespaces(ctx, relatedOrigin, relatedDest, origin, *nsSpec)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve namespace: %w", err)
 		}
@@ -241,7 +240,7 @@ func resolveRelatedResourceObjects(relatedOrigin, relatedDest syncSide, relRes s
 	// this related resource configuration. Again, for label selectors this can be multiple,
 	// otherwise at most 1.
 
-	objects, err := resolveRelatedResourceObjectsInNamespaces(relatedOrigin, relatedDest, relRes, relRes.Object.RelatedResourceObjectSpec, namespaceMap)
+	objects, err := resolveRelatedResourceObjectsInNamespaces(ctx, relatedOrigin, relatedDest, relRes, relRes.Object.RelatedResourceObjectSpec, namespaceMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve objects: %w", err)
 	}
@@ -249,7 +248,7 @@ func resolveRelatedResourceObjects(relatedOrigin, relatedDest syncSide, relRes s
 	return objects, nil
 }
 
-func resolveRelatedResourceOriginNamespaces(relatedOrigin, relatedDest syncSide, origin syncagentv1alpha1.RelatedResourceOrigin, spec syncagentv1alpha1.RelatedResourceObjectSpec) (map[string]string, error) {
+func resolveRelatedResourceOriginNamespaces(ctx context.Context, relatedOrigin, relatedDest syncSide, origin syncagentv1alpha1.RelatedResourceOrigin, spec syncagentv1alpha1.RelatedResourceObjectSpec) (map[string]string, error) {
 	switch {
 	//nolint:staticcheck // .Reference is deprecated, but we still support it for now.
 	case spec.Reference != nil:
@@ -287,7 +286,7 @@ func resolveRelatedResourceOriginNamespaces(relatedOrigin, relatedDest syncSide,
 			LabelSelector: selector,
 		}
 
-		if err := relatedOrigin.client.List(relatedOrigin.ctx, namespaces, opts); err != nil {
+		if err := relatedOrigin.client.List(ctx, namespaces, opts); err != nil {
 			return nil, fmt.Errorf("failed to evaluate label selector: %w", err)
 		}
 
@@ -324,11 +323,11 @@ func resolveRelatedResourceOriginNamespaces(relatedOrigin, relatedDest syncSide,
 	}
 }
 
-func resolveRelatedResourceObjectsInNamespaces(relatedOrigin, relatedDest syncSide, relRes syncagentv1alpha1.RelatedResourceSpec, spec syncagentv1alpha1.RelatedResourceObjectSpec, namespaceMap map[string]string) ([]resolvedObject, error) {
+func resolveRelatedResourceObjectsInNamespaces(ctx context.Context, relatedOrigin, relatedDest syncSide, relRes syncagentv1alpha1.RelatedResourceSpec, spec syncagentv1alpha1.RelatedResourceObjectSpec, namespaceMap map[string]string) ([]resolvedObject, error) {
 	result := []resolvedObject{}
 
 	for originNamespace, destNamespace := range namespaceMap {
-		nameMap, err := resolveRelatedResourceObjectsInNamespace(relatedOrigin, relatedDest, relRes, spec, originNamespace)
+		nameMap, err := resolveRelatedResourceObjectsInNamespace(ctx, relatedOrigin, relatedDest, relRes, spec, originNamespace)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find objects on origin side: %w", err)
 		}
@@ -338,7 +337,7 @@ func resolveRelatedResourceObjectsInNamespaces(relatedOrigin, relatedDest syncSi
 			originObj.SetAPIVersion("v1") // we only support ConfigMaps and Secrets, both are in core/v1
 			originObj.SetKind(relRes.Kind)
 
-			err = relatedOrigin.client.Get(relatedOrigin.ctx, types.NamespacedName{Name: originName, Namespace: originNamespace}, originObj)
+			err = relatedOrigin.client.Get(ctx, types.NamespacedName{Name: originName, Namespace: originNamespace}, originObj)
 			if err != nil {
 				// this should rarely happen, only if an object was deleted in between the .List() call
 				// above and the .Get() call here.
@@ -362,7 +361,7 @@ func resolveRelatedResourceObjectsInNamespaces(relatedOrigin, relatedDest syncSi
 	return result, nil
 }
 
-func resolveRelatedResourceObjectsInNamespace(relatedOrigin, relatedDest syncSide, relRes syncagentv1alpha1.RelatedResourceSpec, spec syncagentv1alpha1.RelatedResourceObjectSpec, namespace string) (map[string]string, error) {
+func resolveRelatedResourceObjectsInNamespace(ctx context.Context, relatedOrigin, relatedDest syncSide, relRes syncagentv1alpha1.RelatedResourceSpec, spec syncagentv1alpha1.RelatedResourceObjectSpec, namespace string) (map[string]string, error) {
 	switch {
 	//nolint:staticcheck
 	case spec.Reference != nil:
@@ -408,7 +407,7 @@ func resolveRelatedResourceObjectsInNamespace(relatedOrigin, relatedDest syncSid
 			Namespace:     namespace,
 		}
 
-		if err := relatedOrigin.client.List(relatedOrigin.ctx, originObjects, opts); err != nil {
+		if err := relatedOrigin.client.List(ctx, originObjects, opts); err != nil {
 			return nil, fmt.Errorf("failed to select origin objects based on label selector: %w", err)
 		}
 

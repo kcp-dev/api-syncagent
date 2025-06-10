@@ -60,22 +60,21 @@ type objectSyncer struct {
 }
 
 type syncSide struct {
-	ctx           context.Context
 	clusterName   logicalcluster.Name
 	workspacePath logicalcluster.Path
 	client        ctrlruntimeclient.Client
 	object        *unstructured.Unstructured
 }
 
-func (s *objectSyncer) Sync(log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
+func (s *objectSyncer) Sync(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
 	// handle deletion: if source object is in deletion, delete the destination object (the clone)
 	if source.object.GetDeletionTimestamp() != nil {
-		return s.handleDeletion(log, source, dest)
+		return s.handleDeletion(ctx, log, source, dest)
 	}
 
 	// add finalizer to source object so that we never orphan the destination object
 	if s.blockSourceDeletion {
-		updated, err := ensureFinalizer(source.ctx, log, source.client, source.object, deletionFinalizer)
+		updated, err := ensureFinalizer(ctx, log, source.client, source.object, deletionFinalizer)
 		if err != nil {
 			return false, fmt.Errorf("failed to add cleanup finalizer to source object: %w", err)
 		}
@@ -97,7 +96,7 @@ func (s *objectSyncer) Sync(log *zap.SugaredLogger, source, dest syncSide) (requ
 	// if no destination object exists yet, attempt to create it;
 	// note that the object _might_ exist, but we were not able to find it because of broken labels
 	if dest.object == nil {
-		err := s.ensureDestinationObject(log, source, dest)
+		err := s.ensureDestinationObject(ctx, log, source, dest)
 		if err != nil {
 			return false, fmt.Errorf("failed to create destination object: %w", err)
 		}
@@ -116,7 +115,7 @@ func (s *objectSyncer) Sync(log *zap.SugaredLogger, source, dest syncSide) (requ
 		return false, nil
 	}
 
-	requeue, err = s.syncObjectContents(log, source, dest)
+	requeue, err = s.syncObjectContents(ctx, log, source, dest)
 	if err != nil {
 		return false, fmt.Errorf("failed to synchronize object state: %w", err)
 	}
@@ -164,20 +163,20 @@ func (s *objectSyncer) applyMutations(source, dest syncSide) (syncSide, syncSide
 	return source, dest, nil
 }
 
-func (s *objectSyncer) syncObjectContents(log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
+func (s *objectSyncer) syncObjectContents(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
 	// Sync the spec (or more generally, the desired state) from source to dest.
-	requeue, err = s.syncObjectSpec(log, source, dest)
+	requeue, err = s.syncObjectSpec(ctx, log, source, dest)
 	if requeue || err != nil {
 		return requeue, err
 	}
 
 	// Sync the status back in the opposite direction, from dest to source.
-	return s.syncObjectStatus(log, source, dest)
+	return s.syncObjectStatus(ctx, log, source, dest)
 }
 
-func (s *objectSyncer) syncObjectSpec(log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
+func (s *objectSyncer) syncObjectSpec(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
 	// figure out the last known state
-	lastKnownSourceState, err := s.stateStore.Get(source)
+	lastKnownSourceState, err := s.stateStore.Get(ctx, source)
 	if err != nil {
 		return false, fmt.Errorf("failed to determine last known state: %w", err)
 	}
@@ -221,7 +220,7 @@ func (s *objectSyncer) syncObjectSpec(log *zap.SugaredLogger, source, dest syncS
 		if string(rawPatch) != "{}" {
 			log.Debugw("Patching destination object…", "patch", string(rawPatch))
 
-			if err := dest.client.Patch(dest.ctx, dest.object, ctrlruntimeclient.RawPatch(types.MergePatchType, rawPatch)); err != nil {
+			if err := dest.client.Patch(ctx, dest.object, ctrlruntimeclient.RawPatch(types.MergePatchType, rawPatch)); err != nil {
 				return false, fmt.Errorf("failed to patch destination object: %w", err)
 			}
 
@@ -247,7 +246,7 @@ func (s *objectSyncer) syncObjectSpec(log *zap.SugaredLogger, source, dest syncS
 		// are identical w.r.t. the fields we have copied (spec, annotations, labels, ..).
 		log.Warn("Updating destination object because last-known-state is missing/invalid…")
 
-		if err := dest.client.Update(dest.ctx, dest.object); err != nil {
+		if err := dest.client.Update(ctx, dest.object); err != nil {
 			return false, fmt.Errorf("failed to update destination object: %w", err)
 		}
 
@@ -257,7 +256,7 @@ func (s *objectSyncer) syncObjectSpec(log *zap.SugaredLogger, source, dest syncS
 	if requeue {
 		// remember this object state for the next reconciliation (this will strip any syncer-related
 		// metadata the 3-way diff may have added above)
-		if err := s.stateStore.Put(sourceObjCopy, source.clusterName, s.subresources); err != nil {
+		if err := s.stateStore.Put(ctx, sourceObjCopy, source.clusterName, s.subresources); err != nil {
 			return true, fmt.Errorf("failed to update sync state: %w", err)
 		}
 	}
@@ -265,7 +264,7 @@ func (s *objectSyncer) syncObjectSpec(log *zap.SugaredLogger, source, dest syncS
 	return requeue, nil
 }
 
-func (s *objectSyncer) syncObjectStatus(log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
+func (s *objectSyncer) syncObjectStatus(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
 	if !s.syncStatusBack {
 		return false, nil
 	}
@@ -280,7 +279,7 @@ func (s *objectSyncer) syncObjectStatus(log *zap.SugaredLogger, source, dest syn
 		sourceContent["status"] = destContent["status"]
 
 		log.Debug("Updating source object status…")
-		if err := source.client.Status().Update(source.ctx, source.object); err != nil {
+		if err := source.client.Status().Update(ctx, source.object); err != nil {
 			return false, fmt.Errorf("failed to update source object status: %w", err)
 		}
 	}
@@ -289,7 +288,7 @@ func (s *objectSyncer) syncObjectStatus(log *zap.SugaredLogger, source, dest syn
 	return false, nil
 }
 
-func (s *objectSyncer) ensureDestinationObject(log *zap.SugaredLogger, source, dest syncSide) error {
+func (s *objectSyncer) ensureDestinationObject(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) error {
 	// create a copy of the source with GVK projected and renaming rules applied
 	destObj, err := s.destCreator(source.object)
 	if err != nil {
@@ -297,7 +296,7 @@ func (s *objectSyncer) ensureDestinationObject(log *zap.SugaredLogger, source, d
 	}
 
 	// make sure the target namespace on the destination cluster exists
-	if err := s.ensureNamespace(dest.ctx, log, dest.client, destObj.GetNamespace()); err != nil {
+	if err := s.ensureNamespace(ctx, log, dest.client, destObj.GetNamespace()); err != nil {
 		return fmt.Errorf("failed to ensure destination namespace: %w", err)
 	}
 
@@ -321,25 +320,25 @@ func (s *objectSyncer) ensureDestinationObject(log *zap.SugaredLogger, source, d
 	objectLog := log.With("dest-object", newObjectKey(destObj, dest.clusterName, logicalcluster.None))
 	objectLog.Debugw("Creating destination object…")
 
-	if err := dest.client.Create(dest.ctx, destObj); err != nil {
+	if err := dest.client.Create(ctx, destObj); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return fmt.Errorf("failed to create destination object: %w", err)
 		}
 
-		if err := s.adoptExistingDestinationObject(objectLog, dest, destObj, sourceObjKey); err != nil {
+		if err := s.adoptExistingDestinationObject(ctx, objectLog, dest, destObj, sourceObjKey); err != nil {
 			return fmt.Errorf("failed to adopt destination object: %w", err)
 		}
 	}
 
 	// remember the state of the object that we just created
-	if err := s.stateStore.Put(source.object, source.clusterName, s.subresources); err != nil {
+	if err := s.stateStore.Put(ctx, source.object, source.clusterName, s.subresources); err != nil {
 		return fmt.Errorf("failed to update sync state: %w", err)
 	}
 
 	return nil
 }
 
-func (s *objectSyncer) adoptExistingDestinationObject(log *zap.SugaredLogger, dest syncSide, existingDestObj *unstructured.Unstructured, sourceKey objectKey) error {
+func (s *objectSyncer) adoptExistingDestinationObject(ctx context.Context, log *zap.SugaredLogger, dest syncSide, existingDestObj *unstructured.Unstructured, sourceKey objectKey) error {
 	// Cannot add labels to an object in deletion, also there would be no point
 	// in adopting a soon-to-disappear object; instead we silently wait, requeue
 	// and when the object is gone, recreate a fresh one with proper labels.
@@ -350,7 +349,7 @@ func (s *objectSyncer) adoptExistingDestinationObject(log *zap.SugaredLogger, de
 	log.Warn("Adopting existing but mislabelled destination object…")
 
 	// fetch the current state
-	if err := dest.client.Get(dest.ctx, ctrlruntimeclient.ObjectKeyFromObject(existingDestObj), existingDestObj); err != nil {
+	if err := dest.client.Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(existingDestObj), existingDestObj); err != nil {
 		return fmt.Errorf("failed to get current destination object: %w", err)
 	}
 
@@ -363,7 +362,7 @@ func (s *objectSyncer) adoptExistingDestinationObject(log *zap.SugaredLogger, de
 
 	s.labelWithAgent(existingDestObj)
 
-	if err := dest.client.Update(dest.ctx, existingDestObj); err != nil {
+	if err := dest.client.Update(ctx, existingDestObj); err != nil {
 		return fmt.Errorf("failed to upsert current destination object labels: %w", err)
 	}
 
@@ -397,7 +396,7 @@ func (s *objectSyncer) ensureNamespace(ctx context.Context, log *zap.SugaredLogg
 	return nil
 }
 
-func (s *objectSyncer) handleDeletion(log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
+func (s *objectSyncer) handleDeletion(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
 	// if no finalizer was added, we can safely ignore this event
 	if !s.blockSourceDeletion {
 		return false, nil
@@ -407,7 +406,7 @@ func (s *objectSyncer) handleDeletion(log *zap.SugaredLogger, source, dest syncS
 	if dest.object != nil {
 		if dest.object.GetDeletionTimestamp() == nil {
 			log.Debugw("Deleting destination object…", "dest-object", newObjectKey(dest.object, dest.clusterName, logicalcluster.None))
-			if err := dest.client.Delete(dest.ctx, dest.object); err != nil {
+			if err := dest.client.Delete(ctx, dest.object); err != nil {
 				return false, fmt.Errorf("failed to delete destination object: %w", err)
 			}
 		}
@@ -416,7 +415,7 @@ func (s *objectSyncer) handleDeletion(log *zap.SugaredLogger, source, dest syncS
 	}
 
 	// the destination object is gone, we can release the source one
-	updated, err := removeFinalizer(source.ctx, log, source.client, source.object, deletionFinalizer)
+	updated, err := removeFinalizer(ctx, log, source.client, source.object, deletionFinalizer)
 	if err != nil {
 		return false, fmt.Errorf("failed to remove cleanup finalizer from source object: %w", err)
 	}
