@@ -17,6 +17,7 @@ limitations under the License.
 package sync
 
 import (
+	"context"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -135,11 +136,11 @@ func NewResourceSyncer(
 // Each of these steps can potentially end the current processing and return (true, nil). In this
 // case, the caller should re-fetch the remote object and call Process() again (most likely in the
 // next reconciliation). Only when (false, nil) is returned is the entire process finished.
-func (s *ResourceSyncer) Process(ctx Context, remoteObj *unstructured.Unstructured) (requeue bool, err error) {
-	log := s.log.With("source-object", newObjectKey(remoteObj, ctx.clusterName, ctx.workspacePath))
+func (s *ResourceSyncer) Process(ctx context.Context, info clusterInfo, remoteObj *unstructured.Unstructured) (requeue bool, err error) {
+	log := s.log.With("source-object", newObjectKey(remoteObj, info.clusterName, info.workspacePath))
 
 	// find the local equivalent object in the local service cluster
-	localObj, err := s.findLocalObject(ctx, remoteObj)
+	localObj, err := s.findLocalObject(ctx, info, remoteObj)
 	if err != nil {
 		return false, fmt.Errorf("failed to find local equivalent: %w", err)
 	}
@@ -150,15 +151,13 @@ func (s *ResourceSyncer) Process(ctx Context, remoteObj *unstructured.Unstructur
 	// Prepare object sync sides.
 
 	sourceSide := syncSide{
-		ctx:           ctx.remote,
-		clusterName:   ctx.clusterName,
-		workspacePath: ctx.workspacePath,
+		clusterName:   info.clusterName,
+		workspacePath: info.workspacePath,
 		client:        s.remoteClient,
 		object:        remoteObj,
 	}
 
 	destSide := syncSide{
-		ctx:    ctx.local,
 		client: s.localClient,
 		object: localObj,
 	}
@@ -173,7 +172,7 @@ func (s *ResourceSyncer) Process(ctx Context, remoteObj *unstructured.Unstructur
 		agentName:    s.agentName,
 		subresources: s.subresources,
 		// use the projection and renaming rules configured in the PublishedResource
-		destCreator: s.newLocalObjectCreator(ctx),
+		destCreator: s.newLocalObjectCreator(info),
 		// for the main resource, status subresource handling is enabled (this
 		// means _allowing_ status back-syncing, it still depends on whether the
 		// status subresource even exists whether an update happens)
@@ -191,7 +190,7 @@ func (s *ResourceSyncer) Process(ctx Context, remoteObj *unstructured.Unstructur
 		metadataOnDestination: true,
 	}
 
-	requeue, err = syncer.Sync(log, sourceSide, destSide)
+	requeue, err = syncer.Sync(ctx, log, sourceSide, destSide)
 	if err != nil {
 		return false, err
 	}
@@ -208,17 +207,17 @@ func (s *ResourceSyncer) Process(ctx Context, remoteObj *unstructured.Unstructur
 	// it modifies the state of the world, otherwise the objects in
 	// source/dest.object might be ouf date.
 
-	return s.processRelatedResources(log, stateStore, sourceSide, destSide)
+	return s.processRelatedResources(ctx, log, stateStore, sourceSide, destSide)
 }
 
-func (s *ResourceSyncer) findLocalObject(ctx Context, remoteObj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	localSelector := labels.SelectorFromSet(newObjectKey(remoteObj, ctx.clusterName, ctx.workspacePath).Labels())
+func (s *ResourceSyncer) findLocalObject(ctx context.Context, info clusterInfo, remoteObj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	localSelector := labels.SelectorFromSet(newObjectKey(remoteObj, info.clusterName, info.workspacePath).Labels())
 
 	localObjects := &unstructured.UnstructuredList{}
 	localObjects.SetAPIVersion(s.destDummy.GetAPIVersion())
 	localObjects.SetKind(s.destDummy.GetKind() + "List")
 
-	if err := s.localClient.List(ctx.local, localObjects, &ctrlruntimeclient.ListOptions{
+	if err := s.localClient.List(ctx, localObjects, &ctrlruntimeclient.ListOptions{
 		LabelSelector: localSelector,
 		Limit:         2, // 2 in order to detect broken configurations
 	}); err != nil {
@@ -235,7 +234,7 @@ func (s *ResourceSyncer) findLocalObject(ctx Context, remoteObj *unstructured.Un
 	}
 }
 
-func (s *ResourceSyncer) newLocalObjectCreator(ctx Context) objectCreatorFunc {
+func (s *ResourceSyncer) newLocalObjectCreator(info clusterInfo) objectCreatorFunc {
 	return func(remoteObj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 		// map from the remote API into the actual, local API group
 		destObj := remoteObj.DeepCopy()
@@ -245,7 +244,7 @@ func (s *ResourceSyncer) newLocalObjectCreator(ctx Context) objectCreatorFunc {
 		destScope := syncagentv1alpha1.ResourceScope(s.localCRD.Spec.Scope)
 
 		// map namespace/name
-		mappedName, err := templating.GenerateLocalObjectName(s.pubRes, remoteObj, ctx.clusterName, ctx.workspacePath)
+		mappedName, err := templating.GenerateLocalObjectName(s.pubRes, remoteObj, info.clusterName, info.workspacePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate local object name: %w", err)
 		}

@@ -42,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrlruntime "sigs.k8s.io/controller-runtime"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/kontext"
 )
 
 func TestSyncRelatedObjects(t *testing.T) {
@@ -54,7 +53,7 @@ func TestSyncRelatedObjects(t *testing.T) {
 		// the name of this testcase
 		name string
 		// the org workspace everything should happen in
-		workspace logicalcluster.Name
+		workspace string
 		// the configuration for the related resource
 		relatedConfig syncagentv1alpha1.RelatedResourceSpec
 		// the primary object created by the user in kcp
@@ -517,9 +516,12 @@ func TestSyncRelatedObjects(t *testing.T) {
 			utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
 
 			// wait until the API is available
-			teamCtx := kontext.WithCluster(ctx, logicalcluster.Name(fmt.Sprintf("root:%s:team-1", testcase.workspace)))
-			kcpClient := utils.GetKcpAdminClusterClient(t)
-			utils.WaitForBoundAPI(t, teamCtx, kcpClient, schema.GroupVersionResource{
+			kcpClusterClient := utils.GetKcpAdminClusterClient(t)
+
+			teamClusterPath := logicalcluster.NewPath("root").Join(testcase.workspace).Join("team-1")
+			teamClient := kcpClusterClient.Cluster(teamClusterPath)
+
+			utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
 				Group:    apiExportName,
 				Version:  "v1",
 				Resource: "crontabs",
@@ -532,7 +534,7 @@ func TestSyncRelatedObjects(t *testing.T) {
 			crontab.SetAPIVersion("kcp.example.com/v1")
 			crontab.SetKind("CronTab")
 
-			if err := kcpClient.Create(teamCtx, crontab); err != nil {
+			if err := teamClient.Create(ctx, crontab); err != nil {
 				t.Fatalf("Failed to create CronTab in kcp: %v", err)
 			}
 
@@ -540,25 +542,22 @@ func TestSyncRelatedObjects(t *testing.T) {
 			t.Logf("Creating credential Secret on the %s side…", testcase.relatedConfig.Origin)
 
 			originClient := envtestClient
-			originContext := ctx
-			destClient := kcpClient
-			destContext := teamCtx
+			destClient := teamClient
 
 			if testcase.relatedConfig.Origin == syncagentv1alpha1.RelatedResourceOriginKcp {
 				originClient, destClient = destClient, originClient
-				originContext, destContext = destContext, originContext
 			}
 
-			ensureNamespace(t, originContext, originClient, testcase.sourceRelatedObject.Namespace)
+			ensureNamespace(t, ctx, originClient, testcase.sourceRelatedObject.Namespace)
 
-			if err := originClient.Create(originContext, &testcase.sourceRelatedObject); err != nil {
+			if err := originClient.Create(ctx, &testcase.sourceRelatedObject); err != nil {
 				t.Fatalf("Failed to create Secret: %v", err)
 			}
 
 			// wait for the agent to do its magic
 			t.Log("Wait for Secret to be synced…")
 			copySecret := corev1.Secret{}
-			err := wait.PollUntilContextTimeout(destContext, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
+			err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
 				copyKey := ctrlruntimeclient.ObjectKeyFromObject(&testcase.expectedSyncedRelatedObject)
 				return destClient.Get(ctx, copyKey, &copySecret) == nil, nil
 			})

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
 func stripMetadata(obj *unstructured.Unstructured) error {
@@ -137,7 +138,7 @@ func filterLabels(original labels.Set, forbidList sets.Set[string]) labels.Set {
 	return filtered
 }
 
-func RemoteNameForLocalObject(localObj ctrlruntimeclient.Object) *reconcile.Request {
+func RemoteNameForLocalObject(localObj ctrlruntimeclient.Object) *mcreconcile.Request {
 	labels := localObj.GetLabels()
 	annotations := localObj.GetAnnotations()
 	clusterName := labels[remoteObjectClusterLabel]
@@ -149,11 +150,13 @@ func RemoteNameForLocalObject(localObj ctrlruntimeclient.Object) *reconcile.Requ
 		return nil
 	}
 
-	return &reconcile.Request{
+	return &mcreconcile.Request{
 		ClusterName: clusterName,
-		NamespacedName: types.NamespacedName{
-			Namespace: namespace,
-			Name:      name,
+		Request: reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: namespace,
+				Name:      name,
+			},
 		},
 	}
 }

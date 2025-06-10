@@ -34,20 +34,23 @@ import (
 	kcpdevcorev1alpha1 "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/cluster"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/kontext"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	mccontroller "sigs.k8s.io/multicluster-runtime/pkg/controller"
+	mchandler "sigs.k8s.io/multicluster-runtime/pkg/handler"
+	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
+	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
+	mcsource "sigs.k8s.io/multicluster-runtime/pkg/source"
 )
 
 const (
@@ -55,12 +58,14 @@ const (
 )
 
 type Reconciler struct {
-	localClient ctrlruntimeclient.Client
-	vwClient    ctrlruntimeclient.Client
-	log         *zap.SugaredLogger
-	syncer      *sync.ResourceSyncer
-	remoteDummy *unstructured.Unstructured
-	pubRes      *syncagentv1alpha1.PublishedResource
+	localClient    ctrlruntimeclient.Client
+	remoteManager  mcmanager.Manager
+	log            *zap.SugaredLogger
+	remoteDummy    *unstructured.Unstructured
+	pubRes         *syncagentv1alpha1.PublishedResource
+	localCRD       *apiextensionsv1.CustomResourceDefinition
+	stateNamespace string
+	agentName      string
 }
 
 // Create creates a new controller and importantly does *not* add it to the manager,
@@ -68,14 +73,14 @@ type Reconciler struct {
 func Create(
 	ctx context.Context,
 	localManager manager.Manager,
-	virtualWorkspaceCluster cluster.Cluster,
+	remoteManager mcmanager.Manager,
 	pubRes *syncagentv1alpha1.PublishedResource,
 	discoveryClient *discovery.Client,
 	stateNamespace string,
 	agentName string,
 	log *zap.SugaredLogger,
 	numWorkers int,
-) (controller.Controller, error) {
+) (mccontroller.Controller, error) {
 	log = log.Named(ControllerName)
 
 	// find the local CRD so we know the actual local object scope
@@ -103,47 +108,46 @@ func Create(
 	remoteDummy.SetGroupVersionKind(remoteGVK)
 
 	// create the syncer that holds the meat&potatoes of the synchronization logic
-	syncer, err := sync.NewResourceSyncer(log, localManager.GetClient(), virtualWorkspaceCluster.GetClient(), pubRes, localCRD, mutation.NewMutator, stateNamespace, agentName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create syncer: %w", err)
-	}
 
 	// setup the reconciler
 	reconciler := &Reconciler{
-		localClient: localManager.GetClient(),
-		vwClient:    virtualWorkspaceCluster.GetClient(),
-		log:         log,
-		remoteDummy: remoteDummy,
-		syncer:      syncer,
-		pubRes:      pubRes,
+		localClient:    localManager.GetClient(),
+		remoteManager:  remoteManager,
+		log:            log,
+		remoteDummy:    remoteDummy,
+		pubRes:         pubRes,
+		stateNamespace: stateNamespace,
+		agentName:      agentName,
+		localCRD:       localCRD,
 	}
 
-	ctrlOptions := controller.Options{
+	ctrlOptions := mccontroller.Options{
 		Reconciler:              reconciler,
 		MaxConcurrentReconciles: numWorkers,
 		SkipNameValidation:      ptr.To(true),
 	}
 
-	// It doesn't really matter what manager is used here, as starting/stopping happens
-	// outside of the manager's control anyway.
-	c, err := controller.NewUnmanaged(ControllerName, localManager, ctrlOptions)
+	log.Info("Setting up unmanaged controller...")
+
+	// The manager parameter is mostly unused and will be removed in future CR versions.
+	c, err := mccontroller.NewUnmanaged(ControllerName, remoteManager, ctrlOptions)
 	if err != nil {
 		return nil, err
 	}
 
 	// watch the target resource in the virtual workspace
-	if err := c.Watch(source.Kind(virtualWorkspaceCluster.GetCache(), remoteDummy, &handler.TypedEnqueueRequestForObject[*unstructured.Unstructured]{})); err != nil {
+	if err := c.MultiClusterWatch(mcsource.TypedKind(remoteDummy, mchandler.TypedEnqueueRequestForObject[*unstructured.Unstructured]())); err != nil {
 		return nil, err
 	}
 
 	// watch the source resource in the local cluster, but enqueue the origin remote object
-	enqueueRemoteObjForLocalObj := handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, o *unstructured.Unstructured) []reconcile.Request {
+	enqueueRemoteObjForLocalObj := handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, o *unstructured.Unstructured) []mcreconcile.Request {
 		req := sync.RemoteNameForLocalObject(o)
 		if req == nil {
 			return nil
 		}
 
-		return []reconcile.Request{*req}
+		return []mcreconcile.Request{*req}
 	})
 
 	// only watch local objects that we own
@@ -151,21 +155,27 @@ func Create(
 		return sync.OwnedBy(u, agentName)
 	})
 
-	if err := c.Watch(source.Kind(localManager.GetCache(), localDummy, enqueueRemoteObjForLocalObj, nameFilter)); err != nil {
+	if err := c.Watch(source.TypedKind(localManager.GetCache(), localDummy, enqueueRemoteObjForLocalObj, nameFilter)); err != nil {
 		return nil, err
 	}
+
+	log.Info("Done setting up unmanaged controller.")
 
 	return c, nil
 }
 
-func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request) (reconcile.Result, error) {
 	log := r.log.With("request", request, "cluster", request.ClusterName)
 	log.Debug("Processing")
 
-	wsCtx := kontext.WithCluster(ctx, logicalcluster.Name(request.ClusterName))
+	cl, err := r.remoteManager.GetCluster(ctx, request.ClusterName)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to get cluster: %w", err)
+	}
+	vwClient := cl.GetClient()
 
 	remoteObj := r.remoteDummy.DeepCopy()
-	if err := r.vwClient.Get(wsCtx, request.NamespacedName, remoteObj); ctrlruntimeclient.IgnoreNotFound(err) != nil {
+	if err := vwClient.Get(ctx, request.NamespacedName, remoteObj); ctrlruntimeclient.IgnoreNotFound(err) != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to retrieve remote object: %w", err)
 	}
 
@@ -180,7 +190,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		namespace = &corev1.Namespace{}
 		key := types.NamespacedName{Name: remoteObj.GetNamespace()}
 
-		if err := r.vwClient.Get(wsCtx, key, namespace); err != nil {
+		if err := vwClient.Get(ctx, key, namespace); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to retrieve remote object's namespace: %w", err)
 		}
 	}
@@ -195,22 +205,29 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		return reconcile.Result{}, nil
 	}
 
-	syncContext := sync.NewContext(ctx, wsCtx)
+	cInfo := sync.NewClusterInfo(logicalcluster.Name(request.ClusterName))
 
 	// if desired, fetch the cluster path as well (some downstream service providers might make use of it,
 	// but since it requires an additional permission claim, it's optional)
 	if r.pubRes.Spec.EnableWorkspacePaths {
 		lc := &kcpdevcorev1alpha1.LogicalCluster{}
-		if err := r.vwClient.Get(wsCtx, types.NamespacedName{Name: kcpdevcorev1alpha1.LogicalClusterName}, lc); err != nil {
+		if err := vwClient.Get(ctx, types.NamespacedName{Name: kcpdevcorev1alpha1.LogicalClusterName}, lc); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to retrieve remote logicalcluster: %w", err)
 		}
 
 		path := lc.Annotations[kcpcore.LogicalClusterPathAnnotationKey]
-		syncContext = syncContext.WithWorkspacePath(logicalcluster.NewPath(path))
+		cInfo = cInfo.WithWorkspacePath(logicalcluster.NewPath(path))
 	}
 
 	// sync main object
-	requeue, err := r.syncer.Process(syncContext, remoteObj)
+	mutator := mutation.NewMutator(r.pubRes.Spec.Mutation)
+
+	syncer, err := sync.NewResourceSyncer(log, r.localClient, vwClient, r.pubRes, r.localCRD, mutator, r.stateNamespace, r.agentName)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to create syncer: %w", err)
+	}
+
+	requeue, err := syncer.Process(ctx, cInfo, remoteObj)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

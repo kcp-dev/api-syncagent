@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrlruntime "sigs.k8s.io/controller-runtime"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/kontext"
 )
 
 func TestSyncSimpleObject(t *testing.T) {
@@ -92,9 +91,12 @@ func TestSyncSimpleObject(t *testing.T) {
 	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
 
 	// wait until the API is available
-	teamCtx := kontext.WithCluster(ctx, logicalcluster.Name(fmt.Sprintf("root:%s:team-1", orgWorkspace)))
-	kcpClient := utils.GetKcpAdminClusterClient(t)
-	utils.WaitForBoundAPI(t, teamCtx, kcpClient, schema.GroupVersionResource{
+	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
+
+	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
+	teamClient := kcpClusterClient.Cluster(teamClusterPath)
+
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
 		Group:    kcpGroupName,
 		Version:  "v1",
 		Resource: "crontabs",
@@ -113,7 +115,7 @@ spec:
   image: ubuntu:latest
 `)
 
-	if err := kcpClient.Create(teamCtx, crontab); err != nil {
+	if err := teamClient.Create(ctx, crontab); err != nil {
 		t.Fatalf("Failed to create CronTab in kcp: %v", err)
 	}
 
@@ -182,9 +184,12 @@ func TestSyncSimpleObjectOldNaming(t *testing.T) {
 	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
 
 	// wait until the API is available
-	teamCtx := kontext.WithCluster(ctx, logicalcluster.Name(fmt.Sprintf("root:%s:team-1", orgWorkspace)))
-	kcpClient := utils.GetKcpAdminClusterClient(t)
-	utils.WaitForBoundAPI(t, teamCtx, kcpClient, schema.GroupVersionResource{
+	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
+
+	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
+	teamClient := kcpClusterClient.Cluster(teamClusterPath)
+
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
 		Group:    kcpGroupName,
 		Version:  "v1",
 		Resource: "crontabs",
@@ -203,7 +208,7 @@ spec:
   image: ubuntu:latest
 `)
 
-	if err := kcpClient.Create(teamCtx, crontab); err != nil {
+	if err := teamClient.Create(ctx, crontab); err != nil {
 		t.Fatalf("Failed to create CronTab in kcp: %v", err)
 	}
 
@@ -266,7 +271,8 @@ func TestSyncWithDefaultNamingRules(t *testing.T) {
 	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
 
 	// wait until the API is available
-	kcpClient := utils.GetKcpAdminClusterClient(t)
+	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
+
 	crontabsGVR := schema.GroupVersionResource{
 		Group:    "kcp.example.com",
 		Version:  "v1",
@@ -288,10 +294,12 @@ spec:
 
 	t.Log("Creating CronTabs in kcp…")
 	for _, team := range []string{"team-1", "team-2"} {
-		teamCtx := kontext.WithCluster(ctx, logicalcluster.Name(fmt.Sprintf("root:%s:%s", orgWorkspace, team)))
-		utils.WaitForBoundAPI(t, teamCtx, kcpClient, crontabsGVR)
+		teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join(team)
+		teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
-		if err := kcpClient.Create(teamCtx, utils.YAMLToUnstructured(t, crontabYAML)); err != nil {
+		utils.WaitForBoundAPI(t, ctx, teamClient, crontabsGVR)
+
+		if err := teamClient.Create(ctx, yamlToUnstructured(t, crontabYAML)); err != nil {
 			t.Fatalf("Failed to create %s's CronTab in kcp: %v", team, err)
 		}
 	}
@@ -366,9 +374,12 @@ func TestLocalChangesAreKept(t *testing.T) {
 	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
 
 	// wait until the API is available
-	teamCtx := kontext.WithCluster(ctx, logicalcluster.Name(fmt.Sprintf("root:%s:team-1", orgWorkspace)))
-	kcpClient := utils.GetKcpAdminClusterClient(t)
-	utils.WaitForBoundAPI(t, teamCtx, kcpClient, schema.GroupVersionResource{
+	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
+
+	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
+	teamClient := kcpClusterClient.Cluster(teamClusterPath)
+
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
 		Group:    kcpGroupName,
 		Version:  "v1",
 		Resource: "crontabs",
@@ -387,7 +398,7 @@ spec:
   image: ubuntu:latest
 `)
 
-	if err := kcpClient.Create(teamCtx, crontab); err != nil {
+	if err := teamClient.Create(ctx, crontab); err != nil {
 		t.Fatalf("Failed to create CronTab in kcp: %v", err)
 	}
 
@@ -420,7 +431,7 @@ spec:
 	// make some changes in kcp, these should be applied to the local object without overwriting the cronSpec
 
 	// refresh the current object state
-	if err := kcpClient.Get(teamCtx, ctrlruntimeclient.ObjectKeyFromObject(crontab), crontab); err != nil {
+	if err := teamClient.Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(crontab), crontab); err != nil {
 		t.Fatalf("Failed to create CronTab in kcp: %v", err)
 	}
 
@@ -428,7 +439,7 @@ spec:
 	unstructured.SetNestedField(crontab.Object, newImage, "spec", "image")
 
 	t.Logf("Modifying object in kcp…")
-	if err := kcpClient.Update(teamCtx, crontab); err != nil {
+	if err := teamClient.Update(ctx, crontab); err != nil {
 		t.Fatalf("Failed to update source object in kcp: %v", err)
 	}
 
@@ -470,14 +481,14 @@ spec:
 	// Now we actually change the cronSpec in kcp, and this change _must_ make it to the service cluster.
 	t.Logf("Modify object in kcp again…")
 
-	if err := kcpClient.Get(teamCtx, ctrlruntimeclient.ObjectKeyFromObject(crontab), crontab); err != nil {
+	if err := teamClient.Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(crontab), crontab); err != nil {
 		t.Fatalf("Failed to create CronTab in kcp: %v", err)
 	}
 
 	kcpNewCronSpec := "users-new-desired-cronspec"
 	unstructured.SetNestedField(crontab.Object, kcpNewCronSpec, "spec", "cronSpec")
 
-	if err := kcpClient.Update(teamCtx, crontab); err != nil {
+	if err := teamClient.Update(ctx, crontab); err != nil {
 		t.Fatalf("Failed to update source object in kcp: %v", err)
 	}
 
@@ -560,9 +571,12 @@ func TestResourceFilter(t *testing.T) {
 	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
 
 	// wait until the API is available
-	teamCtx := kontext.WithCluster(ctx, logicalcluster.Name(fmt.Sprintf("root:%s:team-1", orgWorkspace)))
-	kcpClient := utils.GetKcpAdminClusterClient(t)
-	utils.WaitForBoundAPI(t, teamCtx, kcpClient, schema.GroupVersionResource{
+	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
+
+	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
+	teamClient := kcpClusterClient.Cluster(teamClusterPath)
+
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
 		Group:    kcpGroupName,
 		Version:  "v1",
 		Resource: "crontabs",
@@ -580,7 +594,7 @@ spec:
   image: ubuntu:latest
 `)
 
-	if err := kcpClient.Create(teamCtx, ignoredCrontab); err != nil {
+	if err := teamClient.Create(ctx, ignoredCrontab); err != nil {
 		t.Fatalf("Failed to create CronTab in kcp: %v", err)
 	}
 
@@ -596,7 +610,7 @@ spec:
   image: debian:12
 `)
 
-	if err := kcpClient.Create(teamCtx, includedCrontab); err != nil {
+	if err := teamClient.Create(ctx, includedCrontab); err != nil {
 		t.Fatalf("Failed to create CronTab in kcp: %v", err)
 	}
 
@@ -674,9 +688,12 @@ func TestSyncingOverlyLongNames(t *testing.T) {
 	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
 
 	// wait until the API is available
-	teamCtx := kontext.WithCluster(ctx, logicalcluster.Name(fmt.Sprintf("root:%s:team-1", orgWorkspace)))
-	kcpClient := utils.GetKcpAdminClusterClient(t)
-	utils.WaitForBoundAPI(t, teamCtx, kcpClient, schema.GroupVersionResource{
+	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
+
+	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
+	teamClient := kcpClusterClient.Cluster(teamClusterPath)
+
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
 		Group:    kcpGroupName,
 		Version:  "v1",
 		Resource: "crontabs",
@@ -686,7 +703,7 @@ func TestSyncingOverlyLongNames(t *testing.T) {
 	namespace := &corev1.Namespace{}
 	namespace.Name = strings.Repeat("yadda", 3) // 250 chars in total
 
-	if err := kcpClient.Create(teamCtx, namespace); err != nil {
+	if err := teamClient.Create(ctx, namespace); err != nil {
 		t.Fatalf("Failed to create namespace in kcp: %v", err)
 	}
 
@@ -703,7 +720,7 @@ spec:
 	ignoredCrontab.SetNamespace(namespace.Name)
 	ignoredCrontab.SetName(strings.Repeat("yotta", 50))
 
-	if err := kcpClient.Create(teamCtx, ignoredCrontab); err != nil {
+	if err := teamClient.Create(ctx, ignoredCrontab); err != nil {
 		t.Fatalf("Failed to create CronTab in kcp: %v", err)
 	}
 
