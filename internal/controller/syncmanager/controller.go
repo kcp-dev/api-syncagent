@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	apiexportprovider "github.com/kcp-dev/multicluster-provider/apiexport"
 	"go.uber.org/zap"
 
 	"github.com/kcp-dev/api-syncagent/internal/controller/sync"
@@ -31,6 +30,9 @@ import (
 
 	kcpapisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	apiexportprovider "github.com/kcp-dev/multicluster-provider/apiexport"
+	mccontroller "sigs.k8s.io/multicluster-runtime/pkg/controller"
+	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -47,8 +49,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	mccontroller "sigs.k8s.io/multicluster-runtime/pkg/controller"
-	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
 )
 
 const (

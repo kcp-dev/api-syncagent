@@ -24,12 +24,11 @@ import (
 	"strings"
 	"testing"
 
-	mcclient "github.com/kcp-dev/multicluster-provider/client"
-
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
 	kcpapisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcptenancyv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
+	mcclient "github.com/kcp-dev/multicluster-provider/client"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
