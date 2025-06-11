@@ -29,7 +29,6 @@ import (
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
 	kcpapisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
-	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	apiexportprovider "github.com/kcp-dev/multicluster-provider/apiexport"
 	mccontroller "sigs.k8s.io/multicluster-runtime/pkg/controller"
 	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
@@ -75,7 +74,7 @@ type Reconciler struct {
 	stateNamespace  string
 	agentName       string
 
-	apiExport *kcpdevv1alpha1.APIExport
+	apiExport *kcpapisv1alpha1.APIExport
 
 	// URL for which the current vwCluster instance has been created
 	vwURL string
@@ -110,7 +109,7 @@ func Add(
 	kcpCluster cluster.Cluster,
 	kcpRestConfig *rest.Config,
 	log *zap.SugaredLogger,
-	apiExport *kcpdevv1alpha1.APIExport,
+	apiExport *kcpapisv1alpha1.APIExport,
 	prFilter labels.Selector,
 	stateNamespace string,
 	agentName string,
@@ -144,7 +143,7 @@ func Add(
 		// Watch for changes to APIExport on the kcp side to start/restart the actual syncing controllers;
 		// the cache is already restricted by a fieldSelector in the main.go to respect the RBAC restrictions,
 		// so there is no need here to add an additional filter.
-		WatchesRawSource(source.Kind(kcpCluster.GetCache(), &kcpdevv1alpha1.APIExport{}, controllerutil.EnqueueConst[*kcpdevv1alpha1.APIExport]("dummy"))).
+		WatchesRawSource(source.Kind(kcpCluster.GetCache(), &kcpapisv1alpha1.APIExport{}, controllerutil.EnqueueConst[*kcpapisv1alpha1.APIExport]("dummy"))).
 		// Watch for changes to the PublishedResources
 		Watches(&syncagentv1alpha1.PublishedResource{}, controllerutil.EnqueueConst[ctrlruntimeclient.Object]("dummy"), builder.WithPredicates(predicate.ByLabels(prFilter))).
 		Build(reconciler)
@@ -158,7 +157,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, _ reconcile.Request) (reconc
 
 	key := types.NamespacedName{Name: r.apiExport.Name}
 
-	apiExport := &kcpdevv1alpha1.APIExport{}
+	apiExport := &kcpapisv1alpha1.APIExport{}
 	if err := r.kcpCluster.GetClient().Get(ctx, key, apiExport); ctrlruntimeclient.IgnoreNotFound(err) != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to retrieve APIExport: %w", err)
 	}
@@ -166,7 +165,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, _ reconcile.Request) (reconc
 	return reconcile.Result{}, r.reconcile(ctx, log, apiExport)
 }
 
-func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, apiExport *kcpdevv1alpha1.APIExport) error {
+func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, apiExport *kcpapisv1alpha1.APIExport) error {
 	// We're not yet making use of APIEndpointSlices, as we don't even fully
 	// support a sharded kcp setup yet. Hence for now we're safe just using
 	// this deprecated VW URL.
@@ -261,12 +260,10 @@ func (r *Reconciler) ensureManager(log *zap.SugaredLogger, vwURL string) error {
 		// Make sure the vwManager can Engage() on the controller, even though we
 		// start and stop them outside the control of the manager. This shim will
 		// ensure Engage() calls are handed to the underlying sync controller as
-		// as long as the controller is running. There is sadly no way to remove
-		// a shim from the manager again, so the list of runnables in the manager
-		// will just grow over time.
-		manager.Add(&controllerShim{
-			reconciler: r,
-		})
+		// as long as the controller is running.
+		if err := manager.Add(&controllerShim{reconciler: r}); err != nil {
+			return fmt.Errorf("failed to initialize cluster: %w", err)
+		}
 
 		// use the app's root context as the base, not the reconciling context, which
 		// might get cancelled after Reconcile() is done;
