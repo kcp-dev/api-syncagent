@@ -17,38 +17,23 @@ limitations under the License.
 package sync
 
 import (
-	"context"
-
 	"github.com/kcp-dev/logicalcluster/v3"
-
-	"sigs.k8s.io/controller-runtime/pkg/kontext"
 )
 
-type Context struct {
+type clusterInfo struct {
 	clusterName   logicalcluster.Name
 	workspacePath logicalcluster.Path
-	local         context.Context
-	remote        context.Context
 }
 
-func NewContext(local, remote context.Context) Context {
-	clusterName, ok := kontext.ClusterFrom(remote)
-	if !ok {
-		panic("Provided remote context does not contain cluster name.")
-	}
-
-	return Context{
+func NewClusterInfo(clusterName logicalcluster.Name) clusterInfo {
+	return clusterInfo{
 		clusterName: clusterName,
-		local:       local,
-		remote:      remote,
 	}
 }
 
-func (c *Context) WithWorkspacePath(path logicalcluster.Path) Context {
-	return Context{
+func (c *clusterInfo) WithWorkspacePath(path logicalcluster.Path) clusterInfo {
+	return clusterInfo{
 		clusterName:   c.clusterName,
 		workspacePath: path,
-		local:         c.local,
-		remote:        c.remote,
 	}
 }
