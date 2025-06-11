@@ -19,14 +19,14 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
 
-	v1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
+	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 	scheme "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned/scheme"
 )
 
@@ -38,33 +38,34 @@ type PublishedResourcesGetter interface {
 
 // PublishedResourceInterface has methods to work with PublishedResource resources.
 type PublishedResourceInterface interface {
-	Create(ctx context.Context, publishedResource *v1alpha1.PublishedResource, opts v1.CreateOptions) (*v1alpha1.PublishedResource, error)
-	Update(ctx context.Context, publishedResource *v1alpha1.PublishedResource, opts v1.UpdateOptions) (*v1alpha1.PublishedResource, error)
+	Create(ctx context.Context, publishedResource *syncagentv1alpha1.PublishedResource, opts v1.CreateOptions) (*syncagentv1alpha1.PublishedResource, error)
+	Update(ctx context.Context, publishedResource *syncagentv1alpha1.PublishedResource, opts v1.UpdateOptions) (*syncagentv1alpha1.PublishedResource, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, publishedResource *v1alpha1.PublishedResource, opts v1.UpdateOptions) (*v1alpha1.PublishedResource, error)
+	UpdateStatus(ctx context.Context, publishedResource *syncagentv1alpha1.PublishedResource, opts v1.UpdateOptions) (*syncagentv1alpha1.PublishedResource, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.PublishedResource, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.PublishedResourceList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*syncagentv1alpha1.PublishedResource, error)
+	List(ctx context.Context, opts v1.ListOptions) (*syncagentv1alpha1.PublishedResourceList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PublishedResource, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *syncagentv1alpha1.PublishedResource, err error)
 	PublishedResourceExpansion
 }
 
 // publishedResources implements PublishedResourceInterface
 type publishedResources struct {
-	*gentype.ClientWithList[*v1alpha1.PublishedResource, *v1alpha1.PublishedResourceList]
+	*gentype.ClientWithList[*syncagentv1alpha1.PublishedResource, *syncagentv1alpha1.PublishedResourceList]
 }
 
 // newPublishedResources returns a PublishedResources
 func newPublishedResources(c *SyncagentV1alpha1Client) *publishedResources {
 	return &publishedResources{
-		gentype.NewClientWithList[*v1alpha1.PublishedResource, *v1alpha1.PublishedResourceList](
+		gentype.NewClientWithList[*syncagentv1alpha1.PublishedResource, *syncagentv1alpha1.PublishedResourceList](
 			"publishedresources",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha1.PublishedResource { return &v1alpha1.PublishedResource{} },
-			func() *v1alpha1.PublishedResourceList { return &v1alpha1.PublishedResourceList{} }),
+			func() *syncagentv1alpha1.PublishedResource { return &syncagentv1alpha1.PublishedResource{} },
+			func() *syncagentv1alpha1.PublishedResourceList { return &syncagentv1alpha1.PublishedResourceList{} },
+		),
 	}
 }

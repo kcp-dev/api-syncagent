@@ -35,7 +35,7 @@ func RelatedResourceObject() *RelatedResourceObjectApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Selector field is set to the value of the last call.
 func (b *RelatedResourceObjectApplyConfiguration) WithSelector(value *RelatedResourceObjectSelectorApplyConfiguration) *RelatedResourceObjectApplyConfiguration {
-	b.Selector = value
+	b.RelatedResourceObjectSpecApplyConfiguration.Selector = value
 	return b
 }
 
@@ -43,7 +43,7 @@ func (b *RelatedResourceObjectApplyConfiguration) WithSelector(value *RelatedRes
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Reference field is set to the value of the last call.
 func (b *RelatedResourceObjectApplyConfiguration) WithReference(value *RelatedResourceObjectReferenceApplyConfiguration) *RelatedResourceObjectApplyConfiguration {
-	b.Reference = value
+	b.RelatedResourceObjectSpecApplyConfiguration.Reference = value
 	return b
 }
 
@@ -51,7 +51,7 @@ func (b *RelatedResourceObjectApplyConfiguration) WithReference(value *RelatedRe
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Template field is set to the value of the last call.
 func (b *RelatedResourceObjectApplyConfiguration) WithTemplate(value *TemplateExpressionApplyConfiguration) *RelatedResourceObjectApplyConfiguration {
-	b.Template = value
+	b.RelatedResourceObjectSpecApplyConfiguration.Template = value
 	return b
 }
 
