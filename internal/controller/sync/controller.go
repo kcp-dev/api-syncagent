@@ -32,6 +32,11 @@ import (
 
 	kcpcore "github.com/kcp-dev/kcp/sdk/apis/core"
 	kcpdevcorev1alpha1 "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
+	mccontroller "sigs.k8s.io/multicluster-runtime/pkg/controller"
+	mchandler "sigs.k8s.io/multicluster-runtime/pkg/handler"
+	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
+	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
+	mcsource "sigs.k8s.io/multicluster-runtime/pkg/source"
 
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -46,11 +51,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	mccontroller "sigs.k8s.io/multicluster-runtime/pkg/controller"
-	mchandler "sigs.k8s.io/multicluster-runtime/pkg/handler"
-	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
-	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
-	mcsource "sigs.k8s.io/multicluster-runtime/pkg/source"
 )
 
 const (
