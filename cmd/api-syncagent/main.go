@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	golog "log"
+	"slices"
 	"strings"
 
 	"github.com/go-logr/zapr"
@@ -46,6 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	ctrlruntime "sigs.k8s.io/controller-runtime"
@@ -56,6 +58,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
+
+var availableControllers = sets.New("apiexport", "apiresourceschema", "sync")
 
 func main() {
 	ctx := context.Background()
@@ -133,16 +137,37 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 		return fmt.Errorf("failed to add kcp cluster runnable: %w", err)
 	}
 
-	if err := apiresourceschema.Add(mgr, kcpCluster, lcName, log, 4, opts.AgentName, opts.PublishedResourceSelector); err != nil {
-		return fmt.Errorf("failed to add apiresourceschema controller: %w", err)
+	startController := func(name string, creator func() error) error {
+		if slices.Contains(opts.DisabledControllers, name) {
+			log.Infof("Not starting %s controller because it is disabled.", name)
+			return nil
+		}
+
+		if err := creator(); err != nil {
+			return fmt.Errorf("failed to add %s controller: %w", name, err)
+		}
+
+		return nil
 	}
 
-	if err := apiexport.Add(mgr, kcpCluster, lcName, log, opts.APIExportRef, opts.AgentName, opts.PublishedResourceSelector); err != nil {
-		return fmt.Errorf("failed to add apiexport controller: %w", err)
+	if err := startController("apiresourceschema", func() error {
+		return apiresourceschema.Add(mgr, kcpCluster, lcName, log, 4, opts.AgentName, opts.PublishedResourceSelector)
+	}); err != nil {
+		return err
 	}
 
-	if err := syncmanager.Add(ctx, mgr, kcpCluster, kcpRestConfig, log, apiExport, opts.PublishedResourceSelector, opts.Namespace, opts.AgentName); err != nil {
-		return fmt.Errorf("failed to add syncmanager controller: %w", err)
+	if err := startController("apiexport", func() error {
+		return apiexport.Add(mgr, kcpCluster, lcName, log, opts.APIExportRef, opts.AgentName, opts.PublishedResourceSelector)
+	}); err != nil {
+		return err
+	}
+
+	// This controller is called "sync" because it makes the most sense to the users, even though internally the relevant
+	// controller is the syncmanager (which in turn would start/stop the sync controllers).
+	if err := startController("sync", func() error {
+		return syncmanager.Add(ctx, mgr, kcpCluster, kcpRestConfig, log, apiExport, opts.PublishedResourceSelector, opts.Namespace, opts.AgentName)
+	}); err != nil {
+		return err
 	}
 
 	log.Info("Starting kcp Sync Agent…")
