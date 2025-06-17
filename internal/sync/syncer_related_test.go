@@ -60,19 +60,16 @@ func TestResolveRelatedResourceObjects(t *testing.T) {
 
 	kcpClient := buildFakeClient(primaryObject)
 	serviceClusterClient := buildFakeClient(primaryObjectCopy, dummySecret)
-	ctx := t.Context()
 
 	// Now we configure origin/dest as if we're syncing a Secret up from the service cluster to kcp,
 	// i.e. origin=service.
 
 	originSide := syncSide{
-		ctx:    ctx,
 		client: serviceClusterClient,
 		object: primaryObjectCopy,
 	}
 
 	destSide := syncSide{
-		ctx:    ctx,
 		client: kcpClient,
 		object: primaryObject,
 		// Since this is a just a regular kube client, we do not need to set clusterName/clusterPath.
@@ -222,7 +219,7 @@ func TestResolveRelatedResourceObjects(t *testing.T) {
 				Object:     testcase.objectSpec,
 			}
 
-			foundObjects, err := resolveRelatedResourceObjects(originSide, destSide, pubRes)
+			foundObjects, err := resolveRelatedResourceObjects(t.Context(), originSide, destSide, pubRes)
 			if err != nil {
 				t.Fatalf("Failed to resolve related objects: %v", err)
 			}

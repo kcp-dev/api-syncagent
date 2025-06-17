@@ -30,7 +30,7 @@ type FakeSyncagentV1alpha1 struct {
 }
 
 func (c *FakeSyncagentV1alpha1) PublishedResources() v1alpha1.PublishedResourceInterface {
-	return &FakePublishedResources{c}
+	return newFakePublishedResources(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

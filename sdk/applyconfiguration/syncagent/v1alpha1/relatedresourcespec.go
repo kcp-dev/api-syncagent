@@ -19,14 +19,14 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
+	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 )
 
 // RelatedResourceSpecApplyConfiguration represents a declarative configuration of the RelatedResourceSpec type for use
 // with apply.
 type RelatedResourceSpecApplyConfiguration struct {
 	Identifier *string                                  `json:"identifier,omitempty"`
-	Origin     *v1alpha1.RelatedResourceOrigin          `json:"origin,omitempty"`
+	Origin     *syncagentv1alpha1.RelatedResourceOrigin `json:"origin,omitempty"`
 	Kind       *string                                  `json:"kind,omitempty"`
 	Object     *RelatedResourceObjectApplyConfiguration `json:"object,omitempty"`
 	Mutation   *ResourceMutationSpecApplyConfiguration  `json:"mutation,omitempty"`
@@ -49,7 +49,7 @@ func (b *RelatedResourceSpecApplyConfiguration) WithIdentifier(value string) *Re
 // WithOrigin sets the Origin field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Origin field is set to the value of the last call.
-func (b *RelatedResourceSpecApplyConfiguration) WithOrigin(value v1alpha1.RelatedResourceOrigin) *RelatedResourceSpecApplyConfiguration {
+func (b *RelatedResourceSpecApplyConfiguration) WithOrigin(value syncagentv1alpha1.RelatedResourceOrigin) *RelatedResourceSpecApplyConfiguration {
 	b.Origin = &value
 	return b
 }

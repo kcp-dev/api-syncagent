@@ -44,7 +44,6 @@ func TestStateStoreBasics(t *testing.T) {
 	}
 
 	stateSide := syncSide{
-		ctx:    ctx,
 		client: serviceClusterClient,
 	}
 
@@ -54,7 +53,7 @@ func TestStateStoreBasics(t *testing.T) {
 	///////////////////////////////////////
 	// get nil from empty store
 
-	result, err := store.Get(syncSide{object: primaryObject})
+	result, err := store.Get(ctx, syncSide{object: primaryObject})
 	if err != nil {
 		t.Fatalf("Failed to get primary object from empty cache: %v", err)
 	}
@@ -74,7 +73,7 @@ func TestStateStoreBasics(t *testing.T) {
 		},
 	}, withKind("RemoteThing"))
 
-	err = store.Put(firstObject, "", nil)
+	err = store.Put(ctx, firstObject, "", nil)
 	if err != nil {
 		t.Fatalf("Failed to store object in empty cache: %v", err)
 	}
@@ -90,7 +89,7 @@ func TestStateStoreBasics(t *testing.T) {
 	///////////////////////////////////////
 	// retrieve the stored object
 
-	result, err = store.Get(syncSide{object: firstObject})
+	result, err = store.Get(ctx, syncSide{object: firstObject})
 	if err != nil {
 		t.Fatalf("Failed to get stored object from cache: %v", err)
 	}
@@ -109,7 +108,7 @@ func TestStateStoreBasics(t *testing.T) {
 		},
 	}, withKind("RemoteThing"))
 
-	result, err = store.Get(syncSide{object: secondObject})
+	result, err = store.Get(ctx, syncSide{object: secondObject})
 	if err != nil {
 		t.Fatalf("Failed to get second object from cache: %v", err)
 	}
@@ -120,12 +119,12 @@ func TestStateStoreBasics(t *testing.T) {
 	///////////////////////////////////////
 	// store a 2nd object
 
-	err = store.Put(secondObject, "", nil)
+	err = store.Put(ctx, secondObject, "", nil)
 	if err != nil {
 		t.Fatalf("Failed to store second object in cache: %v", err)
 	}
 
-	result, err = store.Get(syncSide{object: secondObject})
+	result, err = store.Get(ctx, syncSide{object: secondObject})
 	if err != nil {
 		t.Fatalf("Failed to get second object from cache: %v", err)
 	}
@@ -135,7 +134,7 @@ func TestStateStoreBasics(t *testing.T) {
 	///////////////////////////////////////
 	// retrieve the first, ensure it's not overwritten
 
-	result, err = store.Get(syncSide{object: firstObject})
+	result, err = store.Get(ctx, syncSide{object: firstObject})
 	if err != nil {
 		t.Fatalf("Failed to get first object from cache again: %v", err)
 	}
@@ -157,7 +156,7 @@ func TestStateStoreBasics(t *testing.T) {
 		},
 	}, withKind("RemoteThing"))
 
-	err = store.Put(thirdObject, "", nil)
+	err = store.Put(ctx, thirdObject, "", nil)
 	if err != nil {
 		t.Fatalf("Failed to store third object in cache: %v", err)
 	}
@@ -165,7 +164,7 @@ func TestStateStoreBasics(t *testing.T) {
 	///////////////////////////////////////
 	// ensure status is kept
 
-	result, err = store.Get(syncSide{object: thirdObject})
+	result, err = store.Get(ctx, syncSide{object: thirdObject})
 	if err != nil {
 		t.Fatalf("Failed to get third object from cache again: %v", err)
 	}
@@ -175,7 +174,7 @@ func TestStateStoreBasics(t *testing.T) {
 	///////////////////////////////////////
 	// overwrite, but this time strip subresource
 
-	err = store.Put(thirdObject, "", []string{"status"})
+	err = store.Put(ctx, thirdObject, "", []string{"status"})
 	if err != nil {
 		t.Fatalf("Failed to store third object in cache: %v", err)
 	}
@@ -183,7 +182,7 @@ func TestStateStoreBasics(t *testing.T) {
 	///////////////////////////////////////
 	// ensure status is gone
 
-	result, err = store.Get(syncSide{object: thirdObject})
+	result, err = store.Get(ctx, syncSide{object: thirdObject})
 	if err != nil {
 		t.Fatalf("Failed to get third object from cache again: %v", err)
 	}

@@ -39,7 +39,6 @@ import (
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/kontext"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -170,9 +169,7 @@ func (r *Reconciler) reconcile(ctx context.Context) error {
 		r.createAPIExportReconciler(arsList, claimedResources, r.agentName, r.apiExportName),
 	}
 
-	wsCtx := kontext.WithCluster(ctx, r.lcName)
-
-	if err := reconciling.ReconcileAPIExports(wsCtx, factories, "", r.kcpClient); err != nil {
+	if err := reconciling.ReconcileAPIExports(ctx, factories, "", r.kcpClient); err != nil {
 		return fmt.Errorf("failed to reconcile APIExport: %w", err)
 	}
 
