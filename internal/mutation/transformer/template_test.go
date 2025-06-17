@@ -22,6 +22,7 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/test/diff"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 	"github.com/kcp-dev/api-syncagent/test/utils"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 

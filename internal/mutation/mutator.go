@@ -47,22 +47,18 @@ var _ Mutator = &mutator{}
 // NewMutator creates a new mutator, which will apply the mutation rules to a synced object, in
 // both directions. A nil spec is supported and will simply make the mutator not do anything.
 func NewMutator(spec *syncagentv1alpha1.ResourceMutationSpec) (Mutator, error) {
-	var (
-		specAgg   *transformer.AggregateTransformer
-		statusAgg *transformer.AggregateTransformer
-		err       error
-	)
+	if spec == nil {
+		return nil, nil
+	}
 
-	if spec != nil {
-		specAgg, err = createAggregatedTransformer(spec.Spec)
-		if err != nil {
-			return nil, fmt.Errorf("cannot create transformer for spec: %w", err)
-		}
+	specAgg, err := createAggregatedTransformer(spec.Spec)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create transformer for spec: %w", err)
+	}
 
-		statusAgg, err = createAggregatedTransformer(spec.Status)
-		if err != nil {
-			return nil, fmt.Errorf("cannot create transformer for status: %w", err)
-		}
+	statusAgg, err := createAggregatedTransformer(spec.Status)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create transformer for status: %w", err)
 	}
 
 	return &mutator{
@@ -72,10 +68,18 @@ func NewMutator(spec *syncagentv1alpha1.ResourceMutationSpec) (Mutator, error) {
 }
 
 func (m *mutator) MutateSpec(toMutate *unstructured.Unstructured, otherObj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	if m == nil {
+		return toMutate, nil
+	}
+
 	return m.spec.Apply(toMutate, otherObj)
 }
 
 func (m *mutator) MutateStatus(toMutate *unstructured.Unstructured, otherObj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	if m == nil {
+		return toMutate, nil
+	}
+
 	return m.status.Apply(toMutate, otherObj)
 }
 

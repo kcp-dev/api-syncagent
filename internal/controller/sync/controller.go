@@ -103,12 +103,7 @@ func Create(
 	remoteDummy.SetGroupVersionKind(remoteGVK)
 
 	// create the syncer that holds the meat&potatoes of the synchronization logic
-	mutator, err := mutation.NewMutator(pubRes.Spec.Mutation)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create mutator: %w", err)
-	}
-
-	syncer, err := sync.NewResourceSyncer(log, localManager.GetClient(), virtualWorkspaceCluster.GetClient(), pubRes, localCRD, mutator, stateNamespace, agentName)
+	syncer, err := sync.NewResourceSyncer(log, localManager.GetClient(), virtualWorkspaceCluster.GetClient(), pubRes, localCRD, mutation.NewMutator, stateNamespace, agentName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create syncer: %w", err)
 	}
