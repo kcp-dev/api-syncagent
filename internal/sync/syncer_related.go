@@ -278,7 +278,12 @@ func resolveRelatedResourceOriginNamespaces(relatedOrigin, relatedDest syncSide,
 	case spec.Selector != nil:
 		namespaces := &corev1.NamespaceList{}
 
-		selector, err := metav1.LabelSelectorAsSelector(&spec.Selector.LabelSelector)
+		labelSelector, err := templateLabelSelector(relatedOrigin, relatedDest, origin, &spec.Selector.LabelSelector)
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply templates to label selector: %w", err)
+		}
+
+		selector, err := metav1.LabelSelectorAsSelector(labelSelector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid selector configured: %w", err)
 		}
