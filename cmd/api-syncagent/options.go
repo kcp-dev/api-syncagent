@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -68,6 +69,8 @@ type Options struct {
 
 	MetricsAddr string
 	HealthAddr  string
+
+	DisabledControllers []string
 }
 
 func NewOptions() *Options {
@@ -91,6 +94,7 @@ func (o *Options) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.KubeconfigCAFileOverride, "kubeconfig-ca-file-override", o.KubeconfigCAFileOverride, "override the server CA file configured in the local kubeconfig")
 	flags.StringVar(&o.MetricsAddr, "metrics-address", o.MetricsAddr, "host and port to serve Prometheus metrics via /metrics (HTTP)")
 	flags.StringVar(&o.HealthAddr, "health-address", o.HealthAddr, "host and port to serve probes via /readyz and /healthz (HTTP)")
+	flags.StringSliceVar(&o.DisabledControllers, "disabled-controllers", o.DisabledControllers, fmt.Sprintf("comma-separated list of controllers (out of %v) to disable (can be given multiple times)", sets.List(availableControllers)))
 }
 
 func (o *Options) Validate() error {
@@ -122,6 +126,13 @@ func (o *Options) Validate() error {
 		if _, err := labels.Parse(s); err != nil {
 			errs = append(errs, fmt.Errorf("invalid --published-resource-selector %q: %w", s, err))
 		}
+	}
+
+	disabled := sets.New(o.DisabledControllers...)
+	unknown := disabled.Difference(availableControllers)
+
+	if unknown.Len() > 0 {
+		errs = append(errs, fmt.Errorf("unknown controller(s) %v, mut be any of %v", sets.List(unknown), sets.List(availableControllers)))
 	}
 
 	return utilerrors.NewAggregate(errs)
