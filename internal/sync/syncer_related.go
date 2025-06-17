@@ -118,6 +118,11 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 			object:      destObject,
 		}
 
+		mutator, err := mutation.NewMutator(relRes.Mutation)
+		if err != nil {
+			return false, fmt.Errorf("failed to create mutator: %w", err)
+		}
+
 		syncer := objectSyncer{
 			// Related objects within kcp are not labelled with the agent name because it's unnecessary.
 			// agentName: "",
@@ -142,7 +147,7 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 			// sure we can clean up properly
 			blockSourceDeletion: relRes.Origin == "kcp",
 			// apply mutation rules configured for the related resource
-			mutator: mutation.NewMutator(relRes.Mutation),
+			mutator: mutator,
 			// we never want to store sync-related metadata inside kcp
 			metadataOnDestination: false,
 		}

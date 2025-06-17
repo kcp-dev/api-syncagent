@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
@@ -33,6 +34,8 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
+	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/scale/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -183,4 +186,22 @@ func ToUnstructured(t *testing.T, obj any) *unstructured.Unstructured {
 	}
 
 	return &unstructured.Unstructured{Object: raw}
+}
+
+func YAMLToUnstructured(t *testing.T, data string) *unstructured.Unstructured {
+	t.Helper()
+
+	decoder := yamlutil.NewYAMLOrJSONDecoder(strings.NewReader(data), 100)
+
+	var rawObj runtime.RawExtension
+	if err := decoder.Decode(&rawObj); err != nil {
+		t.Fatalf("Failed to decode: %v", err)
+	}
+
+	obj, _, err := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme).Decode(rawObj.Raw, nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to decode: %v", err)
+	}
+
+	return ToUnstructured(t, obj)
 }
