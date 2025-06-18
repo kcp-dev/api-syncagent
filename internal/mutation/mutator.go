@@ -17,8 +17,10 @@ limitations under the License.
 package mutation
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/kcp-dev/api-syncagent/internal/mutation/transformer"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -36,71 +38,85 @@ type Mutator interface {
 }
 
 type mutator struct {
-	spec *syncagentv1alpha1.ResourceMutationSpec
+	spec   *transformer.AggregateTransformer
+	status *transformer.AggregateTransformer
 }
 
 var _ Mutator = &mutator{}
 
 // NewMutator creates a new mutator, which will apply the mutation rules to a synced object, in
 // both directions. A nil spec is supported and will simply make the mutator not do anything.
-func NewMutator(spec *syncagentv1alpha1.ResourceMutationSpec) Mutator {
-	return &mutator{
-		spec: spec,
+func NewMutator(spec *syncagentv1alpha1.ResourceMutationSpec) (Mutator, error) {
+	if spec == nil {
+		return nil, nil
 	}
+
+	specAgg, err := createAggregatedTransformer(spec.Spec)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create transformer for spec: %w", err)
+	}
+
+	statusAgg, err := createAggregatedTransformer(spec.Status)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create transformer for status: %w", err)
+	}
+
+	return &mutator{
+		spec:   specAgg,
+		status: statusAgg,
+	}, nil
 }
 
 func (m *mutator) MutateSpec(toMutate *unstructured.Unstructured, otherObj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	if m.spec == nil || m.spec.Spec == nil {
+	if m == nil {
 		return toMutate, nil
 	}
 
-	ctx := &TemplateMutationContext{
-		RemoteObject: toMutate.Object,
-	}
-
-	if otherObj != nil {
-		ctx.LocalObject = otherObj.Object
-	}
-
-	mutatedObj, err := ApplyResourceMutations(toMutate.Object, m.spec.Spec, ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	obj, ok := mutatedObj.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("mutations did not yield an object, but %T", mutatedObj)
-	}
-
-	toMutate.Object = obj
-
-	return toMutate, nil
+	return m.spec.Apply(toMutate, otherObj)
 }
 
 func (m *mutator) MutateStatus(toMutate *unstructured.Unstructured, otherObj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	if m.spec == nil || m.spec.Status == nil {
+	if m == nil {
 		return toMutate, nil
 	}
 
-	ctx := &TemplateMutationContext{
-		LocalObject: toMutate.Object,
+	return m.status.Apply(toMutate, otherObj)
+}
+
+func createAggregatedTransformer(mutations []syncagentv1alpha1.ResourceMutation) (*transformer.AggregateTransformer, error) {
+	agg := transformer.NewAggregate()
+
+	for _, mut := range mutations {
+		var (
+			trans any
+			err   error
+		)
+
+		switch {
+		case mut.Delete != nil:
+			trans, err = transformer.NewDelete(mut.Delete)
+			if err != nil {
+				return nil, err
+			}
+
+		case mut.Regex != nil:
+			trans, err = transformer.NewRegex(mut.Regex)
+			if err != nil {
+				return nil, err
+			}
+
+		case mut.Template != nil:
+			trans, err = transformer.NewTemplate(mut.Template)
+			if err != nil {
+				return nil, err
+			}
+
+		default:
+			return nil, errors.New("no valid mutation mechanism provided")
+		}
+
+		agg.Add(trans)
 	}
 
-	if otherObj != nil {
-		ctx.RemoteObject = otherObj.Object
-	}
-
-	mutatedObj, err := ApplyResourceMutations(toMutate.Object, m.spec.Status, ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	obj, ok := mutatedObj.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("mutations did not yield an object, but %T", mutatedObj)
-	}
-
-	toMutate.Object = obj
-
-	return toMutate, nil
+	return agg, nil
 }

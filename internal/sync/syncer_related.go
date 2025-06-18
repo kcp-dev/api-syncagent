@@ -27,7 +27,6 @@ import (
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 
-	"github.com/kcp-dev/api-syncagent/internal/mutation"
 	"github.com/kcp-dev/api-syncagent/internal/sync/templating"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
@@ -142,7 +141,7 @@ func (s *ResourceSyncer) processRelatedResource(log *zap.SugaredLogger, stateSto
 			// sure we can clean up properly
 			blockSourceDeletion: relRes.Origin == "kcp",
 			// apply mutation rules configured for the related resource
-			mutator: mutation.NewMutator(relRes.Mutation),
+			mutator: s.relatedMutators[relRes.Identifier],
 			// we never want to store sync-related metadata inside kcp
 			metadataOnDestination: false,
 		}

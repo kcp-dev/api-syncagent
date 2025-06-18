@@ -45,7 +45,9 @@ type ResourceSyncer struct {
 
 	destDummy *unstructured.Unstructured
 
-	mutator mutation.Mutator
+	// cached mutators (for those transformers that are expensive to compile, like CEL)
+	primaryMutator  mutation.Mutator
+	relatedMutators map[string]mutation.Mutator
 
 	agentName string
 
@@ -53,13 +55,15 @@ type ResourceSyncer struct {
 	newObjectStateStore newObjectStateStoreFunc
 }
 
+type MutatorCreatorFunc func(*syncagentv1alpha1.ResourceMutationSpec) (mutation.Mutator, error)
+
 func NewResourceSyncer(
 	log *zap.SugaredLogger,
 	localClient ctrlruntimeclient.Client,
 	remoteClient ctrlruntimeclient.Client,
 	pubRes *syncagentv1alpha1.PublishedResource,
 	localCRD *apiextensionsv1.CustomResourceDefinition,
-	mutator mutation.Mutator,
+	mutatorCreator MutatorCreatorFunc,
 	stateNamespace string,
 	agentName string,
 ) (*ResourceSyncer, error) {
@@ -94,6 +98,21 @@ func NewResourceSyncer(
 		}
 	}
 
+	primaryMutator, err := mutatorCreator(pubRes.Spec.Mutation)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create primary object mutator: %w", err)
+	}
+
+	relatedMutators := map[string]mutation.Mutator{}
+	for _, rr := range pubRes.Spec.Related {
+		mutator, err := mutatorCreator(rr.Mutation)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create related object %q mutator: %w", rr.Identifier, err)
+		}
+
+		relatedMutators[rr.Identifier] = mutator
+	}
+
 	return &ResourceSyncer{
 		log:                 log.With("local-gvk", localGVK, "remote-gvk", remoteGVK),
 		localClient:         localClient,
@@ -102,7 +121,8 @@ func NewResourceSyncer(
 		localCRD:            localCRD,
 		subresources:        subresources,
 		destDummy:           localDummy,
-		mutator:             mutator,
+		primaryMutator:      primaryMutator,
+		relatedMutators:     relatedMutators,
 		agentName:           agentName,
 		newObjectStateStore: newKubernetesStateStoreCreator(stateNamespace),
 	}, nil
@@ -162,7 +182,7 @@ func (s *ResourceSyncer) Process(ctx Context, remoteObj *unstructured.Unstructur
 		// in kcp is deleted
 		blockSourceDeletion: true,
 		// use the configured mutations from the PublishedResource
-		mutator: s.mutator,
+		mutator: s.primaryMutator,
 		// make sure the syncer can remember the current state of any object
 		stateStore: stateStore,
 		// For the main resource, we need to store metadata on the destination copy
