@@ -25,8 +25,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/kcp-dev/api-syncagent/internal/controllerutil/predicate"
-	"github.com/kcp-dev/api-syncagent/internal/crypto"
 	"github.com/kcp-dev/api-syncagent/internal/discovery"
+	"github.com/kcp-dev/api-syncagent/internal/kcp"
 	"github.com/kcp-dev/api-syncagent/internal/projection"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
@@ -166,7 +166,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubR
 	}
 
 	// generate a unique name for this exact state of the CRD
-	arsName := r.getAPIResourceSchemaName(projectedCRD)
+	arsName := kcp.GetAPIResourceSchemaName(projectedCRD)
 
 	// ensure ARS exists (don't try to reconcile it, it's basically entirely immutable)
 	wsCtx := kontext.WithCluster(ctx, r.lcName)
@@ -174,7 +174,14 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubR
 	err = r.kcpClient.Get(wsCtx, types.NamespacedName{Name: arsName}, ars, &ctrlruntimeclient.GetOptions{})
 
 	if apierrors.IsNotFound(err) {
-		if err := r.createAPIResourceSchema(wsCtx, log, projectedCRD, arsName); err != nil {
+		ars, err := kcp.CreateAPIResourceSchema(projectedCRD, arsName, r.agentName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create APIResourceSchema: %w", err)
+		}
+
+		log.With("name", arsName).Info("Creating APIResourceSchema…")
+
+		if err := r.kcpClient.Create(wsCtx, ars); err != nil {
 			return nil, fmt.Errorf("failed to create APIResourceSchema: %w", err)
 		}
 	} else if err != nil {
@@ -195,49 +202,4 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubR
 	}
 
 	return nil, nil
-}
-
-func (r *Reconciler) createAPIResourceSchema(ctx context.Context, log *zap.SugaredLogger, projectedCRD *apiextensionsv1.CustomResourceDefinition, arsName string) error {
-	// prefix is irrelevant as the name is overridden later
-	converted, err := kcpdevv1alpha1.CRDToAPIResourceSchema(projectedCRD, "irrelevant")
-	if err != nil {
-		return fmt.Errorf("failed to convert CRD: %w", err)
-	}
-
-	ars := &kcpdevv1alpha1.APIResourceSchema{}
-	ars.Name = arsName
-	ars.Annotations = map[string]string{
-		syncagentv1alpha1.SourceGenerationAnnotation: fmt.Sprintf("%d", projectedCRD.Generation),
-		syncagentv1alpha1.AgentNameAnnotation:        r.agentName,
-	}
-	ars.Labels = map[string]string{
-		syncagentv1alpha1.AgentNameLabel: r.agentName,
-	}
-	ars.Spec.Group = converted.Spec.Group
-	ars.Spec.Names = converted.Spec.Names
-	ars.Spec.Scope = converted.Spec.Scope
-	ars.Spec.Versions = converted.Spec.Versions
-
-	if len(converted.Spec.Versions) > 1 {
-		ars.Spec.Conversion = &kcpdevv1alpha1.CustomResourceConversion{
-			// as of kcp 0.27, there is no constant for this
-			Strategy: kcpdevv1alpha1.ConversionStrategyType("None"),
-		}
-	}
-
-	log.With("name", arsName).Info("Creating APIResourceSchema…")
-
-	return r.kcpClient.Create(ctx, ars)
-}
-
-// getAPIResourceSchemaName generates the name for the ARS in kcp. Note that
-// kcp requires, just like CRDs, that ARS are named following a specific pattern.
-func (r *Reconciler) getAPIResourceSchemaName(crd *apiextensionsv1.CustomResourceDefinition) string {
-	crd = crd.DeepCopy()
-	crd.Spec.Conversion = nil
-
-	checksum := crypto.Hash(crd.Spec)
-
-	// include a leading "v" to prevent SHA-1 hashes with digits to break the name
-	return fmt.Sprintf("v%s.%s.%s", checksum[:8], crd.Spec.Names.Plural, crd.Spec.Group)
 }
