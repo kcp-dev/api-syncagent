@@ -335,7 +335,7 @@ spec:
   naming:
     # this is where our CA and Issuer live in this example
     namespace: kube-system
-    # need to adjust it to prevent collions (normally clustername is the namespace)
+    # need to adjust it to prevent collisions (normally clustername is the namespace)
     name: "{{ .ClusterName }}-{{ .Object.metadata.namespace | sha3short }}-{{ .Object.metadata.name | sha3short }}"
 
   related:
@@ -643,7 +643,7 @@ spec:
   naming:
     # this is where our CA and Issuer live in this example
     namespace: kube-system
-    # need to adjust it to prevent collions (normally clustername is the namespace)
+    # need to adjust it to prevent collisions (normally clustername is the namespace)
     name: "{{ .ClusterName }}-{{ .Object.metadata.namespace | sha3short }}-{{ .Object.metadata.name | sha3short }}"
 
   related:
