@@ -55,6 +55,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &syncagentv1alpha1.RelatedResourceSelectorRewriteApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RelatedResourceSpec"):
 		return &syncagentv1alpha1.RelatedResourceSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ResourceCELMutation"):
+		return &syncagentv1alpha1.ResourceCELMutationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ResourceDeleteMutation"):
 		return &syncagentv1alpha1.ResourceDeleteMutationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ResourceFilter"):

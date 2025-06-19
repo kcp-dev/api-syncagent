@@ -24,6 +24,7 @@ type ResourceMutationApplyConfiguration struct {
 	Delete   *ResourceDeleteMutationApplyConfiguration   `json:"delete,omitempty"`
 	Regex    *ResourceRegexMutationApplyConfiguration    `json:"regex,omitempty"`
 	Template *ResourceTemplateMutationApplyConfiguration `json:"template,omitempty"`
+	CEL      *ResourceCELMutationApplyConfiguration      `json:"cel,omitempty"`
 }
 
 // ResourceMutationApplyConfiguration constructs a declarative configuration of the ResourceMutation type for use with
@@ -53,5 +54,13 @@ func (b *ResourceMutationApplyConfiguration) WithRegex(value *ResourceRegexMutat
 // If called multiple times, the Template field is set to the value of the last call.
 func (b *ResourceMutationApplyConfiguration) WithTemplate(value *ResourceTemplateMutationApplyConfiguration) *ResourceMutationApplyConfiguration {
 	b.Template = value
+	return b
+}
+
+// WithCEL sets the CEL field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the CEL field is set to the value of the last call.
+func (b *ResourceMutationApplyConfiguration) WithCEL(value *ResourceCELMutationApplyConfiguration) *ResourceMutationApplyConfiguration {
+	b.CEL = value
 	return b
 }

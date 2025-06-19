@@ -169,6 +169,7 @@ type ResourceMutation struct {
 	Delete   *ResourceDeleteMutation   `json:"delete,omitempty"`
 	Regex    *ResourceRegexMutation    `json:"regex,omitempty"`
 	Template *ResourceTemplateMutation `json:"template,omitempty"`
+	CEL      *ResourceCELMutation      `json:"cel,omitempty"`
 }
 
 type ResourceDeleteMutation struct {
@@ -186,6 +187,11 @@ type ResourceRegexMutation struct {
 type ResourceTemplateMutation struct {
 	Path     string `json:"path"`
 	Template string `json:"template"`
+}
+
+type ResourceCELMutation struct {
+	Path       string `json:"path"`
+	Expression string `json:"expression"`
 }
 
 type RelatedResourceOrigin string

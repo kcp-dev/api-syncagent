@@ -111,6 +111,12 @@ func createAggregatedTransformer(mutations []syncagentv1alpha1.ResourceMutation)
 				return nil, err
 			}
 
+		case mut.CEL != nil:
+			trans, err = transformer.NewCEL(mut.CEL)
+			if err != nil {
+				return nil, err
+			}
+
 		default:
 			return nil, errors.New("no valid mutation mechanism provided")
 		}
