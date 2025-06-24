@@ -1,8 +1,8 @@
 # kcp API Sync Agent
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/kcp-dev/api-syncagent)](https://goreportcard.com/report/github.com/kcp-dev/api-syncagent)
-[![GitHub](https://img.shields.io/github/license/kcp-dev/api-syncagent)](https://img.shields.io/github/license/kcp-dev/api-syncagent)
-[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kcp-dev/api-syncagent?sort=semver)](https://img.shields.io/github/v/release/kcp-dev/api-syncagent?sort=semver)
+[![GitHub](https://img.shields.io/github/license/kcp-dev/api-syncagent)](https://github.com/kcp-dev/api-syncagent/blob/main/LICENSE)
+[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kcp-dev/api-syncagent?sort=semver)](https://github.com/kcp-dev/api-syncagent/releases/latest)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fkcp-dev%2Fapi-syncagent.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fkcp-dev%2Fapi-syncagent?ref=badge_shield)
 
 The kcp API Sync Agent is a Kubernetes controller capable of synchronizing objects from many kcp
