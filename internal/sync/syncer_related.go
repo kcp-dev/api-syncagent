@@ -250,7 +250,6 @@ func resolveRelatedResourceObjects(relatedOrigin, relatedDest syncSide, relRes s
 
 func resolveRelatedResourceOriginNamespaces(relatedOrigin, relatedDest syncSide, origin syncagentv1alpha1.RelatedResourceOrigin, spec syncagentv1alpha1.RelatedResourceObjectSpec) (map[string]string, error) {
 	switch {
-	//nolint:staticcheck // .Reference is deprecated, but we still support it for now.
 	case spec.Reference != nil:
 		originNamespace, err := resolveObjectReference(relatedOrigin.object, *spec.Reference) //nolint:staticcheck
 		if err != nil {
