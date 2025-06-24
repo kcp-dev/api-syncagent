@@ -35,12 +35,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	ctrlruntime "sigs.k8s.io/controller-runtime"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/kontext"
@@ -105,7 +102,7 @@ func TestSyncSimpleObject(t *testing.T) {
 
 	// create a Crontab object in a team workspace
 	t.Log("Creating CronTab in kcp…")
-	crontab := yamlToUnstructured(t, `
+	crontab := utils.YAMLToUnstructured(t, `
 apiVersion: kcp.example.com/v1
 kind: CronTab
 metadata:
@@ -195,7 +192,7 @@ func TestSyncSimpleObjectOldNaming(t *testing.T) {
 
 	// create a Crontab object in a team workspace
 	t.Log("Creating CronTab in kcp…")
-	crontab := yamlToUnstructured(t, `
+	crontab := utils.YAMLToUnstructured(t, `
 apiVersion: kcp.example.com/v1
 kind: CronTab
 metadata:
@@ -294,7 +291,7 @@ spec:
 		teamCtx := kontext.WithCluster(ctx, logicalcluster.Name(fmt.Sprintf("root:%s:%s", orgWorkspace, team)))
 		utils.WaitForBoundAPI(t, teamCtx, kcpClient, crontabsGVR)
 
-		if err := kcpClient.Create(teamCtx, yamlToUnstructured(t, crontabYAML)); err != nil {
+		if err := kcpClient.Create(teamCtx, utils.YAMLToUnstructured(t, crontabYAML)); err != nil {
 			t.Fatalf("Failed to create %s's CronTab in kcp: %v", team, err)
 		}
 	}
@@ -379,7 +376,7 @@ func TestLocalChangesAreKept(t *testing.T) {
 
 	// create a Crontab object in a team workspace
 	t.Log("Creating CronTab in kcp…")
-	crontab := yamlToUnstructured(t, `
+	crontab := utils.YAMLToUnstructured(t, `
 apiVersion: kcp.example.com/v1
 kind: CronTab
 metadata:
@@ -507,25 +504,6 @@ spec:
 	}
 }
 
-func yamlToUnstructured(t *testing.T, data string) *unstructured.Unstructured {
-	t.Helper()
-
-	decoder := yamlutil.NewYAMLOrJSONDecoder(strings.NewReader(data), 100)
-
-	var rawObj runtime.RawExtension
-	if err := decoder.Decode(&rawObj); err != nil {
-		t.Fatalf("Failed to decode: %v", err)
-	}
-
-	obj, _, err := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme).Decode(rawObj.Raw, nil, nil)
-	unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return &unstructured.Unstructured{Object: unstructuredMap}
-}
-
 func TestResourceFilter(t *testing.T) {
 	const (
 		apiExportName = "kcp.example.com"
@@ -592,7 +570,7 @@ func TestResourceFilter(t *testing.T) {
 
 	// create two Crontab objects in a team workspace
 	t.Log("Creating CronTab in kcp…")
-	ignoredCrontab := yamlToUnstructured(t, `
+	ignoredCrontab := utils.YAMLToUnstructured(t, `
 apiVersion: kcp.example.com/v1
 kind: CronTab
 metadata:
@@ -606,7 +584,7 @@ spec:
 		t.Fatalf("Failed to create CronTab in kcp: %v", err)
 	}
 
-	includedCrontab := yamlToUnstructured(t, `
+	includedCrontab := utils.YAMLToUnstructured(t, `
 apiVersion: kcp.example.com/v1
 kind: CronTab
 metadata:
@@ -713,7 +691,7 @@ func TestSyncingOverlyLongNames(t *testing.T) {
 	}
 
 	t.Log("Creating CronTab in kcp…")
-	ignoredCrontab := yamlToUnstructured(t, `
+	ignoredCrontab := utils.YAMLToUnstructured(t, `
 apiVersion: kcp.example.com/v1
 kind: CronTab
 metadata:

@@ -26,6 +26,7 @@ import (
 	"github.com/kcp-dev/logicalcluster/v3"
 	"go.uber.org/zap"
 
+	"github.com/kcp-dev/api-syncagent/internal/mutation"
 	dummyv1alpha1 "github.com/kcp-dev/api-syncagent/internal/sync/apis/dummy/v1alpha1"
 	"github.com/kcp-dev/api-syncagent/internal/test/diff"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
@@ -899,7 +900,9 @@ func TestSyncerProcessingSingleResourceWithoutStatus(t *testing.T) {
 				remoteClient,
 				testcase.pubRes,
 				testcase.localCRD,
-				nil,
+				func(rms *syncagentv1alpha1.ResourceMutationSpec) (mutation.Mutator, error) {
+					return nil, nil
+				},
 				stateNamespace,
 				"textor-the-doctor",
 			)
@@ -1205,7 +1208,9 @@ func TestSyncerProcessingSingleResourceWithStatus(t *testing.T) {
 				remoteClient,
 				testcase.pubRes,
 				testcase.localCRD,
-				nil,
+				func(rms *syncagentv1alpha1.ResourceMutationSpec) (mutation.Mutator, error) {
+					return nil, nil
+				},
 				stateNamespace,
 				"textor-the-doctor",
 			)
