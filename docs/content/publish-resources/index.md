@@ -519,7 +519,7 @@ spec:
 
             # or
             template:
-              template: "{{ .Name }}-foo"
+              template: "{{ .Value }}-foo"
 
         # Like with references, the namespace can (or must) be configured explicitly.
         # You do not need to also use label selectors here, you can mix and match
