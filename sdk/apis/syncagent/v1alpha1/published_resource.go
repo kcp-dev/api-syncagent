@@ -102,10 +102,17 @@ type PublishedResourceSpec struct {
 // ResourceNaming describes how the names for local objects should be formed.
 type ResourceNaming struct {
 	// The name field allows to control the name the local objects created by the Sync Agent.
-	// If left empty, "$remoteNamespaceHash-$remoteNameHash" is assumed. This guarantees unique
-	// names as long as the cluster name ($remoteClusterName) is used for the local namespace
+	// If left empty, the default value is:
+	//
+	//   "{{ .Object.metadata.namespace | sha3short }}-{{ .Object.metadata.name | sha3short }}"
+	//
+	// This guarantees unique names as long as the cluster name is used for the local namespace
 	// (the default unless configured otherwise).
-	// This is a string with placeholders. The following placeholders can be used:
+	//
+	// This value is a Go template, see the documentation for the available variables and functions.
+	//
+	// Alternatively (but deprecated), this value can be a simple string using one of the following
+	// placeholders:
 	//
 	//   - $remoteClusterName   -- the kcp workspace's cluster name (e.g. "1084s8ceexsehjm2")
 	//   - $remoteNamespace     -- the original namespace used by the consumer inside the kcp
@@ -116,11 +123,17 @@ type ResourceNaming struct {
 	//                             (rarely used to construct local namespace names)
 	//   - $remoteNameHash      -- first 20 hex characters of the SHA-1 hash of $remoteName
 	//
+	// Authors are advised to use Go templates instead, as the custom variable syntax is deprecated
+	// and will be removed from a future release of the Sync Agent.
 	Name string `json:"name,omitempty"`
 
 	// For namespaced resources, the this field allows to control where the local objects will
-	// be created. If left empty, "$remoteClusterName" is assumed.
-	// This is a string with placeholders. The following placeholders can be used:
+	// be created. If left empty, "{{ .ClusterName }}" is assumed.
+	//
+	// This value is a Go template, see the documentation for the available variables and functions.
+	//
+	// Alternatively (but deprecated), this value can be a simple string using one of the following
+	// placeholders:
 	//
 	//   - $remoteClusterName   -- the kcp workspace's cluster name (e.g. "1084s8ceexsehjm2")
 	//   - $remoteNamespace     -- the original namespace used by the consumer inside the kcp
@@ -131,6 +144,8 @@ type ResourceNaming struct {
 	//                             (rarely used to construct local namespace names)
 	//   - $remoteNameHash      -- first 20 hex characters of the SHA-1 hash of $remoteName
 	//
+	// Authors are advised to use Go templates instead, as the custom variable syntax is deprecated
+	// and will be removed from a future release of the Sync Agent.
 	Namespace string `json:"namespace,omitempty"`
 }
 
