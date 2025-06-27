@@ -4,8 +4,8 @@ description: |
 {{- if .Description }}
 {{ .Description | indent 2 }}
 {{- else }}
-  Custom resource definition (CRD) schema reference page for the {{ .Title }} 
-  resource ({{ .NamePlural }}.{{ .Group }}), as part of the Giant Swarm 
+  Custom resource definition (CRD) schema reference page for the {{ .Title }}
+  resource ({{ .NamePlural }}.{{ .Group }}), as part of the Giant Swarm
   Management API documentation.
 {{- end }}
 weight: {{ .Weight }}
@@ -78,7 +78,7 @@ This CRD is being replaced by <a href="../{{ .FullName }}/">{{ .ShortName }}</a>
 </div>
 {{with .Description}}
 <div class="property-description">
-{{.|markdown}}
+{% raw %}{{.|markdown}}{% endraw %}
 </div>
 {{end}}
 </div>
