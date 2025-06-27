@@ -20,6 +20,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
@@ -52,7 +53,7 @@ func TestSyncRelatedObjects(t *testing.T) {
 	testcases := []struct {
 		// the name of this testcase
 		name string
-		//the org workspace everything should happen in
+		// the org workspace everything should happen in
 		workspace logicalcluster.Name
 		// the configuration for the related resource
 		relatedConfig syncagentv1alpha1.RelatedResourceSpec
@@ -86,7 +87,7 @@ func TestSyncRelatedObjects(t *testing.T) {
 			},
 			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
 				Identifier: "credentials",
-				Origin:     "service",
+				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
@@ -137,7 +138,7 @@ func TestSyncRelatedObjects(t *testing.T) {
 			},
 			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
 				Identifier: "credentials",
-				Origin:     "kcp",
+				Origin:     syncagentv1alpha1.RelatedResourceOriginKcp,
 				Kind:       "Secret",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
@@ -188,7 +189,7 @@ func TestSyncRelatedObjects(t *testing.T) {
 			},
 			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
 				Identifier: "credentials",
-				Origin:     "service",
+				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
@@ -243,7 +244,7 @@ func TestSyncRelatedObjects(t *testing.T) {
 			},
 			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
 				Identifier: "credentials",
-				Origin:     "kcp",
+				Origin:     syncagentv1alpha1.RelatedResourceOriginKcp,
 				Kind:       "Secret",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
@@ -298,7 +299,7 @@ func TestSyncRelatedObjects(t *testing.T) {
 			},
 			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
 				Identifier: "credentials",
-				Origin:     "service",
+				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
@@ -353,7 +354,7 @@ func TestSyncRelatedObjects(t *testing.T) {
 			},
 			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
 				Identifier: "credentials",
-				Origin:     "service",
+				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
@@ -419,7 +420,7 @@ func TestSyncRelatedObjects(t *testing.T) {
 			},
 			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
 				Identifier: "credentials",
-				Origin:     "service",
+				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
@@ -543,7 +544,7 @@ func TestSyncRelatedObjects(t *testing.T) {
 			destClient := kcpClient
 			destContext := teamCtx
 
-			if testcase.relatedConfig.Origin == "kcp" {
+			if testcase.relatedConfig.Origin == syncagentv1alpha1.RelatedResourceOriginKcp {
 				originClient, destClient = destClient, originClient
 				originContext, destContext = destContext, originContext
 			}
@@ -556,34 +557,17 @@ func TestSyncRelatedObjects(t *testing.T) {
 
 			// wait for the agent to do its magic
 			t.Log("Wait for Secret to be synced…")
-			copySecret := &corev1.Secret{}
+			copySecret := corev1.Secret{}
 			err := wait.PollUntilContextTimeout(destContext, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
 				copyKey := ctrlruntimeclient.ObjectKeyFromObject(&testcase.expectedSyncedRelatedObject)
-				return destClient.Get(ctx, copyKey, copySecret) == nil, nil
+				return destClient.Get(ctx, copyKey, &copySecret) == nil, nil
 			})
 			if err != nil {
 				t.Fatalf("Failed to wait for Secret to be synced: %v", err)
 			}
 
-			// ensure the secret in kcp does not have any sync-related metadata
-			maps.DeleteFunc(copySecret.Labels, func(k, v string) bool {
-				return strings.HasPrefix(k, "claimed.internal.apis.kcp.io/")
-			})
-
-			delete(copySecret.Annotations, "kcp.io/cluster")
-			if len(copySecret.Annotations) == 0 {
-				copySecret.Annotations = nil
-			}
-
-			orig := testcase.expectedSyncedRelatedObject
-			copySecret.CreationTimestamp = orig.CreationTimestamp
-			copySecret.Generation = orig.Generation
-			copySecret.ResourceVersion = orig.ResourceVersion
-			copySecret.ManagedFields = orig.ManagedFields
-			copySecret.UID = orig.UID
-
-			if changes := diff.ObjectDiff(orig, copySecret); changes != "" {
-				t.Errorf("Synced secret does not match expected Secret:\n%s", changes)
+			if err := compareSecrets(copySecret, testcase.expectedSyncedRelatedObject); err != nil {
+				t.Fatalf("Synced secret does not match expected Secret:\n%v", err)
 			}
 		})
 	}
@@ -598,4 +582,380 @@ func ensureNamespace(t *testing.T, ctx context.Context, client ctrlruntimeclient
 			t.Fatalf("Failed to create namespace %s in kcp: %v", name, err)
 		}
 	}
+}
+
+// TestSyncRelatedMultiObjects is similar to TestSyncRelatedObjects, but here
+// we test for cases where a single related resource configuration matches multiple
+// Kubernetes objects.
+func TestSyncRelatedMultiObjects(t *testing.T) {
+	const apiExportName = "kcp.example.com"
+
+	ctrlruntime.SetLogger(logr.Discard())
+
+	testcases := []struct {
+		// the name of this testcase
+		name string
+		// the org workspace everything should happen in
+		workspace logicalcluster.Name
+		// the configuration for the related resource
+		relatedConfig syncagentv1alpha1.RelatedResourceSpec
+		// the primary object created by the user in kcp
+		remoteMainResource crds.Backup
+		// the primary object created (and potentially mutated) by the agent on the
+		// local cluster (we explicitly create it here to simulate that remote and
+		// local objects are different)
+		localMainResource crds.Backup
+		// the original related objects (will automatically be created on either the
+		// kcp or service side, depending on the relatedConfig above)
+		sourceRelatedObjects []corev1.Secret
+		// expectation: this is how the copies of the related objects should look
+		// like after the sync has completed
+		expectedSyncedRelatedObjects []corev1.Secret
+	}{
+		{
+			name:      "reference that returns a nice, sensible array",
+			workspace: "sensible-multi-reference",
+			remoteMainResource: crds.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-backup",
+					Namespace: "default",
+				},
+				Spec: crds.BackupSpec{
+					Items: []crds.BackupItem{
+						{Name: "secret-1"},
+						{Name: "secret-2"},
+						{Name: "secret-3"},
+					},
+				},
+			},
+			localMainResource: crds.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-backup",
+					Namespace: "synced-default",
+				},
+				Spec: crds.BackupSpec{
+					Items: []crds.BackupItem{
+						{Name: "mutated-secret-1"},
+						{Name: "mutated-secret-2"},
+						{Name: "mutated-secret-3"},
+					},
+				},
+			},
+			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
+				Identifier: "credentials",
+				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
+				Kind:       "Secret",
+				Object: syncagentv1alpha1.RelatedResourceObject{
+					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
+						Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
+							Path: "spec.items.#.name",
+						},
+					},
+				},
+			},
+			sourceRelatedObjects: []corev1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mutated-secret-1",
+						Namespace: "synced-default",
+					},
+					Data: map[string][]byte{
+						"password": []byte("hunter1"),
+					},
+					Type: corev1.SecretTypeOpaque,
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mutated-secret-2",
+						Namespace: "synced-default",
+					},
+					Data: map[string][]byte{
+						"password": []byte("hunter2"),
+					},
+					Type: corev1.SecretTypeOpaque,
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mutated-secret-3",
+						Namespace: "synced-default",
+					},
+					Data: map[string][]byte{
+						"password": []byte("hunter3"),
+					},
+					Type: corev1.SecretTypeOpaque,
+				},
+			},
+
+			expectedSyncedRelatedObjects: []corev1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "secret-1",
+						Namespace: "default",
+					},
+					Data: map[string][]byte{
+						"password": []byte("hunter1"),
+					},
+					Type: corev1.SecretTypeOpaque,
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "secret-2",
+						Namespace: "default",
+					},
+					Data: map[string][]byte{
+						"password": []byte("hunter2"),
+					},
+					Type: corev1.SecretTypeOpaque,
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "secret-3",
+						Namespace: "default",
+					},
+					Data: map[string][]byte{
+						"password": []byte("hunter3"),
+					},
+					Type: corev1.SecretTypeOpaque,
+				},
+			},
+		},
+
+		{
+			name:      "empty items on either side should be silently skipped",
+			workspace: "empty-items-multi-references",
+			remoteMainResource: crds.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-backup",
+					Namespace: "default",
+				},
+				Spec: crds.BackupSpec{
+					Items: []crds.BackupItem{
+						{Name: "secret-1"},
+						{Name: ""},
+						{Name: "secret-3"},
+					},
+				},
+			},
+			localMainResource: crds.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-backup",
+					Namespace: "synced-default",
+				},
+				Spec: crds.BackupSpec{
+					Items: []crds.BackupItem{
+						{Name: "mutated-secret-1"},
+						{Name: "mutated-secret-2"},
+						{Name: ""},
+					},
+				},
+			},
+			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
+				Identifier: "credentials",
+				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
+				Kind:       "Secret",
+				Object: syncagentv1alpha1.RelatedResourceObject{
+					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
+						Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
+							Path: "spec.items.#.name",
+						},
+					},
+				},
+			},
+			sourceRelatedObjects: []corev1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mutated-secret-1",
+						Namespace: "synced-default",
+					},
+					Data: map[string][]byte{
+						"password": []byte("hunter1"),
+					},
+					Type: corev1.SecretTypeOpaque,
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mutated-secret-2",
+						Namespace: "synced-default",
+					},
+					Data: map[string][]byte{
+						"password": []byte("hunter2"),
+					},
+					Type: corev1.SecretTypeOpaque,
+				},
+			},
+
+			expectedSyncedRelatedObjects: []corev1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "secret-1",
+						Namespace: "default",
+					},
+					Data: map[string][]byte{
+						"password": []byte("hunter1"),
+					},
+					Type: corev1.SecretTypeOpaque,
+				},
+			},
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			// setup a test environment in kcp
+			orgKubconfig := utils.CreateOrganization(t, ctx, testcase.workspace, apiExportName)
+
+			// start a service cluster
+			envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
+				"test/crds/backup.yaml",
+			})
+
+			// publish Backups
+			t.Logf("Publishing CRDs…")
+			prBackups := &syncagentv1alpha1.PublishedResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "publish-backups",
+				},
+				Spec: syncagentv1alpha1.PublishedResourceSpec{
+					Resource: syncagentv1alpha1.SourceResourceDescriptor{
+						APIGroup: "eksempel.no",
+						Version:  "v1",
+						Kind:     "Backup",
+					},
+					// These rules make finding the local object easier, but should not be used in production.
+					Naming: &syncagentv1alpha1.ResourceNaming{
+						Name:      "{{ .Object.metadata.name }}",
+						Namespace: "synced-{{ .Object.metadata.namespace }}",
+					},
+					Projection: &syncagentv1alpha1.ResourceProjection{
+						Group: "kcp.example.com",
+					},
+					Related: []syncagentv1alpha1.RelatedResourceSpec{testcase.relatedConfig},
+				},
+			}
+
+			if err := envtestClient.Create(ctx, prBackups); err != nil {
+				t.Fatalf("Failed to create PublishedResource: %v", err)
+			}
+
+			// pre-create the synced Backup because it's easier to let the agent deal with updating,
+			// rather than us here having to implement to update/patch logic.
+			t.Log("Creating synced Backup copy locally…")
+
+			ensureNamespace(t, ctx, envtestClient, testcase.localMainResource.Namespace)
+
+			localBackup := utils.ToUnstructured(t, &testcase.localMainResource)
+			localBackup.SetAPIVersion("eksempel.no/v1")
+			localBackup.SetKind("Backup")
+
+			if err := envtestClient.Create(ctx, localBackup); err != nil {
+				t.Fatalf("Failed to create local Backup: %v", err)
+			}
+
+			// fake operator: create credential Secrets
+			teamCtx := kontext.WithCluster(ctx, logicalcluster.Name(fmt.Sprintf("root:%s:team-1", testcase.workspace)))
+			kcpClient := utils.GetKcpAdminClusterClient(t)
+
+			originClient := envtestClient
+			originContext := ctx
+			destClient := kcpClient
+			destContext := teamCtx
+
+			if testcase.relatedConfig.Origin == syncagentv1alpha1.RelatedResourceOriginKcp {
+				originClient, destClient = destClient, originClient
+				originContext, destContext = destContext, originContext
+			}
+
+			for _, relatedObject := range testcase.sourceRelatedObjects {
+				t.Logf("Creating credential Secret on the %s side…", testcase.relatedConfig.Origin)
+
+				ensureNamespace(t, originContext, originClient, relatedObject.Namespace)
+
+				if err := originClient.Create(originContext, &relatedObject); err != nil {
+					t.Fatalf("Failed to create Secret %s: %v", relatedObject.Name, err)
+				}
+			}
+
+			// start the agent in the background to update the APIExport with the Backups API
+			utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+
+			// wait until the API is available
+			utils.WaitForBoundAPI(t, teamCtx, kcpClient, schema.GroupVersionResource{
+				Group:    apiExportName,
+				Version:  "v1",
+				Resource: "backups",
+			})
+
+			// create a Backup object in a team workspace
+			t.Log("Creating Backup in kcp…")
+
+			remoteBackup := utils.ToUnstructured(t, &testcase.remoteMainResource)
+			remoteBackup.SetAPIVersion("kcp.example.com/v1")
+			remoteBackup.SetKind("Backup")
+
+			if err := kcpClient.Create(teamCtx, remoteBackup); err != nil {
+				t.Fatalf("Failed to create Backup in kcp: %v", err)
+			}
+
+			// wait for the agent to do its magic
+			t.Log("Wait for Secrets to be synced…")
+			checkSecret := func(ctx context.Context, expected corev1.Secret) error {
+				copySecret := &corev1.Secret{}
+				if err := destClient.Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(&expected), copySecret); err != nil {
+					return fmt.Errorf("failed to get copy of Secret %v: %w", ctrlruntimeclient.ObjectKeyFromObject(&expected), err)
+				}
+
+				if err := compareSecrets(*copySecret, expected); err != nil {
+					return fmt.Errorf("synced secret does not match expected Secret:\n%w", err)
+				}
+
+				return nil
+			}
+
+			err := wait.PollUntilContextTimeout(destContext, 2*time.Second, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
+				var errs []string
+
+				for _, expectedObj := range testcase.expectedSyncedRelatedObjects {
+					if err := checkSecret(ctx, expectedObj); err != nil {
+						errs = append(errs, fmt.Sprintf("invalid Secret %s: %v", expectedObj.Name, err))
+					}
+				}
+
+				if len(errs) > 0 {
+					t.Logf("Sync has not completed yet:\n%s", strings.Join(errs, "\n"))
+					return false, nil
+				}
+
+				return true, nil
+			})
+			if err != nil {
+				t.Fatalf("Failed to wait for Secrets to be synced: %v", err)
+			}
+		})
+	}
+}
+
+func compareSecrets(actual, expected corev1.Secret) error {
+	// ensure the secret in kcp does not have any sync-related metadata
+	maps.DeleteFunc(actual.Labels, func(k, v string) bool {
+		return strings.HasPrefix(k, "claimed.internal.apis.kcp.io/")
+	})
+
+	delete(actual.Annotations, "kcp.io/cluster")
+	if len(actual.Annotations) == 0 {
+		actual.Annotations = nil
+	}
+
+	actual.CreationTimestamp = expected.CreationTimestamp
+	actual.Generation = expected.Generation
+	actual.ResourceVersion = expected.ResourceVersion
+	actual.ManagedFields = expected.ManagedFields
+	actual.UID = expected.UID
+
+	if changes := diff.ObjectDiff(expected, actual); changes != "" {
+		return errors.New(changes)
+	}
+
+	return nil
 }

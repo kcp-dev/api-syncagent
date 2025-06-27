@@ -28,6 +28,11 @@ type Backup struct {
 }
 
 type BackupSpec struct {
-	Source      string `json:"source"`
-	Destination string `json:"destination"`
+	Source      string       `json:"source"`
+	Destination string       `json:"destination"`
+	Items       []BackupItem `json:"items,omitempty"`
+}
+
+type BackupItem struct {
+	Name string `json:"name"`
 }

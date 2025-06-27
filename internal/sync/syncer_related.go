@@ -251,27 +251,25 @@ func resolveRelatedResourceObjects(relatedOrigin, relatedDest syncSide, relRes s
 func resolveRelatedResourceOriginNamespaces(relatedOrigin, relatedDest syncSide, origin syncagentv1alpha1.RelatedResourceOrigin, spec syncagentv1alpha1.RelatedResourceObjectSpec) (map[string]string, error) {
 	switch {
 	case spec.Reference != nil:
-		originNamespace, err := resolveObjectReference(relatedOrigin.object, *spec.Reference)
+		originNamespaces, err := resolveObjectReference(relatedOrigin.object, *spec.Reference)
 		if err != nil {
 			return nil, err
 		}
 
-		if originNamespace == "" {
+		if len(originNamespaces) == 0 {
 			return nil, nil
 		}
 
-		destNamespace, err := resolveObjectReference(relatedDest.object, *spec.Reference)
+		destNamespaces, err := resolveObjectReference(relatedDest.object, *spec.Reference)
 		if err != nil {
 			return nil, err
 		}
 
-		if destNamespace == "" {
-			return nil, nil
+		if len(destNamespaces) != len(originNamespaces) {
+			return nil, fmt.Errorf("cannot sync related resources: found %d namespaces on the origin, but %d on the destination side", len(originNamespaces), len(destNamespaces))
 		}
 
-		return map[string]string{
-			originNamespace: destNamespace,
-		}, nil
+		return mapSlices(originNamespaces, destNamespaces), nil
 
 	case spec.Selector != nil:
 		namespaces := &corev1.NamespaceList{}
@@ -327,6 +325,22 @@ func resolveRelatedResourceOriginNamespaces(relatedOrigin, relatedDest syncSide,
 	}
 }
 
+func mapSlices(a, b []string) map[string]string {
+	mapping := map[string]string{}
+	for i, aItem := range a {
+		bItem := b[i]
+
+		// ignore any origin<->dest pair where either of the sides is empty
+		if bItem == "" || aItem == "" {
+			continue
+		}
+
+		mapping[aItem] = bItem
+	}
+
+	return mapping
+}
+
 func resolveRelatedResourceObjectsInNamespaces(relatedOrigin, relatedDest syncSide, relRes syncagentv1alpha1.RelatedResourceSpec, spec syncagentv1alpha1.RelatedResourceObjectSpec, namespaceMap map[string]string) ([]resolvedObject, error) {
 	result := []resolvedObject{}
 
@@ -368,27 +382,25 @@ func resolveRelatedResourceObjectsInNamespaces(relatedOrigin, relatedDest syncSi
 func resolveRelatedResourceObjectsInNamespace(relatedOrigin, relatedDest syncSide, relRes syncagentv1alpha1.RelatedResourceSpec, spec syncagentv1alpha1.RelatedResourceObjectSpec, namespace string) (map[string]string, error) {
 	switch {
 	case spec.Reference != nil:
-		originName, err := resolveObjectReference(relatedOrigin.object, *spec.Reference)
+		originNames, err := resolveObjectReference(relatedOrigin.object, *spec.Reference)
 		if err != nil {
 			return nil, err
 		}
 
-		if originName == "" {
+		if len(originNames) == 0 {
 			return nil, nil
 		}
 
-		destName, err := resolveObjectReference(relatedDest.object, *spec.Reference)
+		destNames, err := resolveObjectReference(relatedDest.object, *spec.Reference)
 		if err != nil {
 			return nil, err
 		}
 
-		if destName == "" {
-			return nil, nil
+		if len(destNames) != len(originNames) {
+			return nil, fmt.Errorf("cannot sync related resources: found %d names on the origin, but %d on the destination side", len(originNames), len(destNames))
 		}
 
-		return map[string]string{
-			originName: destName,
-		}, nil
+		return mapSlices(originNames, destNames), nil
 
 	case spec.Selector != nil:
 		originObjects := &unstructured.UnstructuredList{}
@@ -447,34 +459,44 @@ func resolveRelatedResourceObjectsInNamespace(relatedOrigin, relatedDest syncSid
 	}
 }
 
-func resolveObjectReference(object *unstructured.Unstructured, ref syncagentv1alpha1.RelatedResourceObjectReference) (string, error) {
+func resolveObjectReference(object *unstructured.Unstructured, ref syncagentv1alpha1.RelatedResourceObjectReference) ([]string, error) {
 	data, err := object.MarshalJSON()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	return resolveReference(data, ref)
 }
 
-func resolveReference(jsonData []byte, ref syncagentv1alpha1.RelatedResourceObjectReference) (string, error) {
-	gval := gjson.Get(string(jsonData), ref.Path)
-	if !gval.Exists() {
-		return "", nil
+func resolveReference(jsonData []byte, ref syncagentv1alpha1.RelatedResourceObjectReference) ([]string, error) {
+	result := gjson.Get(string(jsonData), ref.Path)
+	if !result.Exists() {
+		return nil, nil
 	}
 
-	// this does apply some coalescing, like turning numbers into strings
-	strVal := gval.String()
+	var values []string
+	if result.IsArray() {
+		for _, elem := range result.Array() {
+			values = append(values, strings.TrimSpace(elem.String()))
+		}
+	} else {
+		values = append(values, strings.TrimSpace(result.String()))
+	}
 
 	if re := ref.Regex; re != nil {
 		var err error
 
-		strVal, err = applyRegularExpression(strVal, *re)
-		if err != nil {
-			return "", err
+		for i, value := range values {
+			value, err = applyRegularExpression(value, *re)
+			if err != nil {
+				return nil, err
+			}
+
+			values[i] = value
 		}
 	}
 
-	return strVal, nil
+	return values, nil
 }
 
 // applyTemplate is used after a label selector has been applied and a list of namespaces or objects

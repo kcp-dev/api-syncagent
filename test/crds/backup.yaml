@@ -25,3 +25,10 @@ spec:
                   type: string
                 destination:
                   type: string
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
