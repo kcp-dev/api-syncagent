@@ -1772,10 +1772,17 @@ many different kcp workspaces.</p>
 
 <div class="property-description">
 <p>The name field allows to control the name the local objects created by the Sync Agent.
-If left empty, &ldquo;$remoteNamespaceHash-$remoteNameHash&rdquo; is assumed. This guarantees unique
-names as long as the cluster name ($remoteClusterName) is used for the local namespace
-(the default unless configured otherwise).
-This is a string with placeholders. The following placeholders can be used:</p>
+If left empty, the default value is:</p>
+
+<p>&rdquo;{{ .Object.metadata.namespace | sha3short }}-{{ .Object.metadata.name | sha3short }}&rdquo;</p>
+
+<p>This guarantees unique names as long as the cluster name is used for the local namespace
+(the default unless configured otherwise).</p>
+
+<p>This value is a Go template, see the documentation for the available variables and functions.</p>
+
+<p>Alternatively (but deprecated), this value can be a simple string using one of the following
+placeholders:</p>
 
 <ul>
 <li>$remoteClusterName   &ndash; the kcp workspace&rsquo;s cluster name (e.g. &ldquo;1084s8ceexsehjm2&rdquo;)</li>
@@ -1787,6 +1794,9 @@ This is a string with placeholders. The following placeholders can be used:</p>
                         (rarely used to construct local namespace names)</li>
 <li>$remoteNameHash      &ndash; first 20 hex characters of the SHA-1 hash of $remoteName</li>
 </ul>
+
+<p>Authors are advised to use Go templates instead, as the custom variable syntax is deprecated
+and will be removed from a future release of the Sync Agent.</p>
 
 </div>
 
@@ -1805,8 +1815,12 @@ This is a string with placeholders. The following placeholders can be used:</p>
 
 <div class="property-description">
 <p>For namespaced resources, the this field allows to control where the local objects will
-be created. If left empty, &ldquo;$remoteClusterName&rdquo; is assumed.
-This is a string with placeholders. The following placeholders can be used:</p>
+be created. If left empty, &ldquo;{{ .ClusterName }}&rdquo; is assumed.</p>
+
+<p>This value is a Go template, see the documentation for the available variables and functions.</p>
+
+<p>Alternatively (but deprecated), this value can be a simple string using one of the following
+placeholders:</p>
 
 <ul>
 <li>$remoteClusterName   &ndash; the kcp workspace&rsquo;s cluster name (e.g. &ldquo;1084s8ceexsehjm2&rdquo;)</li>
@@ -1818,6 +1832,9 @@ This is a string with placeholders. The following placeholders can be used:</p>
                         (rarely used to construct local namespace names)</li>
 <li>$remoteNameHash      &ndash; first 20 hex characters of the SHA-1 hash of $remoteName</li>
 </ul>
+
+<p>Authors are advised to use Go templates instead, as the custom variable syntax is deprecated
+and will be removed from a future release of the Sync Agent.</p>
 
 </div>
 
@@ -2466,8 +2483,6 @@ raised during syncing if the field is not specified.</p>
 <p>Reference points to a field inside the main object. This reference is
 evaluated on both source and destination sides to find the related object.</p>
 
-<p>Deprecated: Use Go templates instead.</p>
-
 </div>
 
 </div>
@@ -2845,8 +2860,6 @@ construct the resulting string.</p>
 <div class="property-description">
 <p>Reference points to a field inside the main object. This reference is
 evaluated on both source and destination sides to find the related object.</p>
-
-<p>Deprecated: Use Go templates instead.</p>
 
 </div>
 
