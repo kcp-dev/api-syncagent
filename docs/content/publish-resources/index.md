@@ -303,20 +303,23 @@ existing" and not create an error.
 
 #### References
 
-A reference is a JSONPath-like expression that are evaluated on both sides of the synchronization.
-You configure a single path expression (like `spec.secretName`) and the sync agent will evaluate it
-in the original primary object (in kcp) and again in the copied primary object (on the service
-cluster). Since the primary object has already been mutated, the `spec.secretName` is already
-rewritten/adjusted to work on the service cluster (for example it was changed from `my-secret` to
-`jk23h4wz47329rz2r72r92-secret` on the service cluster side). By doing it this way, admins only have
-to think about mutations and rewrites once (when configuring the primary object in the
-PublishedResource) and the path will yield 2 ready to use values (`my-secret` and the computed value).
+A reference is a JSONPath-like expression (more precisely, it follows the [gjson syntax](https://github.com/tidwall/gjson?tab=readme-ov-file#path-syntax))
+that are evaluated on both sides of the synchronization. You configure a single path expression
+(like `spec.secretName`) and the sync agent will evaluate it in the original primary object (in kcp)
+and again in the copied primary object (on the service cluster). Since the primary object has already
+been mutated, the `spec.secretName` is already rewritten/adjusted to work on the service cluster
+(for example it was changed from `my-secret` to `jk23h4wz47329rz2r72r92-secret` on the service
+cluster side). By doing it this way, admins only have to think about mutations and rewrites once
+(when configuring the primary object in the PublishedResource) and the path will yield 2 ready to
+use values (`my-secret` and the computed value).
 
-The value selected by the path expression must be a string (or number, but it will be coalesced into
-a string) and can then be further adjusted by applying a regular expression to it.
+References can either return a single scalar (strings or integers that will be auto-converted to a
+string) (like in `spec.secretName`) or a list of strings/numbers (like `spec.users.#.name`). A
+reference must return the same number of items on both the local and remote object, otherwise the
+agent will not be able to map local related names to remote related names correctly.
 
-References can only ever select one related object. Their upside is that they are simple to understand
-and easy to use, but require a "link" in the primary object that would point to the related object.
+A regular expression can be configured to be applied to each found value (i.e. if the reference returns
+a list of values, the regular expression is applied to each individual value).
 
 Here's an example on how to use references to locate the related object.
 
