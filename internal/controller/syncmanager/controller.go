@@ -231,8 +231,6 @@ func (r *Reconciler) ensureManager(log *zap.SugaredLogger, vwURL string) error {
 	if r.vwProvider == nil {
 		log.Debug("Setting up APIExport provider…")
 
-		fmt.Printf("config: %#v\n", vwConfig)
-
 		provider, err := apiexportprovider.New(vwConfig, apiexportprovider.Options{
 			Scheme: scheme,
 		})
