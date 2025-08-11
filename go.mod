@@ -19,8 +19,8 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/kcp-dev/api-syncagent/sdk v0.0.0-00010101000000-000000000000
 	github.com/kcp-dev/code-generator/v2 v2.3.1
-	github.com/kcp-dev/kcp v0.0.0-20250606081858-d77640860cac
-	github.com/kcp-dev/kcp/sdk v0.27.1
+	github.com/kcp-dev/kcp v0.28.0
+	github.com/kcp-dev/kcp/sdk v0.28.0
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
 	github.com/kcp-dev/multicluster-provider v0.1.0
 	github.com/openshift-eng/openshift-goimports v0.0.0-20230304234052-c70783e636f2
@@ -37,6 +37,7 @@ require (
 	k8s.io/apiserver v0.32.3
 	k8s.io/client-go v0.32.3
 	k8s.io/code-generator v0.32.3
+	k8s.io/component-base v0.32.3
 	k8s.io/kube-openapi v0.0.0-20241212222426-2c72e554b1e7
 	k8s.io/utils v0.0.0-20241210054802-24370beab758
 	sigs.k8s.io/controller-runtime v0.20.4
@@ -87,7 +88,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kcp-dev/apimachinery/v2 v2.0.1-0.20250512171935-ebb573a40077 // indirect
-	github.com/kcp-dev/client-go v0.0.0-20250512170835-5457a0f4bd98 // indirect
+	github.com/kcp-dev/client-go v0.0.0-20250707095244-decc4df45adb // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
@@ -152,7 +153,6 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/component-base v0.32.3 // indirect
 	k8s.io/component-helpers v0.32.3 // indirect
 	k8s.io/controller-manager v0.32.3 // indirect
 	k8s.io/gengo/v2 v2.0.0-20240911193312-2b36238f13e9 // indirect
