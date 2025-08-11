@@ -220,9 +220,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request)
 	}
 
 	// sync main object
-	mutator := mutation.NewMutator(r.pubRes.Spec.Mutation)
-
-	syncer, err := sync.NewResourceSyncer(log, r.localClient, vwClient, r.pubRes, r.localCRD, mutator, r.stateNamespace, r.agentName)
+	syncer, err := sync.NewResourceSyncer(log, r.localClient, vwClient, r.pubRes, r.localCRD, mutation.NewMutator, r.stateNamespace, r.agentName)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to create syncer: %w", err)
 	}

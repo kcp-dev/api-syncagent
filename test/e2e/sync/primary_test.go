@@ -299,7 +299,7 @@ spec:
 
 		utils.WaitForBoundAPI(t, ctx, teamClient, crontabsGVR)
 
-		if err := teamClient.Create(ctx, yamlToUnstructured(t, crontabYAML)); err != nil {
+		if err := teamClient.Create(ctx, utils.YAMLToUnstructured(t, crontabYAML)); err != nil {
 			t.Fatalf("Failed to create %s's CronTab in kcp: %v", team, err)
 		}
 	}

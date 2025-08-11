@@ -179,7 +179,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubR
 
 		log.With("name", arsName).Info("Creating APIResourceSchema…")
 
-		if err := r.kcpClient.Create(wsCtx, ars); err != nil {
+		if err := r.kcpClient.Create(ctx, ars); err != nil {
 			return nil, fmt.Errorf("failed to create APIResourceSchema: %w", err)
 		}
 	} else if err != nil {
