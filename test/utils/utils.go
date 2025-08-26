@@ -28,6 +28,7 @@ import (
 
 	kcpapisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcptenancyv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
+	mcclient "github.com/kcp-dev/multicluster-provider/client"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -40,7 +41,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/kcp"
 )
 
 func GetKcpAdminKubeconfig(t *testing.T) string {
@@ -72,12 +72,12 @@ func newScheme(t *testing.T) *runtime.Scheme {
 
 var clusterPathSuffix = regexp.MustCompile(`/clusters/[a-z0-9:*]+$`)
 
-func GetKcpAdminClusterClient(t *testing.T) ctrlruntimeclient.Client {
+func GetKcpAdminClusterClient(t *testing.T) mcclient.ClusterClient {
 	t.Helper()
 	return GetClusterClient(t, GetKcpAdminKubeconfig(t))
 }
 
-func GetClusterClient(t *testing.T, kubeconfig string) ctrlruntimeclient.Client {
+func GetClusterClient(t *testing.T, kubeconfig string) mcclient.ClusterClient {
 	t.Helper()
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
@@ -89,7 +89,7 @@ func GetClusterClient(t *testing.T, kubeconfig string) ctrlruntimeclient.Client 
 	// to point to the base URL (either of kcp or a virtual workspace)
 	config.Host = clusterPathSuffix.ReplaceAllLiteralString(config.Host, "")
 
-	client, err := kcp.NewClusterAwareClient(config, ctrlruntimeclient.Options{
+	client, err := mcclient.New(config, ctrlruntimeclient.Options{
 		Scheme: newScheme(t),
 	})
 	if err != nil {

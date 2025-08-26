@@ -19,121 +19,35 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
 
 	v1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
+	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/clientset/versioned/typed/syncagent/v1alpha1"
 )
 
-// FakePublishedResources implements PublishedResourceInterface
-type FakePublishedResources struct {
+// fakePublishedResources implements PublishedResourceInterface
+type fakePublishedResources struct {
+	*gentype.FakeClientWithList[*v1alpha1.PublishedResource, *v1alpha1.PublishedResourceList]
 	Fake *FakeSyncagentV1alpha1
 }
 
-var publishedresourcesResource = v1alpha1.SchemeGroupVersion.WithResource("publishedresources")
-
-var publishedresourcesKind = v1alpha1.SchemeGroupVersion.WithKind("PublishedResource")
-
-// Get takes name of the publishedResource, and returns the corresponding publishedResource object, and an error if there is any.
-func (c *FakePublishedResources) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.PublishedResource, err error) {
-	emptyResult := &v1alpha1.PublishedResource{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetActionWithOptions(publishedresourcesResource, name, options), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakePublishedResources(fake *FakeSyncagentV1alpha1) syncagentv1alpha1.PublishedResourceInterface {
+	return &fakePublishedResources{
+		gentype.NewFakeClientWithList[*v1alpha1.PublishedResource, *v1alpha1.PublishedResourceList](
+			fake.Fake,
+			"",
+			v1alpha1.SchemeGroupVersion.WithResource("publishedresources"),
+			v1alpha1.SchemeGroupVersion.WithKind("PublishedResource"),
+			func() *v1alpha1.PublishedResource { return &v1alpha1.PublishedResource{} },
+			func() *v1alpha1.PublishedResourceList { return &v1alpha1.PublishedResourceList{} },
+			func(dst, src *v1alpha1.PublishedResourceList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.PublishedResourceList) []*v1alpha1.PublishedResource {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.PublishedResourceList, items []*v1alpha1.PublishedResource) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.PublishedResource), err
-}
-
-// List takes label and field selectors, and returns the list of PublishedResources that match those selectors.
-func (c *FakePublishedResources) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.PublishedResourceList, err error) {
-	emptyResult := &v1alpha1.PublishedResourceList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListActionWithOptions(publishedresourcesResource, publishedresourcesKind, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.PublishedResourceList{ListMeta: obj.(*v1alpha1.PublishedResourceList).ListMeta}
-	for _, item := range obj.(*v1alpha1.PublishedResourceList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested publishedResources.
-func (c *FakePublishedResources) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchActionWithOptions(publishedresourcesResource, opts))
-}
-
-// Create takes the representation of a publishedResource and creates it.  Returns the server's representation of the publishedResource, and an error, if there is any.
-func (c *FakePublishedResources) Create(ctx context.Context, publishedResource *v1alpha1.PublishedResource, opts v1.CreateOptions) (result *v1alpha1.PublishedResource, err error) {
-	emptyResult := &v1alpha1.PublishedResource{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(publishedresourcesResource, publishedResource, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.PublishedResource), err
-}
-
-// Update takes the representation of a publishedResource and updates it. Returns the server's representation of the publishedResource, and an error, if there is any.
-func (c *FakePublishedResources) Update(ctx context.Context, publishedResource *v1alpha1.PublishedResource, opts v1.UpdateOptions) (result *v1alpha1.PublishedResource, err error) {
-	emptyResult := &v1alpha1.PublishedResource{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateActionWithOptions(publishedresourcesResource, publishedResource, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.PublishedResource), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePublishedResources) UpdateStatus(ctx context.Context, publishedResource *v1alpha1.PublishedResource, opts v1.UpdateOptions) (result *v1alpha1.PublishedResource, err error) {
-	emptyResult := &v1alpha1.PublishedResource{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(publishedresourcesResource, "status", publishedResource, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.PublishedResource), err
-}
-
-// Delete takes name of the publishedResource and deletes it. Returns an error if one occurs.
-func (c *FakePublishedResources) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(publishedresourcesResource, name, opts), &v1alpha1.PublishedResource{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakePublishedResources) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionActionWithOptions(publishedresourcesResource, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.PublishedResourceList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched publishedResource.
-func (c *FakePublishedResources) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PublishedResource, err error) {
-	emptyResult := &v1alpha1.PublishedResource{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(publishedresourcesResource, name, pt, data, opts, subresources...), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.PublishedResource), err
 }

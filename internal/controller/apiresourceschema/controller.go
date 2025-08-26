@@ -45,7 +45,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/kontext"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -169,9 +168,8 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubR
 	arsName := kcp.GetAPIResourceSchemaName(projectedCRD)
 
 	// ensure ARS exists (don't try to reconcile it, it's basically entirely immutable)
-	wsCtx := kontext.WithCluster(ctx, r.lcName)
 	ars := &kcpdevv1alpha1.APIResourceSchema{}
-	err = r.kcpClient.Get(wsCtx, types.NamespacedName{Name: arsName}, ars, &ctrlruntimeclient.GetOptions{})
+	err = r.kcpClient.Get(ctx, types.NamespacedName{Name: arsName}, ars, &ctrlruntimeclient.GetOptions{})
 
 	if apierrors.IsNotFound(err) {
 		ars, err := kcp.CreateAPIResourceSchema(projectedCRD, arsName, r.agentName)
@@ -181,7 +179,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubR
 
 		log.With("name", arsName).Info("Creating APIResourceSchema…")
 
-		if err := r.kcpClient.Create(wsCtx, ars); err != nil {
+		if err := r.kcpClient.Create(ctx, ars); err != nil {
 			return nil, fmt.Errorf("failed to create APIResourceSchema: %w", err)
 		}
 	} else if err != nil {

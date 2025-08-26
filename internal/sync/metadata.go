@@ -21,6 +21,8 @@ import (
 	"maps"
 	"strings"
 
+	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -137,7 +139,7 @@ func filterLabels(original labels.Set, forbidList sets.Set[string]) labels.Set {
 	return filtered
 }
 
-func RemoteNameForLocalObject(localObj ctrlruntimeclient.Object) *reconcile.Request {
+func RemoteNameForLocalObject(localObj ctrlruntimeclient.Object) *mcreconcile.Request {
 	labels := localObj.GetLabels()
 	annotations := localObj.GetAnnotations()
 	clusterName := labels[remoteObjectClusterLabel]
@@ -149,11 +151,13 @@ func RemoteNameForLocalObject(localObj ctrlruntimeclient.Object) *reconcile.Requ
 		return nil
 	}
 
-	return &reconcile.Request{
+	return &mcreconcile.Request{
 		ClusterName: clusterName,
-		NamespacedName: types.NamespacedName{
-			Namespace: namespace,
-			Name:      name,
+		Request: reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: namespace,
+				Name:      name,
+			},
 		},
 	}
 }

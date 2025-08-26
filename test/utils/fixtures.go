@@ -39,29 +39,29 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/kontext"
 )
 
 func CreateOrganization(
 	t *testing.T,
 	ctx context.Context,
-	workspaceName logicalcluster.Name,
+	workspaceName string,
 	apiExportName string,
 ) string {
 	t.Helper()
 
-	kcpClient := GetKcpAdminClusterClient(t)
+	kcpClusterClient := GetKcpAdminClusterClient(t)
 	agent := rbacv1.Subject{
 		Kind: "User",
 		Name: "api-syncagent-e2e",
 	}
 
 	// setup workspaces
-	orgClusterName := CreateWorkspace(t, ctx, kcpClient, "root", workspaceName)
+	clusterPath := logicalcluster.NewPath("root")
+	orgClusterName := CreateWorkspace(t, ctx, kcpClusterClient.Cluster(clusterPath), workspaceName)
 
 	// grant access and allow the agent to resolve its own workspace path
-	homeCtx := kontext.WithCluster(ctx, orgClusterName)
-	GrantWorkspaceAccess(t, homeCtx, kcpClient, string(workspaceName), agent, rbacv1.PolicyRule{
+	orgClient := kcpClusterClient.Cluster(clusterPath.Join(workspaceName))
+	GrantWorkspaceAccess(t, ctx, orgClient, agent, rbacv1.PolicyRule{
 		APIGroups:     []string{"core.kcp.io"},
 		Resources:     []string{"logicalclusters"},
 		ResourceNames: []string{"cluster"},
@@ -70,34 +70,31 @@ func CreateOrganization(
 
 	// add some consumer workspaces
 	teamClusters := []logicalcluster.Name{
-		CreateWorkspace(t, ctx, kcpClient, orgClusterName, "team-1"),
-		CreateWorkspace(t, ctx, kcpClient, orgClusterName, "team-2"),
+		CreateWorkspace(t, ctx, orgClient, "team-1"),
+		CreateWorkspace(t, ctx, orgClient, "team-2"),
 	}
 
 	// setup the APIExport and wait for it to be ready
-	apiExport := CreateAPIExport(t, homeCtx, kcpClient, apiExportName, &agent)
+	apiExport := CreateAPIExport(t, ctx, orgClient, apiExportName, &agent)
 
 	// bind it in all team workspaces, so the virtual workspace is ready inside kcp
 	for _, teamCluster := range teamClusters {
-		teamCtx := kontext.WithCluster(ctx, teamCluster)
-		BindToAPIExport(t, teamCtx, kcpClient, apiExport)
+		BindToAPIExport(t, ctx, kcpClusterClient.Cluster(teamCluster.Path()), apiExport)
 	}
 
 	return CreateKcpAgentKubeconfig(t, fmt.Sprintf("/clusters/%s", orgClusterName))
 }
 
-func CreateWorkspace(t *testing.T, ctx context.Context, client ctrlruntimeclient.Client, parent logicalcluster.Name, workspaceName logicalcluster.Name) logicalcluster.Name {
+func CreateWorkspace(t *testing.T, ctx context.Context, client ctrlruntimeclient.Client, workspaceName string) logicalcluster.Name {
 	t.Helper()
 
 	testWs := &kcptenancyv1alpha1.Workspace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: workspaceName.String(),
+			Name: workspaceName,
 		},
 	}
 
-	ctx = kontext.WithCluster(ctx, parent)
-
-	t.Logf("Creating workspace %s:%s…", parent, workspaceName)
+	t.Logf("Creating workspace %s…", workspaceName)
 	if err := client.Create(ctx, testWs); err != nil {
 		t.Fatalf("Failed to create %q workspace: %v", workspaceName, err)
 	}
@@ -196,7 +193,7 @@ func CreateAPIExport(t *testing.T, ctx context.Context, client ctrlruntimeclient
 	return apiExport
 }
 
-func GrantWorkspaceAccess(t *testing.T, ctx context.Context, client ctrlruntimeclient.Client, workspaceName string, rbacSubject rbacv1.Subject, extraRules ...rbacv1.PolicyRule) {
+func GrantWorkspaceAccess(t *testing.T, ctx context.Context, client ctrlruntimeclient.Client, rbacSubject rbacv1.Subject, extraRules ...rbacv1.PolicyRule) {
 	t.Helper()
 
 	clusterRoleName := fmt.Sprintf("access-workspace:%s", strings.ToLower(rbacSubject.Name))

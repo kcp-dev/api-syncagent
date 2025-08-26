@@ -18,22 +18,24 @@ package syncmanager
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/kcp-dev/logicalcluster/v3"
 	"go.uber.org/zap"
 
 	"github.com/kcp-dev/api-syncagent/internal/controller/sync"
-	"github.com/kcp-dev/api-syncagent/internal/controller/syncmanager/lifecycle"
 	"github.com/kcp-dev/api-syncagent/internal/controllerutil"
 	"github.com/kcp-dev/api-syncagent/internal/controllerutil/predicate"
 	"github.com/kcp-dev/api-syncagent/internal/discovery"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
-	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	kcpapisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	apiexportprovider "github.com/kcp-dev/multicluster-provider/apiexport"
+	mccontroller "sigs.k8s.io/multicluster-runtime/pkg/controller"
+	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
@@ -42,8 +44,8 @@ import (
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/kontext"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -72,18 +74,32 @@ type Reconciler struct {
 	stateNamespace  string
 	agentName       string
 
-	apiExport *kcpdevv1alpha1.APIExport
+	apiExport *kcpapisv1alpha1.APIExport
 
 	// URL for which the current vwCluster instance has been created
 	vwURL string
 
-	// a Cluster representing the virtual workspace for the APIExport
-	vwCluster *lifecycle.Cluster
+	// A multi-cluster Manager representing the virtual workspace cluster; this manager will
+	// not handle the individual controllers' lifecycle, because their lifecycle depends on
+	// PublishedResources, not the set of workspaces/clusters in the APIExport's virtual workspace.
+	// This manager is stopped and recreated whenever the APIExport's URL changes.
+	vwManager       mcmanager.Manager
+	vwManagerCtx    context.Context
+	vwManagerCancel context.CancelFunc
 
-	// a map of sync controllers, one for each PublishedResource, using their
+	// The provider based on the APIExport; like the vwManager, this is stopped and recreated
+	// whenever the APIExport's URL changes.
+	vwProvider *apiexportprovider.Provider
+
+	// A map of sync controllers, one for each PublishedResource, using their
 	// UIDs and resourceVersion as the map keys; using the version ensures that
 	// when a PR changes, the old controller is orphaned and will be shut down.
-	syncWorkers map[string]lifecycle.Controller
+	syncWorkers map[string]syncWorker
+}
+
+type syncWorker struct {
+	controller mccontroller.Controller
+	cancel     context.CancelFunc
 }
 
 // Add creates a new controller and adds it to the given manager.
@@ -93,7 +109,7 @@ func Add(
 	kcpCluster cluster.Cluster,
 	kcpRestConfig *rest.Config,
 	log *zap.SugaredLogger,
-	apiExport *kcpdevv1alpha1.APIExport,
+	apiExport *kcpapisv1alpha1.APIExport,
 	prFilter labels.Selector,
 	stateNamespace string,
 	agentName string,
@@ -111,11 +127,11 @@ func Add(
 		kcpRestConfig:   kcpRestConfig,
 		log:             log,
 		recorder:        localManager.GetEventRecorderFor(ControllerName),
-		syncWorkers:     map[string]lifecycle.Controller{},
 		discoveryClient: discoveryClient,
 		prFilter:        prFilter,
 		stateNamespace:  stateNamespace,
 		agentName:       agentName,
+		syncWorkers:     map[string]syncWorker{},
 	}
 
 	_, err = builder.ControllerManagedBy(localManager).
@@ -125,12 +141,13 @@ func Add(
 			MaxConcurrentReconciles: 1,
 		}).
 		// Watch for changes to APIExport on the kcp side to start/restart the actual syncing controllers;
-		// the cache is already restricted by a fieldSelector in the main.go to respect the RBC restrictions,
+		// the cache is already restricted by a fieldSelector in the main.go to respect the RBAC restrictions,
 		// so there is no need here to add an additional filter.
-		WatchesRawSource(source.Kind(kcpCluster.GetCache(), &kcpdevv1alpha1.APIExport{}, controllerutil.EnqueueConst[*kcpdevv1alpha1.APIExport]("dummy"))).
+		WatchesRawSource(source.Kind(kcpCluster.GetCache(), &kcpapisv1alpha1.APIExport{}, controllerutil.EnqueueConst[*kcpapisv1alpha1.APIExport]("dummy"))).
 		// Watch for changes to the PublishedResources
 		Watches(&syncagentv1alpha1.PublishedResource{}, controllerutil.EnqueueConst[ctrlruntimeclient.Object]("dummy"), builder.WithPredicates(predicate.ByLabels(prFilter))).
 		Build(reconciler)
+
 	return err
 }
 
@@ -138,18 +155,17 @@ func (r *Reconciler) Reconcile(ctx context.Context, _ reconcile.Request) (reconc
 	log := r.log.Named(ControllerName)
 	log.Debug("Processing")
 
-	wsCtx := kontext.WithCluster(ctx, logicalcluster.From(r.apiExport))
 	key := types.NamespacedName{Name: r.apiExport.Name}
 
-	apiExport := &kcpdevv1alpha1.APIExport{}
-	if err := r.kcpCluster.GetClient().Get(wsCtx, key, apiExport); ctrlruntimeclient.IgnoreNotFound(err) != nil {
+	apiExport := &kcpapisv1alpha1.APIExport{}
+	if err := r.kcpCluster.GetClient().Get(ctx, key, apiExport); ctrlruntimeclient.IgnoreNotFound(err) != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to retrieve APIExport: %w", err)
 	}
 
 	return reconcile.Result{}, r.reconcile(ctx, log, apiExport)
 }
 
-func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, apiExport *kcpdevv1alpha1.APIExport) error {
+func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, apiExport *kcpapisv1alpha1.APIExport) error {
 	// We're not yet making use of APIEndpointSlices, as we don't even fully
 	// support a sharded kcp setup yet. Hence for now we're safe just using
 	// this deprecated VW URL.
@@ -163,10 +179,9 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, apiE
 
 	vwURL := urls[0].URL
 
-	// if the VW URL changed, stop the cluster and all sync controllers
+	// if the VW URL changed, stop the manager and all sync controllers
 	if r.vwURL != "" && vwURL != r.vwURL {
-		r.stopSyncControllers(log)
-		r.stopVirtualWorkspaceCluster(log)
+		r.shutdown(log)
 	}
 
 	// if kcp had a hiccup and wrote a status without an actual URL
@@ -174,9 +189,9 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, apiE
 		return nil
 	}
 
-	// make sure we have a running cluster object for the virtual workspace
-	if err := r.ensureVirtualWorkspaceCluster(log, vwURL); err != nil {
-		return fmt.Errorf("failed to ensure virtual workspace cluster: %w", err)
+	// make sure we have a running manager object for the virtual workspace
+	if err := r.ensureManager(log, vwURL); err != nil {
+		return fmt.Errorf("failed to ensure virtual workspace manager: %w", err)
 	}
 
 	// find all PublishedResources
@@ -195,40 +210,125 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, apiE
 	return nil
 }
 
-func (r *Reconciler) ensureVirtualWorkspaceCluster(log *zap.SugaredLogger, vwURL string) error {
-	if r.vwCluster == nil {
-		log.Info("Setting up virtual workspace cluster…")
+func (r *Reconciler) ensureManager(log *zap.SugaredLogger, vwURL string) error {
+	// Use the global app context so this provider is independent of the reconcile
+	// context, which might get cancelled right after Reconcile() is done.
+	r.vwManagerCtx, r.vwManagerCancel = context.WithCancel(r.ctx)
 
-		stoppableCluster, err := lifecycle.NewCluster(vwURL, r.kcpRestConfig)
+	vwConfig := rest.CopyConfig(r.kcpRestConfig)
+	vwConfig.Host = vwURL
+
+	scheme := runtime.NewScheme()
+
+	if err := corev1.AddToScheme(scheme); err != nil {
+		return fmt.Errorf("failed to register scheme %s: %w", corev1.SchemeGroupVersion, err)
+	}
+
+	if err := kcpapisv1alpha1.AddToScheme(scheme); err != nil {
+		return fmt.Errorf("failed to register scheme %s: %w", kcpapisv1alpha1.SchemeGroupVersion, err)
+	}
+
+	if r.vwProvider == nil {
+		log.Debug("Setting up APIExport provider…")
+
+		provider, err := apiexportprovider.New(vwConfig, apiexportprovider.Options{
+			Scheme: scheme,
+		})
 		if err != nil {
+			return fmt.Errorf("failed to init apiexport provider: %w", err)
+		}
+
+		r.vwProvider = provider
+	}
+
+	if r.vwManager == nil {
+		log.Debug("Setting up virtual workspace manager…")
+
+		manager, err := mcmanager.New(vwConfig, r.vwProvider, manager.Options{
+			Scheme:         scheme,
+			LeaderElection: false,
+			Metrics: server.Options{
+				BindAddress: "0",
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("failed to initialize cluster: %w", err)
+		}
+
+		// Make sure the vwManager can Engage() on the controller, even though we
+		// start and stop them outside the control of the manager. This shim will
+		// ensure Engage() calls are handed to the underlying sync controller as
+		// as long as the controller is running.
+		if err := manager.Add(&controllerShim{reconciler: r}); err != nil {
 			return fmt.Errorf("failed to initialize cluster: %w", err)
 		}
 
 		// use the app's root context as the base, not the reconciling context, which
 		// might get cancelled after Reconcile() is done;
 		// likewise use the reconciler's log without any additional reconciling context
-		if err := stoppableCluster.Start(r.ctx, r.log); err != nil {
-			return fmt.Errorf("failed to start cluster: %w", err)
-		}
+		go func() {
+			if err := manager.Start(r.vwManagerCtx); err != nil {
+				log.Fatalw("Failed to start manager.", zap.Error(err))
+			}
+		}()
 
 		log.Debug("Virtual workspace cluster setup completed.")
 
 		r.vwURL = vwURL
-		r.vwCluster = stoppableCluster
+		r.vwManager = manager
+	}
+
+	// start the provider
+	go func() {
+		// Use the global app context so this provider is independent of the reconcile
+		// context, which might get cancelled right after Reconcile() is done.
+		if err := r.vwProvider.Run(r.vwManagerCtx, r.vwManager); err != nil {
+			log.Fatalw("Failed to start apiexport provider.", zap.Error(err))
+		}
+	}()
+
+	return nil
+}
+
+type controllerShim struct {
+	reconciler *Reconciler
+}
+
+func (s *controllerShim) Engage(ctx context.Context, clusterName string, cl cluster.Cluster) error {
+	s.reconciler.log.Infof("Engage(%q)\n", clusterName)
+
+	for _, worker := range s.reconciler.syncWorkers {
+		if err := worker.controller.Engage(ctx, clusterName, cl); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (r *Reconciler) stopVirtualWorkspaceCluster(log *zap.SugaredLogger) {
-	if r.vwCluster != nil {
-		if err := r.vwCluster.Stop(log); err != nil {
-			log.Errorw("Failed to stop cluster", zap.Error(err))
-		}
+func (s *controllerShim) Start(_ context.Context) error {
+	// NOP, controllers are started outside the control of the manager.
+	return nil
+}
+
+// shutdown will cancel the current context and thereby stop the manager and all
+// sync controllers at the same time.
+func (r *Reconciler) shutdown(log *zap.SugaredLogger) {
+	log.Debug("Shutting down existing manager…")
+
+	if r.vwManagerCancel != nil {
+		r.vwManagerCancel()
 	}
 
-	r.vwCluster = nil
+	r.vwProvider = nil
+	r.vwManager = nil
+	r.vwManagerCtx = nil
+	r.vwManagerCancel = nil
 	r.vwURL = ""
+
+	// Free all workers; since their contexts are based on the manager's context,
+	// they have also been cancelled already above.
+	r.syncWorkers = nil
 }
 
 func getPublishedResourceKey(pr *syncagentv1alpha1.PublishedResource) string {
@@ -236,31 +336,20 @@ func getPublishedResourceKey(pr *syncagentv1alpha1.PublishedResource) string {
 }
 
 func (r *Reconciler) ensureSyncControllers(ctx context.Context, log *zap.SugaredLogger, publishedResources []syncagentv1alpha1.PublishedResource) error {
-	currentPRWorkers := sets.New[string]()
+	requiredWorkers := sets.New[string]()
 	for _, pr := range publishedResources {
-		currentPRWorkers.Insert(getPublishedResourceKey(&pr))
+		requiredWorkers.Insert(getPublishedResourceKey(&pr))
 	}
 
 	// stop controllers that are no longer needed
-	for key, ctrl := range r.syncWorkers {
-		// if the controller failed to properly start, its goroutine will have
-		// ended already, but it's still lingering around in the syncWorkers map;
-		// controller is still required and running
-		if currentPRWorkers.Has(key) && ctrl.Running() {
+	for key, worker := range r.syncWorkers {
+		if requiredWorkers.Has(key) {
 			continue
 		}
 
 		log.Infow("Stopping sync controller…", "key", key)
 
-		var cause error
-		if ctrl.Running() {
-			cause = errors.New("PublishedResource not available anymore")
-		} else {
-			cause = errors.New("gc'ing failed controller")
-		}
-
-		// can only fail if the controller wasn't running; a situation we do not care about here
-		_ = ctrl.Stop(log, cause)
+		worker.cancel()
 		delete(r.syncWorkers, key)
 	}
 
@@ -276,6 +365,8 @@ func (r *Reconciler) ensureSyncControllers(ctx context.Context, log *zap.Sugared
 
 		log.Infow("Starting new sync controller…", "key", key)
 
+		ctrlCtx, ctrlCancel := context.WithCancel(r.vwManagerCtx)
+
 		// create the sync controller;
 		// use the reconciler's log without any additional reconciling context
 		syncController, err := sync.Create(
@@ -283,7 +374,7 @@ func (r *Reconciler) ensureSyncControllers(ctx context.Context, log *zap.Sugared
 			// this context *must not* be stored in the sync controller!
 			ctx,
 			r.localManager,
-			r.vwCluster.GetCluster(),
+			r.vwManager,
 			&pubRes,
 			r.discoveryClient,
 			r.stateNamespace,
@@ -292,34 +383,24 @@ func (r *Reconciler) ensureSyncControllers(ctx context.Context, log *zap.Sugared
 			numSyncWorkers,
 		)
 		if err != nil {
+			ctrlCancel()
 			return fmt.Errorf("failed to create sync controller: %w", err)
 		}
 
-		// wrap it so we can start/stop it easily
-		wrappedController, err := lifecycle.NewController(syncController)
-		if err != nil {
-			return fmt.Errorf("failed to wrap sync controller: %w", err)
+		log.Infof("storing worker at %s", key)
+		r.syncWorkers[key] = syncWorker{
+			controller: syncController,
+			cancel:     ctrlCancel,
 		}
 
-		// let 'er rip (remember to use the long-lived app root context here)
-		if err := wrappedController.Start(r.ctx, log); err != nil {
+		// let 'er rip (remember to use the long-lived context here)
+		if err := syncController.Start(ctrlCtx); err != nil {
+			ctrlCancel()
+			log.Info("deleting again")
+			delete(r.syncWorkers, key)
 			return fmt.Errorf("failed to start sync controller: %w", err)
 		}
-
-		r.syncWorkers[key] = wrappedController
 	}
 
 	return nil
-}
-
-func (r *Reconciler) stopSyncControllers(log *zap.SugaredLogger) {
-	cause := errors.New("virtual workspace cluster is recreating")
-
-	for uid, ctrl := range r.syncWorkers {
-		if err := ctrl.Stop(log, cause); err != nil {
-			log.Errorw("Failed to stop controller", "uid", uid, zap.Error(err))
-		}
-
-		delete(r.syncWorkers, uid)
-	}
 }

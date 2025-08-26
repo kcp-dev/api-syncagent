@@ -39,7 +39,6 @@ import (
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	fakectrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/kontext"
 )
 
 func buildFakeClient(objs ...*unstructured.Unstructured) ctrlruntimeclient.Client {
@@ -910,9 +909,8 @@ func TestSyncerProcessingSingleResourceWithoutStatus(t *testing.T) {
 				t.Fatalf("Failed to create syncer: %v", err)
 			}
 
-			localCtx := t.Context()
-			remoteCtx := kontext.WithCluster(localCtx, clusterName)
-			ctx := NewContext(localCtx, remoteCtx)
+			ctx := t.Context()
+			cInfo := NewClusterInfo(clusterName)
 
 			// setup a custom state backend that we can prime
 			var backend *kubernetesBackend
@@ -921,7 +919,7 @@ func TestSyncerProcessingSingleResourceWithoutStatus(t *testing.T) {
 				if backend == nil {
 					backend = newKubernetesBackend(stateNamespace, primaryObject, stateCluster)
 					if testcase.existingState != "" {
-						if err := backend.Put(testcase.remoteObject, clusterName, []byte(testcase.existingState)); err != nil {
+						if err := backend.Put(ctx, testcase.remoteObject, clusterName, []byte(testcase.existingState)); err != nil {
 							t.Fatalf("Failed to prime state store: %v", err)
 						}
 					}
@@ -942,7 +940,7 @@ func TestSyncerProcessingSingleResourceWithoutStatus(t *testing.T) {
 						t.Fatalf("Detected potential infinite loop, stopping after %d requeues.", i)
 					}
 
-					requeue, err = syncer.Process(ctx, target)
+					requeue, err = syncer.Process(ctx, cInfo, target)
 					if err != nil {
 						break
 					}
@@ -951,7 +949,7 @@ func TestSyncerProcessingSingleResourceWithoutStatus(t *testing.T) {
 						break
 					}
 
-					if err = remoteClient.Get(remoteCtx, ctrlruntimeclient.ObjectKeyFromObject(target), target); err != nil {
+					if err = remoteClient.Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(target), target); err != nil {
 						// it's possible for the processing to have deleted the remote object,
 						// so a NotFound is valid here
 						if apierrors.IsNotFound(err) {
@@ -962,15 +960,15 @@ func TestSyncerProcessingSingleResourceWithoutStatus(t *testing.T) {
 					}
 				}
 			} else {
-				requeue, err = syncer.Process(ctx, testcase.remoteObject)
+				requeue, err = syncer.Process(ctx, cInfo, testcase.remoteObject)
 			}
 
-			finalRemoteObject, getErr := getFinalObjectVersion(remoteCtx, remoteClient, testcase.remoteObject, testcase.expectedRemoteObject)
+			finalRemoteObject, getErr := getFinalObjectVersion(ctx, remoteClient, testcase.remoteObject, testcase.expectedRemoteObject)
 			if getErr != nil {
 				t.Fatalf("Failed to get final remote object: %v", getErr)
 			}
 
-			finalLocalObject, getErr := getFinalObjectVersion(localCtx, localClient, testcase.localObject, testcase.expectedLocalObject)
+			finalLocalObject, getErr := getFinalObjectVersion(ctx, localClient, testcase.localObject, testcase.expectedLocalObject)
 			if getErr != nil {
 				t.Fatalf("Failed to get final local object: %v", getErr)
 			}
@@ -990,7 +988,7 @@ func TestSyncerProcessingSingleResourceWithoutStatus(t *testing.T) {
 						t.Fatal("Cannot check object state, state store was never instantiated.")
 					}
 
-					finalState, err := backend.Get(testcase.expectedRemoteObject, clusterName)
+					finalState, err := backend.Get(ctx, testcase.expectedRemoteObject, clusterName)
 					if err != nil {
 						t.Fatalf("Failed to get final state: %v", err)
 					} else if !bytes.Equal(finalState, []byte(testcase.expectedState)) {
@@ -1218,9 +1216,8 @@ func TestSyncerProcessingSingleResourceWithStatus(t *testing.T) {
 				t.Fatalf("Failed to create syncer: %v", err)
 			}
 
-			localCtx := t.Context()
-			remoteCtx := kontext.WithCluster(localCtx, clusterName)
-			ctx := NewContext(localCtx, remoteCtx)
+			ctx := t.Context()
+			cInfo := NewClusterInfo(clusterName)
 
 			// setup a custom state backend that we can prime
 			var backend *kubernetesBackend
@@ -1229,7 +1226,7 @@ func TestSyncerProcessingSingleResourceWithStatus(t *testing.T) {
 				if backend == nil {
 					backend = newKubernetesBackend(stateNamespace, primaryObject, stateCluster)
 					if testcase.existingState != "" {
-						if err := backend.Put(testcase.remoteObject, clusterName, []byte(testcase.existingState)); err != nil {
+						if err := backend.Put(ctx, testcase.remoteObject, clusterName, []byte(testcase.existingState)); err != nil {
 							t.Fatalf("Failed to prime state store: %v", err)
 						}
 					}
@@ -1250,7 +1247,7 @@ func TestSyncerProcessingSingleResourceWithStatus(t *testing.T) {
 						t.Fatalf("Detected potential infinite loop, stopping after %d requeues.", i)
 					}
 
-					requeue, err = syncer.Process(ctx, target)
+					requeue, err = syncer.Process(ctx, cInfo, target)
 					if err != nil {
 						break
 					}
@@ -1259,7 +1256,7 @@ func TestSyncerProcessingSingleResourceWithStatus(t *testing.T) {
 						break
 					}
 
-					if err = remoteClient.Get(remoteCtx, ctrlruntimeclient.ObjectKeyFromObject(target), target); err != nil {
+					if err = remoteClient.Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(target), target); err != nil {
 						// it's possible for the processing to have deleted the remote object,
 						// so a NotFound is valid here
 						if apierrors.IsNotFound(err) {
@@ -1270,15 +1267,15 @@ func TestSyncerProcessingSingleResourceWithStatus(t *testing.T) {
 					}
 				}
 			} else {
-				requeue, err = syncer.Process(ctx, testcase.remoteObject)
+				requeue, err = syncer.Process(ctx, cInfo, testcase.remoteObject)
 			}
 
-			finalRemoteObject, getErr := getFinalObjectVersion(remoteCtx, remoteClient, testcase.remoteObject, testcase.expectedRemoteObject)
+			finalRemoteObject, getErr := getFinalObjectVersion(ctx, remoteClient, testcase.remoteObject, testcase.expectedRemoteObject)
 			if getErr != nil {
 				t.Fatalf("Failed to get final remote object: %v", getErr)
 			}
 
-			finalLocalObject, getErr := getFinalObjectVersion(localCtx, localClient, testcase.localObject, testcase.expectedLocalObject)
+			finalLocalObject, getErr := getFinalObjectVersion(ctx, localClient, testcase.localObject, testcase.expectedLocalObject)
 			if getErr != nil {
 				t.Fatalf("Failed to get final local object: %v", getErr)
 			}
@@ -1298,7 +1295,7 @@ func TestSyncerProcessingSingleResourceWithStatus(t *testing.T) {
 						t.Fatal("Cannot check object state, state store was never instantiated.")
 					}
 
-					finalState, err := backend.Get(testcase.expectedRemoteObject, clusterName)
+					finalState, err := backend.Get(ctx, testcase.expectedRemoteObject, clusterName)
 					if err != nil {
 						t.Fatalf("Failed to get final state: %v", err)
 					} else if !bytes.Equal(finalState, []byte(testcase.expectedState)) {

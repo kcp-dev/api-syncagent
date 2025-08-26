@@ -17,6 +17,7 @@ limitations under the License.
 package sync
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -32,8 +33,8 @@ import (
 )
 
 type ObjectStateStore interface {
-	Get(source syncSide) (*unstructured.Unstructured, error)
-	Put(obj *unstructured.Unstructured, clusterName logicalcluster.Name, subresources []string) error
+	Get(ctx context.Context, source syncSide) (*unstructured.Unstructured, error)
+	Put(ctx context.Context, obj *unstructured.Unstructured, clusterName logicalcluster.Name, subresources []string) error
 }
 
 // objectStateStore is capable of creating/updating a target Kubernetes object
@@ -56,8 +57,8 @@ func newKubernetesStateStoreCreator(namespace string) newObjectStateStoreFunc {
 	}
 }
 
-func (op *objectStateStore) Get(source syncSide) (*unstructured.Unstructured, error) {
-	data, err := op.backend.Get(source.object, source.clusterName)
+func (op *objectStateStore) Get(ctx context.Context, source syncSide) (*unstructured.Unstructured, error) {
+	data, err := op.backend.Get(ctx, source.object, source.clusterName)
 	if err != nil {
 		return nil, err
 	}
@@ -72,13 +73,13 @@ func (op *objectStateStore) Get(source syncSide) (*unstructured.Unstructured, er
 	return lastKnown, nil
 }
 
-func (op *objectStateStore) Put(obj *unstructured.Unstructured, clusterName logicalcluster.Name, subresources []string) error {
+func (op *objectStateStore) Put(ctx context.Context, obj *unstructured.Unstructured, clusterName logicalcluster.Name, subresources []string) error {
 	encoded, err := op.snapshotObject(obj, subresources)
 	if err != nil {
 		return err
 	}
 
-	return op.backend.Put(obj, clusterName, []byte(encoded))
+	return op.backend.Put(ctx, obj, clusterName, []byte(encoded))
 }
 
 func (op *objectStateStore) snapshotObject(obj *unstructured.Unstructured, subresources []string) (string, error) {
@@ -102,8 +103,8 @@ func (op *objectStateStore) snapshotObject(obj *unstructured.Unstructured, subre
 }
 
 type backend interface {
-	Get(obj *unstructured.Unstructured, clusterName logicalcluster.Name) ([]byte, error)
-	Put(obj *unstructured.Unstructured, clusterName logicalcluster.Name, data []byte) error
+	Get(ctx context.Context, obj *unstructured.Unstructured, clusterName logicalcluster.Name) ([]byte, error)
+	Put(ctx context.Context, obj *unstructured.Unstructured, clusterName logicalcluster.Name, data []byte) error
 }
 
 type kubernetesBackend struct {
@@ -138,9 +139,9 @@ func newKubernetesBackend(namespace string, primaryObject, stateCluster syncSide
 	}
 }
 
-func (b *kubernetesBackend) Get(obj *unstructured.Unstructured, clusterName logicalcluster.Name) ([]byte, error) {
+func (b *kubernetesBackend) Get(ctx context.Context, obj *unstructured.Unstructured, clusterName logicalcluster.Name) ([]byte, error) {
 	secret := corev1.Secret{}
-	if err := b.stateCluster.client.Get(b.stateCluster.ctx, b.secretName, &secret); ctrlruntimeclient.IgnoreNotFound(err) != nil {
+	if err := b.stateCluster.client.Get(ctx, b.secretName, &secret); ctrlruntimeclient.IgnoreNotFound(err) != nil {
 		return nil, err
 	}
 
@@ -153,9 +154,9 @@ func (b *kubernetesBackend) Get(obj *unstructured.Unstructured, clusterName logi
 	return data, nil
 }
 
-func (b *kubernetesBackend) Put(obj *unstructured.Unstructured, clusterName logicalcluster.Name, data []byte) error {
+func (b *kubernetesBackend) Put(ctx context.Context, obj *unstructured.Unstructured, clusterName logicalcluster.Name, data []byte) error {
 	secret := corev1.Secret{}
-	if err := b.stateCluster.client.Get(b.stateCluster.ctx, b.secretName, &secret); ctrlruntimeclient.IgnoreNotFound(err) != nil {
+	if err := b.stateCluster.client.Get(ctx, b.secretName, &secret); ctrlruntimeclient.IgnoreNotFound(err) != nil {
 		return err
 	}
 
@@ -173,9 +174,9 @@ func (b *kubernetesBackend) Put(obj *unstructured.Unstructured, clusterName logi
 		secret.Name = b.secretName.Name
 		secret.Namespace = b.secretName.Namespace
 
-		err = b.stateCluster.client.Create(b.stateCluster.ctx, &secret)
+		err = b.stateCluster.client.Create(ctx, &secret)
 	} else {
-		err = b.stateCluster.client.Update(b.stateCluster.ctx, &secret)
+		err = b.stateCluster.client.Update(ctx, &secret)
 	}
 
 	return err

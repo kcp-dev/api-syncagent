@@ -19,20 +19,20 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
+	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 )
 
 // ResourceProjectionApplyConfiguration represents a declarative configuration of the ResourceProjection type for use
 // with apply.
 type ResourceProjectionApplyConfiguration struct {
-	Group      *string                 `json:"group,omitempty"`
-	Version    *string                 `json:"version,omitempty"`
-	Versions   map[string]string       `json:"versions,omitempty"`
-	Scope      *v1alpha1.ResourceScope `json:"scope,omitempty"`
-	Kind       *string                 `json:"kind,omitempty"`
-	Plural     *string                 `json:"plural,omitempty"`
-	ShortNames []string                `json:"shortNames,omitempty"`
-	Categories []string                `json:"categories,omitempty"`
+	Group      *string                          `json:"group,omitempty"`
+	Version    *string                          `json:"version,omitempty"`
+	Versions   map[string]string                `json:"versions,omitempty"`
+	Scope      *syncagentv1alpha1.ResourceScope `json:"scope,omitempty"`
+	Kind       *string                          `json:"kind,omitempty"`
+	Plural     *string                          `json:"plural,omitempty"`
+	ShortNames []string                         `json:"shortNames,omitempty"`
+	Categories []string                         `json:"categories,omitempty"`
 }
 
 // ResourceProjectionApplyConfiguration constructs a declarative configuration of the ResourceProjection type for use with
@@ -74,7 +74,7 @@ func (b *ResourceProjectionApplyConfiguration) WithVersions(entries map[string]s
 // WithScope sets the Scope field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Scope field is set to the value of the last call.
-func (b *ResourceProjectionApplyConfiguration) WithScope(value v1alpha1.ResourceScope) *ResourceProjectionApplyConfiguration {
+func (b *ResourceProjectionApplyConfiguration) WithScope(value syncagentv1alpha1.ResourceScope) *ResourceProjectionApplyConfiguration {
 	b.Scope = &value
 	return b
 }
