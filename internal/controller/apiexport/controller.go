@@ -103,6 +103,7 @@ func Add(
 		// Watch for changes to PublishedResources on the local service cluster
 		Watches(&syncagentv1alpha1.PublishedResource{}, controllerutil.EnqueueConst[ctrlruntimeclient.Object]("dummy"), builder.WithPredicates(predicateutil.ByLabels(prFilter), hasARS)).
 		Build(reconciler)
+
 	return err
 }
 
@@ -166,7 +167,7 @@ func (r *Reconciler) reconcile(ctx context.Context) error {
 
 	// reconcile an APIExport in kcp
 	factories := []reconciling.NamedAPIExportReconcilerFactory{
-		r.createAPIExportReconciler(arsList, claimedResources, r.agentName, r.apiExportName),
+		r.createAPIExportReconciler(arsList, claimedResources, r.agentName, r.apiExportName, r.recorder),
 	}
 
 	if err := reconciling.ReconcileAPIExports(ctx, factories, "", r.kcpClient); err != nil {
