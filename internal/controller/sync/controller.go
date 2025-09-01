@@ -165,7 +165,7 @@ func Create(
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request) (reconcile.Result, error) {
-	log := r.log.With("request", request, "cluster", request.ClusterName)
+	log := r.log.With("cluster", request.ClusterName, "request", request.NamespacedName)
 	log.Debug("Processing")
 
 	cl, err := r.remoteManager.GetCluster(ctx, request.ClusterName)
