@@ -29,6 +29,10 @@ require (
 	github.com/tidwall/sjson v1.2.5
 	go.uber.org/zap v1.27.0
 	k8c.io/reconciler v0.5.0
+	// Deviating from kcp's kube version (0.32) because more recent multicluster-runtime
+	// versions are built ontop of controller-runtime 0.21 with Kube 0.33. Ideally in
+	// the future we should go back to having kcp, controller-runtime and multicluster-runtime
+	// be in-sync again.
 	k8s.io/api v0.33.3
 	k8s.io/apiextensions-apiserver v0.33.3
 	k8s.io/apimachinery v0.33.3
