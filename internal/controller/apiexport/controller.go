@@ -128,7 +128,7 @@ func (r *Reconciler) reconcile(ctx context.Context) error {
 
 	// for each PR, we note down the created ARS and also the GVKs of related resources
 	arsList := sets.New[string]()
-	claimedResources := sets.New[string]()
+	claimedResources := sets.New("events")
 
 	// PublishedResources use kinds, but the PermissionClaims use resource names (plural),
 	// so we must translate accordingly

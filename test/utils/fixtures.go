@@ -258,6 +258,16 @@ func BindToAPIExport(t *testing.T, ctx context.Context, client ctrlruntimeclient
 					},
 					State: kcpapisv1alpha1.ClaimAccepted,
 				},
+				{
+					PermissionClaim: kcpapisv1alpha1.PermissionClaim{
+						GroupResource: kcpapisv1alpha1.GroupResource{
+							Group:    "",
+							Resource: "events",
+						},
+						All: true,
+					},
+					State: kcpapisv1alpha1.ClaimAccepted,
+				},
 				// for related resources, the agent can also sync ConfigMaps and Secrets
 				{
 					PermissionClaim: kcpapisv1alpha1.PermissionClaim{
