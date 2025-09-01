@@ -58,6 +58,8 @@ func workspacePathFromContext(ctx context.Context) logicalcluster.Path {
 	return path
 }
 
+// WithEventRecorder adds a event recorder to the context. The recorder must be configured
+// for the kcp side of the synchronization as the agent never issues events on the local cluster.
 func WithEventRecorder(ctx context.Context, recorder record.EventRecorder) context.Context {
 	return context.WithValue(ctx, recorderContextKey, recorder)
 }

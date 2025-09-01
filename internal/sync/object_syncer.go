@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -57,13 +58,37 @@ type objectSyncer struct {
 	mutator mutation.Mutator
 	// stateStore is capable of remembering the state of a Kubernetes object
 	stateStore ObjectStateStore
+	// eventObjSide is configuring whether the source or destination object will
+	// receive events. Since these objects might be created during the sync,
+	// they cannot be specified here directly.
+	eventObjSide syncSideType
 }
+
+type syncSideType int
+
+const (
+	syncSideSource syncSideType = iota
+	syncSideDestination
+)
 
 type syncSide struct {
 	clusterName   logicalcluster.Name
 	workspacePath logicalcluster.Path
 	client        ctrlruntimeclient.Client
 	object        *unstructured.Unstructured
+}
+
+func (s *objectSyncer) recordEvent(ctx context.Context, source, dest syncSide, eventtype, reason, msg string, args ...any) {
+	recorder := recorderFromContext(ctx)
+
+	var obj runtime.Object
+	if s.eventObjSide == syncSideDestination {
+		obj = dest.object
+	} else {
+		obj = source.object
+	}
+
+	recorder.Eventf(obj, eventtype, reason, msg, args...)
 }
 
 func (s *objectSyncer) Sync(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
@@ -81,6 +106,7 @@ func (s *objectSyncer) Sync(ctx context.Context, log *zap.SugaredLogger, source,
 
 		// the patch above would trigger a new reconciliation anyway
 		if updated {
+			s.recordEvent(ctx, source, dest, corev1.EventTypeNormal, "ObjectAccepted", "Object has been seen by the service provider.")
 			return true, nil
 		}
 	}
@@ -103,6 +129,7 @@ func (s *objectSyncer) Sync(ctx context.Context, log *zap.SugaredLogger, source,
 
 		// The function above either created a new destination object or patched-in the missing labels,
 		// in both cases do we want to requeue.
+		s.recordEvent(ctx, source, dest, corev1.EventTypeNormal, "ObjectPlaced", "Object has been placed.")
 		return true, nil
 	}
 
@@ -254,6 +281,8 @@ func (s *objectSyncer) syncObjectSpec(ctx context.Context, log *zap.SugaredLogge
 	}
 
 	if requeue {
+		s.recordEvent(ctx, source, dest, corev1.EventTypeNormal, "ObjectSynced", "The current desired state of the object has been synchronized.")
+
 		// remember this object state for the next reconciliation (this will strip any syncer-related
 		// metadata the 3-way diff may have added above)
 		if err := s.stateStore.Put(ctx, sourceObjCopy, source.clusterName, s.subresources); err != nil {
@@ -282,6 +311,8 @@ func (s *objectSyncer) syncObjectStatus(ctx context.Context, log *zap.SugaredLog
 		if err := source.client.Status().Update(ctx, source.object); err != nil {
 			return false, fmt.Errorf("failed to update source object status: %w", err)
 		}
+
+		s.recordEvent(ctx, source, dest, corev1.EventTypeNormal, "ObjectStatusSynced", "The current object status has been updated.")
 	}
 
 	// always return false; there is no need to requeue the source object when we changed its status
@@ -406,6 +437,7 @@ func (s *objectSyncer) handleDeletion(ctx context.Context, log *zap.SugaredLogge
 	if dest.object != nil {
 		if dest.object.GetDeletionTimestamp() == nil {
 			log.Debugw("Deleting destination object…", "dest-object", newObjectKey(dest.object, dest.clusterName, logicalcluster.None))
+			s.recordEvent(ctx, source, dest, corev1.EventTypeNormal, "ObjectCleanup", "Object deletion has been started and will progress in the background.")
 			if err := dest.client.Delete(ctx, dest.object); err != nil {
 				return false, fmt.Errorf("failed to delete destination object: %w", err)
 			}
@@ -422,6 +454,7 @@ func (s *objectSyncer) handleDeletion(ctx context.Context, log *zap.SugaredLogge
 
 	// if we just removed the finalizer, we can requeue the source object
 	if updated {
+		s.recordEvent(ctx, source, dest, corev1.EventTypeNormal, "ObjectDeleted", "Object deletion has been completed, finalizer has been removed.")
 		return true, nil
 	}
 

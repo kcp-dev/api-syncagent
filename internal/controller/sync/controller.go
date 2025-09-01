@@ -215,6 +215,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request)
 	if r.pubRes.Spec.EnableWorkspacePaths {
 		lc := &kcpdevcorev1alpha1.LogicalCluster{}
 		if err := vwClient.Get(ctx, types.NamespacedName{Name: kcpdevcorev1alpha1.LogicalClusterName}, lc); err != nil {
+			recorder.Event(remoteObj, corev1.EventTypeWarning, "ReconcilingError", "Failed to retrieve workspace path, cannot process object.")
 			return reconcile.Result{}, fmt.Errorf("failed to retrieve remote logicalcluster: %w", err)
 		}
 
@@ -225,11 +226,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request)
 	// sync main object
 	syncer, err := sync.NewResourceSyncer(log, r.localClient, vwClient, r.pubRes, r.localCRD, mutation.NewMutator, r.stateNamespace, r.agentName)
 	if err != nil {
+		recorder.Event(remoteObj, corev1.EventTypeWarning, "ReconcilingError", "Failed to process object: a provider-side issue has occurred.")
 		return reconcile.Result{}, fmt.Errorf("failed to create syncer: %w", err)
 	}
 
 	requeue, err := syncer.Process(ctx, remoteObj)
 	if err != nil {
+		recorder.Event(remoteObj, corev1.EventTypeWarning, "ReconcilingError", "Failed to process object: a provider-side issue has occurred.")
 		return reconcile.Result{}, err
 	}
 

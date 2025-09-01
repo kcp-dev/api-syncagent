@@ -194,6 +194,7 @@ func (s *ResourceSyncer) Process(ctx context.Context, remoteObj *unstructured.Un
 		// (i.e. on the service cluster), so that the original and copy are linked
 		// together and can be found.
 		metadataOnDestination: true,
+		eventObjSide:          syncSideSource,
 	}
 
 	requeue, err = syncer.Sync(ctx, log, sourceSide, destSide)
