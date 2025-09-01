@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/tools/record"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	fakectrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -910,7 +911,8 @@ func TestSyncerProcessingSingleResourceWithoutStatus(t *testing.T) {
 			}
 
 			ctx := t.Context()
-			cInfo := NewClusterInfo(clusterName)
+			ctx = WithClusterName(ctx, clusterName)
+			ctx = WithEventRecorder(ctx, record.NewFakeRecorder(99))
 
 			// setup a custom state backend that we can prime
 			var backend *kubernetesBackend
@@ -940,7 +942,7 @@ func TestSyncerProcessingSingleResourceWithoutStatus(t *testing.T) {
 						t.Fatalf("Detected potential infinite loop, stopping after %d requeues.", i)
 					}
 
-					requeue, err = syncer.Process(ctx, cInfo, target)
+					requeue, err = syncer.Process(ctx, target)
 					if err != nil {
 						break
 					}
@@ -960,7 +962,7 @@ func TestSyncerProcessingSingleResourceWithoutStatus(t *testing.T) {
 					}
 				}
 			} else {
-				requeue, err = syncer.Process(ctx, cInfo, testcase.remoteObject)
+				requeue, err = syncer.Process(ctx, testcase.remoteObject)
 			}
 
 			finalRemoteObject, getErr := getFinalObjectVersion(ctx, remoteClient, testcase.remoteObject, testcase.expectedRemoteObject)
@@ -1217,7 +1219,8 @@ func TestSyncerProcessingSingleResourceWithStatus(t *testing.T) {
 			}
 
 			ctx := t.Context()
-			cInfo := NewClusterInfo(clusterName)
+			ctx = WithClusterName(ctx, clusterName)
+			ctx = WithEventRecorder(ctx, record.NewFakeRecorder(99))
 
 			// setup a custom state backend that we can prime
 			var backend *kubernetesBackend
@@ -1247,7 +1250,7 @@ func TestSyncerProcessingSingleResourceWithStatus(t *testing.T) {
 						t.Fatalf("Detected potential infinite loop, stopping after %d requeues.", i)
 					}
 
-					requeue, err = syncer.Process(ctx, cInfo, target)
+					requeue, err = syncer.Process(ctx, target)
 					if err != nil {
 						break
 					}
@@ -1267,7 +1270,7 @@ func TestSyncerProcessingSingleResourceWithStatus(t *testing.T) {
 					}
 				}
 			} else {
-				requeue, err = syncer.Process(ctx, cInfo, testcase.remoteObject)
+				requeue, err = syncer.Process(ctx, testcase.remoteObject)
 			}
 
 			finalRemoteObject, getErr := getFinalObjectVersion(ctx, remoteClient, testcase.remoteObject, testcase.expectedRemoteObject)

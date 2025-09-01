@@ -205,9 +205,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request)
 		return reconcile.Result{}, nil
 	}
 
-	cInfo := sync.NewClusterInfo(logicalcluster.Name(request.ClusterName))
+	recorder := cl.GetEventRecorderFor(ControllerName)
 
-	// if desired, fetch the cluster path as well (some downstream service providers might make use of it,
+	ctx = sync.WithClusterName(ctx, logicalcluster.Name(request.ClusterName))
+	ctx = sync.WithEventRecorder(ctx, recorder)
+
+	// if desired, fetch the workspace path as well (some downstream service providers might make use of it,
 	// but since it requires an additional permission claim, it's optional)
 	if r.pubRes.Spec.EnableWorkspacePaths {
 		lc := &kcpdevcorev1alpha1.LogicalCluster{}
@@ -216,7 +219,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request)
 		}
 
 		path := lc.Annotations[kcpcore.LogicalClusterPathAnnotationKey]
-		cInfo = cInfo.WithWorkspacePath(logicalcluster.NewPath(path))
+		ctx = sync.WithWorkspacePath(ctx, logicalcluster.NewPath(path))
 	}
 
 	// sync main object
@@ -225,7 +228,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request)
 		return reconcile.Result{}, fmt.Errorf("failed to create syncer: %w", err)
 	}
 
-	requeue, err := syncer.Process(ctx, cInfo, remoteObj)
+	requeue, err := syncer.Process(ctx, remoteObj)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

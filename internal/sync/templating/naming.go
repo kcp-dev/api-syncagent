@@ -40,11 +40,11 @@ type localObjectNamingContext struct {
 	ClusterPath logicalcluster.Path
 }
 
-func newLocalObjectNamingContext(object *unstructured.Unstructured, clusterName logicalcluster.Name, clusterPath logicalcluster.Path) localObjectNamingContext {
+func newLocalObjectNamingContext(object *unstructured.Unstructured, clusterName logicalcluster.Name, workspacePath logicalcluster.Path) localObjectNamingContext {
 	return localObjectNamingContext{
 		Object:      object.Object,
 		ClusterName: clusterName,
-		ClusterPath: clusterPath,
+		ClusterPath: workspacePath,
 	}
 }
 
@@ -53,7 +53,7 @@ var defaultNamingScheme = syncagentv1alpha1.ResourceNaming{
 	Name:      "{{ .Object.metadata.namespace | sha3short }}-{{ .Object.metadata.name | sha3short }}",
 }
 
-func GenerateLocalObjectName(pr *syncagentv1alpha1.PublishedResource, object *unstructured.Unstructured, clusterName logicalcluster.Name, clusterPath logicalcluster.Path) (types.NamespacedName, error) {
+func GenerateLocalObjectName(pr *syncagentv1alpha1.PublishedResource, object *unstructured.Unstructured, clusterName logicalcluster.Name, workspacePath logicalcluster.Path) (types.NamespacedName, error) {
 	naming := pr.Spec.Naming
 	if naming == nil {
 		naming = &syncagentv1alpha1.ResourceNaming{}
@@ -65,7 +65,7 @@ func GenerateLocalObjectName(pr *syncagentv1alpha1.PublishedResource, object *un
 	if pattern == "" {
 		pattern = defaultNamingScheme.Namespace
 	}
-	rendered, err := generateLocalObjectIdentifier(pattern, object, clusterName, clusterPath)
+	rendered, err := generateLocalObjectIdentifier(pattern, object, clusterName, workspacePath)
 	if err != nil {
 		return result, fmt.Errorf("invalid namespace naming: %w", err)
 	}
@@ -76,7 +76,7 @@ func GenerateLocalObjectName(pr *syncagentv1alpha1.PublishedResource, object *un
 	if pattern == "" {
 		pattern = defaultNamingScheme.Name
 	}
-	rendered, err = generateLocalObjectIdentifier(pattern, object, clusterName, clusterPath)
+	rendered, err = generateLocalObjectIdentifier(pattern, object, clusterName, workspacePath)
 	if err != nil {
 		return result, fmt.Errorf("invalid name naming: %w", err)
 	}
@@ -86,10 +86,10 @@ func GenerateLocalObjectName(pr *syncagentv1alpha1.PublishedResource, object *un
 	return result, nil
 }
 
-func generateLocalObjectIdentifier(pattern string, object *unstructured.Unstructured, clusterName logicalcluster.Name, clusterPath logicalcluster.Path) (string, error) {
+func generateLocalObjectIdentifier(pattern string, object *unstructured.Unstructured, clusterName logicalcluster.Name, workspacePath logicalcluster.Path) (string, error) {
 	// modern Go template style
 	if strings.Contains(pattern, "{{") {
-		return Render(pattern, newLocalObjectNamingContext(object, clusterName, clusterPath))
+		return Render(pattern, newLocalObjectNamingContext(object, clusterName, workspacePath))
 	}
 
 	// Legacy $variable style, does also not support clusterPath;
