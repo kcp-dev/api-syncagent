@@ -114,8 +114,8 @@ func TestPermissionsClaims(t *testing.T) {
 		t.Fatalf("Failed to wait for APIExport to be updated: %v", err)
 	}
 
-	if claims := apiExport.Spec.PermissionClaims; len(claims) > 0 {
-		t.Fatalf("APIExport should have no permissions claims, but has %v", claims)
+	if claims := apiExport.Spec.PermissionClaims; len(claims) > 1 {
+		t.Fatalf("APIExport should have only events permissions claims, but has %v", claims)
 	}
 
 	// let's configure some related resources
@@ -206,7 +206,8 @@ func TestPermissionsClaims(t *testing.T) {
 			return false, err
 		}
 
-		return len(apiExport.Spec.PermissionClaims) == 3, nil
+		// 4 = events (always) + configmaps + secrets + namespaces (because of configmaps and secrets)
+		return len(apiExport.Spec.PermissionClaims) == 4, nil
 	})
 	if err != nil {
 		t.Fatalf("Failed to wait for APIExport to be updated: %v", err)
@@ -217,6 +218,13 @@ func TestPermissionsClaims(t *testing.T) {
 			GroupResource: kcpapisv1alpha1.GroupResource{
 				Group:    "",
 				Resource: "configmaps",
+			},
+			All: true,
+		},
+		{
+			GroupResource: kcpapisv1alpha1.GroupResource{
+				Group:    "",
+				Resource: "events",
 			},
 			All: true,
 		},
@@ -328,6 +336,13 @@ func TestExistingPermissionsClaimsAreKept(t *testing.T) {
 			GroupResource: kcpapisv1alpha1.GroupResource{
 				Group:    "",
 				Resource: "configmaps",
+			},
+			All: true,
+		},
+		{
+			GroupResource: kcpapisv1alpha1.GroupResource{
+				Group:    "",
+				Resource: "events",
 			},
 			All: true,
 		},

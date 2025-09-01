@@ -129,7 +129,6 @@ func (s *objectSyncer) Sync(ctx context.Context, log *zap.SugaredLogger, source,
 
 		// The function above either created a new destination object or patched-in the missing labels,
 		// in both cases do we want to requeue.
-		s.recordEvent(ctx, source, dest, corev1.EventTypeNormal, "ObjectPlaced", "Object has been placed.")
 		return true, nil
 	}
 
@@ -360,6 +359,9 @@ func (s *objectSyncer) ensureDestinationObject(ctx context.Context, log *zap.Sug
 			return fmt.Errorf("failed to adopt destination object: %w", err)
 		}
 	}
+
+	dest.object = destObj
+	s.recordEvent(ctx, source, dest, corev1.EventTypeNormal, "ObjectPlaced", "Object has been placed.")
 
 	// remember the state of the object that we just created
 	if err := s.stateStore.Put(ctx, source.object, source.clusterName, s.subresources); err != nil {
