@@ -128,7 +128,7 @@ func (r *Reconciler) reconcile(ctx context.Context) error {
 
 	// for each PR, we note down the created ARS and also the GVKs of related resources
 	arsList := sets.New[string]()
-	claimedResources := sets.New("events")
+	claimedResources := sets.New[string]()
 
 	// PublishedResources use kinds, but the PermissionClaims use resource names (plural),
 	// so we must translate accordingly
@@ -159,6 +159,9 @@ func (r *Reconciler) reconcile(ctx context.Context) error {
 	if claimedResources.Len() > 0 {
 		claimedResources.Insert("namespaces")
 	}
+
+	// We always want to create events.
+	claimedResources.Insert("events")
 
 	if arsList.Len() == 0 {
 		r.log.Debug("No ready PublishedResources available.")
