@@ -77,8 +77,10 @@ func (r *Reconciler) createAPIExportReconciler(
 					},
 					All: true,
 				})
+			}
 
-				recorder.Eventf(existing, corev1.EventTypeNormal, "AddingPermissionClaim", "Added new permission claim for all %s.", claimed)
+			if missingClaims.Len() > 0 {
+				recorder.Eventf(existing, corev1.EventTypeNormal, "AddingPermissionClaims", "Added new permission claim(s) for all %s.", strings.Join(sets.List(missingClaims), ", "))
 			}
 
 			// prevent reconcile loops by ensuring a stable order
@@ -131,12 +133,12 @@ func createSchemaEvents(obj runtime.Object, oldSchemas, newSchemas []string, rec
 	oldSet := sets.New(oldSchemas...)
 	newSet := sets.New(newSchemas...)
 
-	for _, s := range newSet.Difference(oldSet) {
-		recorder.Eventf(obj, corev1.EventTypeNormal, "AddingResourceSchema", "Added new resource schema %s.", s)
+	if change := sets.List(newSet.Difference(oldSet)); len(change) > 0 {
+		recorder.Eventf(obj, corev1.EventTypeNormal, "AddingResourceSchema", "Added new resource schema(s) %s.", strings.Join(change, ", "))
 	}
 
-	for _, s := range oldSet.Difference(newSet) {
-		recorder.Eventf(obj, corev1.EventTypeWarning, "RemovingResourceSchema", "Removed resource schema %s.", s)
+	if change := sets.List(oldSet.Difference(newSet)); len(change) > 0 {
+		recorder.Eventf(obj, corev1.EventTypeWarning, "RemovingResourceSchema", "Removed resource schema(s) %s.", strings.Join(change, ", "))
 	}
 }
 
