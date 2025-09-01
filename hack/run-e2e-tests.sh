@@ -15,33 +15,25 @@
 # limitations under the License.
 
 set -euo pipefail
+
+cd "$(dirname $0)/.."
+
 source hack/lib.sh
-
-# have a place to store things
-if [ -z "${ARTIFACTS:-}" ]; then
-  ARTIFACTS=.e2e/artifacts
-  mkdir -p "$ARTIFACTS"
-fi
-
-echodate "Build artifacts will be placed in $ARTIFACTS."
-export ARTIFACTS="$(realpath "$ARTIFACTS")"
-
-# build the agent, we will start it many times during the tests
-echodate "Building the api-syncagent…"
-make build
 
 # get kube envtest binaries
 echodate "Setting up Kube binaries…"
-make _tools/setup-envtest
 export KUBEBUILDER_ASSETS="$(_tools/setup-envtest use 1.31.0 --bin-dir _tools -p path)"
 KUBEBUILDER_ASSETS="$(realpath "$KUBEBUILDER_ASSETS")"
 
-# start a shared kcp process
-make _tools/kcp
+export ARTIFACTS=.e2e
 
-KCP_ROOT_DIRECTORY=.kcp.e2e
+rm -rf "$ARTIFACTS"
+mkdir -p "$ARTIFACTS"
+
+KCP_ROOT_DIRECTORY="$ARTIFACTS/kcp"
 KCP_LOGFILE="$ARTIFACTS/kcp.log"
 KCP_TOKENFILE=hack/ci/testdata/e2e-kcp.tokens
+KCP_PID=0
 
 echodate "Starting kcp…"
 rm -rf "$KCP_ROOT_DIRECTORY" "$KCP_LOGFILE"
@@ -49,10 +41,12 @@ _tools/kcp start \
   -v4 \
   --token-auth-file "$KCP_TOKENFILE" \
   --root-directory "$KCP_ROOT_DIRECTORY" 1>"$KCP_LOGFILE" 2>&1 &
+KCP_PID=$!
 
 stop_kcp() {
-  echodate "Stopping kcp processes (set \$KEEP_KCP=true to not do this)…"
-  pkill -e kcp
+  echodate "Stopping kcp (set \$KEEP_KCP=true to not do this)…"
+  kill -TERM $KCP_PID
+  wait $KCP_PID
 }
 
 if [[ -v KEEP_KCP ]] && $KEEP_KCP; then
@@ -78,9 +72,14 @@ export ROOT_DIRECTORY="$(realpath .)"
 export KCP_KUBECONFIG="$(realpath "$KCP_KUBECONFIG")"
 export AGENT_BINARY="$(realpath _build/api-syncagent)"
 
+# The tests require ARTIFACTS to be absolute.
+ARTIFACTS="$(realpath "$ARTIFACTS")"
+
 # time to run the tests
 echodate "Running e2e tests…"
-WHAT="${WHAT:-./test/e2e/...}"
-(set -x; go test -tags e2e -timeout 2h -v $WHAT)
 
-echodate "Done. :-)"
+WHAT="${WHAT:-./test/e2e/...}"
+TEST_ARGS="${TEST_ARGS:--timeout 30m -v}"
+E2E_PARALLELISM=${E2E_PARALLELISM:-2}
+
+(set -x; go test -tags e2e -parallel $E2E_PARALLELISM $TEST_ARGS "$WHAT")
