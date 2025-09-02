@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kcp-dev/logicalcluster/v3"
 	"go.uber.org/zap"
 
 	"github.com/kcp-dev/api-syncagent/internal/mutation"
@@ -136,11 +137,16 @@ func NewResourceSyncer(
 // Each of these steps can potentially end the current processing and return (true, nil). In this
 // case, the caller should re-fetch the remote object and call Process() again (most likely in the
 // next reconciliation). Only when (false, nil) is returned is the entire process finished.
-func (s *ResourceSyncer) Process(ctx context.Context, info clusterInfo, remoteObj *unstructured.Unstructured) (requeue bool, err error) {
-	log := s.log.With("source-object", newObjectKey(remoteObj, info.clusterName, info.workspacePath))
+// The context must contain a cluster name and event recorder, optionally a workspace path.
+func (s *ResourceSyncer) Process(ctx context.Context, remoteObj *unstructured.Unstructured) (requeue bool, err error) {
+	clusterName := clusterFromContext(ctx)
+	workspacePath := workspacePathFromContext(ctx)
+	objectKey := newObjectKey(remoteObj, clusterName, workspacePath)
+
+	log := s.log.With("source-object", objectKey)
 
 	// find the local equivalent object in the local service cluster
-	localObj, err := s.findLocalObject(ctx, info, remoteObj)
+	localObj, err := s.findLocalObject(ctx, objectKey)
 	if err != nil {
 		return false, fmt.Errorf("failed to find local equivalent: %w", err)
 	}
@@ -151,8 +157,8 @@ func (s *ResourceSyncer) Process(ctx context.Context, info clusterInfo, remoteOb
 	// Prepare object sync sides.
 
 	sourceSide := syncSide{
-		clusterName:   info.clusterName,
-		workspacePath: info.workspacePath,
+		clusterName:   clusterName,
+		workspacePath: workspacePath,
 		client:        s.remoteClient,
 		object:        remoteObj,
 	}
@@ -172,7 +178,7 @@ func (s *ResourceSyncer) Process(ctx context.Context, info clusterInfo, remoteOb
 		agentName:    s.agentName,
 		subresources: s.subresources,
 		// use the projection and renaming rules configured in the PublishedResource
-		destCreator: s.newLocalObjectCreator(info),
+		destCreator: s.newLocalObjectCreator(clusterName, workspacePath),
 		// for the main resource, status subresource handling is enabled (this
 		// means _allowing_ status back-syncing, it still depends on whether the
 		// status subresource even exists whether an update happens)
@@ -188,6 +194,7 @@ func (s *ResourceSyncer) Process(ctx context.Context, info clusterInfo, remoteOb
 		// (i.e. on the service cluster), so that the original and copy are linked
 		// together and can be found.
 		metadataOnDestination: true,
+		eventObjSide:          syncSideSource,
 	}
 
 	requeue, err = syncer.Sync(ctx, log, sourceSide, destSide)
@@ -210,8 +217,8 @@ func (s *ResourceSyncer) Process(ctx context.Context, info clusterInfo, remoteOb
 	return s.processRelatedResources(ctx, log, stateStore, sourceSide, destSide)
 }
 
-func (s *ResourceSyncer) findLocalObject(ctx context.Context, info clusterInfo, remoteObj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	localSelector := labels.SelectorFromSet(newObjectKey(remoteObj, info.clusterName, info.workspacePath).Labels())
+func (s *ResourceSyncer) findLocalObject(ctx context.Context, objectKey objectKey) (*unstructured.Unstructured, error) {
+	localSelector := labels.SelectorFromSet(objectKey.Labels())
 
 	localObjects := &unstructured.UnstructuredList{}
 	localObjects.SetAPIVersion(s.destDummy.GetAPIVersion())
@@ -234,7 +241,7 @@ func (s *ResourceSyncer) findLocalObject(ctx context.Context, info clusterInfo, 
 	}
 }
 
-func (s *ResourceSyncer) newLocalObjectCreator(info clusterInfo) objectCreatorFunc {
+func (s *ResourceSyncer) newLocalObjectCreator(clusterName logicalcluster.Name, workspacePath logicalcluster.Path) objectCreatorFunc {
 	return func(remoteObj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 		// map from the remote API into the actual, local API group
 		destObj := remoteObj.DeepCopy()
@@ -244,7 +251,7 @@ func (s *ResourceSyncer) newLocalObjectCreator(info clusterInfo) objectCreatorFu
 		destScope := syncagentv1alpha1.ResourceScope(s.localCRD.Spec.Scope)
 
 		// map namespace/name
-		mappedName, err := templating.GenerateLocalObjectName(s.pubRes, remoteObj, info.clusterName, info.workspacePath)
+		mappedName, err := templating.GenerateLocalObjectName(s.pubRes, remoteObj, clusterName, workspacePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate local object name: %w", err)
 		}

@@ -64,16 +64,19 @@ type relatedObjectAnnotation struct {
 func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.SugaredLogger, stateStore ObjectStateStore, remote, local syncSide, relRes syncagentv1alpha1.RelatedResourceSpec) (requeue bool, err error) {
 	// decide what direction to sync (local->remote vs. remote->local)
 	var (
-		origin syncSide
-		dest   syncSide
+		origin       syncSide
+		dest         syncSide
+		eventObjSide syncSideType
 	)
 
 	if relRes.Origin == syncagentv1alpha1.RelatedResourceOriginService {
 		origin = local
 		dest = remote
+		eventObjSide = syncSideDestination
 	} else {
 		origin = remote
 		dest = local
+		eventObjSide = syncSideSource
 	}
 
 	// find the all objects on the origin side that match the given criteria
@@ -143,6 +146,8 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 			mutator: s.relatedMutators[relRes.Identifier],
 			// we never want to store sync-related metadata inside kcp
 			metadataOnDestination: false,
+			// events are always created on the kcp side
+			eventObjSide: eventObjSide,
 		}
 
 		req, err := syncer.Sync(ctx, log, sourceSide, destSide)

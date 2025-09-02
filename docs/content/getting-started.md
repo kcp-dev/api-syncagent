@@ -180,7 +180,8 @@ The Sync Agent needs to
 * access the workspace of its `APIExport`,
 * get the `LogicalCluster`,
 * manage its `APIExport`,
-* manage `APIResourceSchemas` and
+* manage `APIResourceSchemas`,
+* create `events` for `APIExports` and
 * access the virtual workspace for its `APIExport`.
 
 This can be achieved by applying RBAC like this _in the workspace where the `APIExport` resides_:
@@ -211,6 +212,16 @@ rules:
       - get
       - list
       - watch
+      - patch
+      - update
+  # issue events for APIExports
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - get
+      - create
       - patch
       - update
   # manage APIResourceSchemas

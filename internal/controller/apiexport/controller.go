@@ -75,7 +75,7 @@ func Add(
 		kcpClient:     kcpCluster.GetClient(),
 		lcName:        lcName,
 		log:           log.Named(ControllerName),
-		recorder:      mgr.GetEventRecorderFor(ControllerName),
+		recorder:      kcpCluster.GetEventRecorderFor(ControllerName),
 		apiExportName: apiExportName,
 		agentName:     agentName,
 		prFilter:      prFilter,
@@ -103,6 +103,7 @@ func Add(
 		// Watch for changes to PublishedResources on the local service cluster
 		Watches(&syncagentv1alpha1.PublishedResource{}, controllerutil.EnqueueConst[ctrlruntimeclient.Object]("dummy"), builder.WithPredicates(predicateutil.ByLabels(prFilter), hasARS)).
 		Build(reconciler)
+
 	return err
 }
 
@@ -159,6 +160,9 @@ func (r *Reconciler) reconcile(ctx context.Context) error {
 		claimedResources.Insert("namespaces")
 	}
 
+	// We always want to create events.
+	claimedResources.Insert("events")
+
 	if arsList.Len() == 0 {
 		r.log.Debug("No ready PublishedResources available.")
 		return nil
@@ -166,7 +170,7 @@ func (r *Reconciler) reconcile(ctx context.Context) error {
 
 	// reconcile an APIExport in kcp
 	factories := []reconciling.NamedAPIExportReconcilerFactory{
-		r.createAPIExportReconciler(arsList, claimedResources, r.agentName, r.apiExportName),
+		r.createAPIExportReconciler(arsList, claimedResources, r.agentName, r.apiExportName, r.recorder),
 	}
 
 	if err := reconciling.ReconcileAPIExports(ctx, factories, "", r.kcpClient); err != nil {

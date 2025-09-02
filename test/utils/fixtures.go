@@ -156,6 +156,11 @@ func CreateAPIExport(t *testing.T, ctx context.Context, client ctrlruntimeclient
 					Verbs:         []string{"get", "list", "watch", "patch", "update"},
 				},
 				{
+					APIGroups: []string{""},
+					Resources: []string{"events"},
+					Verbs:     []string{"get", "create", "update", "patch"},
+				},
+				{
 					APIGroups: []string{"apis.kcp.io"},
 					Resources: []string{"apiresourceschemas"},
 					Verbs:     []string{"get", "list", "watch", "create"},
@@ -253,6 +258,16 @@ func BindToAPIExport(t *testing.T, ctx context.Context, client ctrlruntimeclient
 						GroupResource: kcpapisv1alpha1.GroupResource{
 							Group:    "",
 							Resource: "namespaces",
+						},
+						All: true,
+					},
+					State: kcpapisv1alpha1.ClaimAccepted,
+				},
+				{
+					PermissionClaim: kcpapisv1alpha1.PermissionClaim{
+						GroupResource: kcpapisv1alpha1.GroupResource{
+							Group:    "",
+							Resource: "events",
 						},
 						All: true,
 					},

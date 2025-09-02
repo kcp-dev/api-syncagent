@@ -165,7 +165,7 @@ func Create(
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request) (reconcile.Result, error) {
-	log := r.log.With("request", request, "cluster", request.ClusterName)
+	log := r.log.With("cluster", request.ClusterName, "request", request.NamespacedName)
 	log.Debug("Processing")
 
 	cl, err := r.remoteManager.GetCluster(ctx, request.ClusterName)
@@ -205,28 +205,34 @@ func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request)
 		return reconcile.Result{}, nil
 	}
 
-	cInfo := sync.NewClusterInfo(logicalcluster.Name(request.ClusterName))
+	recorder := cl.GetEventRecorderFor(ControllerName)
 
-	// if desired, fetch the cluster path as well (some downstream service providers might make use of it,
+	ctx = sync.WithClusterName(ctx, logicalcluster.Name(request.ClusterName))
+	ctx = sync.WithEventRecorder(ctx, recorder)
+
+	// if desired, fetch the workspace path as well (some downstream service providers might make use of it,
 	// but since it requires an additional permission claim, it's optional)
 	if r.pubRes.Spec.EnableWorkspacePaths {
 		lc := &kcpdevcorev1alpha1.LogicalCluster{}
 		if err := vwClient.Get(ctx, types.NamespacedName{Name: kcpdevcorev1alpha1.LogicalClusterName}, lc); err != nil {
+			recorder.Event(remoteObj, corev1.EventTypeWarning, "ReconcilingError", "Failed to retrieve workspace path, cannot process object.")
 			return reconcile.Result{}, fmt.Errorf("failed to retrieve remote logicalcluster: %w", err)
 		}
 
 		path := lc.Annotations[kcpcore.LogicalClusterPathAnnotationKey]
-		cInfo = cInfo.WithWorkspacePath(logicalcluster.NewPath(path))
+		ctx = sync.WithWorkspacePath(ctx, logicalcluster.NewPath(path))
 	}
 
 	// sync main object
 	syncer, err := sync.NewResourceSyncer(log, r.localClient, vwClient, r.pubRes, r.localCRD, mutation.NewMutator, r.stateNamespace, r.agentName)
 	if err != nil {
+		recorder.Event(remoteObj, corev1.EventTypeWarning, "ReconcilingError", "Failed to process object: a provider-side issue has occurred.")
 		return reconcile.Result{}, fmt.Errorf("failed to create syncer: %w", err)
 	}
 
-	requeue, err := syncer.Process(ctx, cInfo, remoteObj)
+	requeue, err := syncer.Process(ctx, remoteObj)
 	if err != nil {
+		recorder.Event(remoteObj, corev1.EventTypeWarning, "ReconcilingError", "Failed to process object: a provider-side issue has occurred.")
 		return reconcile.Result{}, err
 	}
 
