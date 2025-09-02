@@ -75,7 +75,7 @@ func Add(
 		kcpClient:     kcpCluster.GetClient(),
 		lcName:        lcName,
 		log:           log.Named(ControllerName),
-		recorder:      mgr.GetEventRecorderFor(ControllerName),
+		recorder:      kcpCluster.GetEventRecorderFor(ControllerName),
 		apiExportName: apiExportName,
 		agentName:     agentName,
 		prFilter:      prFilter,
