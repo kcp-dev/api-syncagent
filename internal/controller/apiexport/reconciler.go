@@ -134,11 +134,11 @@ func createSchemaEvents(obj runtime.Object, oldSchemas, newSchemas []string, rec
 	newSet := sets.New(newSchemas...)
 
 	if change := sets.List(newSet.Difference(oldSet)); len(change) > 0 {
-		recorder.Eventf(obj, corev1.EventTypeNormal, "AddingResourceSchema", "Added new resource schema(s) %s.", strings.Join(change, ", "))
+		recorder.Eventf(obj, corev1.EventTypeNormal, "AddingResourceSchemas", "Added new resource schema(s) %s.", strings.Join(change, ", "))
 	}
 
 	if change := sets.List(oldSet.Difference(newSet)); len(change) > 0 {
-		recorder.Eventf(obj, corev1.EventTypeWarning, "RemovingResourceSchema", "Removed resource schema(s) %s.", strings.Join(change, ", "))
+		recorder.Eventf(obj, corev1.EventTypeWarning, "RemovingResourceSchemas", "Removed resource schema(s) %s.", strings.Join(change, ", "))
 	}
 }
 
