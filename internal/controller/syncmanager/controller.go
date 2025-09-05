@@ -18,7 +18,6 @@ package syncmanager
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -74,7 +73,7 @@ type Reconciler struct {
 	stateNamespace  string
 	agentName       string
 
-	// only one of these two must be set
+	// endpointSlice is preferred over apiExport
 	apiExport     *kcpapisv1alpha1.APIExport
 	endpointSlice *kcpapisv1alpha1.APIExportEndpointSlice
 
@@ -105,8 +104,6 @@ type syncWorker struct {
 }
 
 // Add creates a new controller and adds it to the given manager.
-//
-// Only one of apiExport and endpointSlice must be given.
 func Add(
 	ctx context.Context,
 	localManager manager.Manager,
@@ -119,13 +116,6 @@ func Add(
 	stateNamespace string,
 	agentName string,
 ) error {
-	if apiExport != nil && endpointSlice != nil {
-		return errors.New("this controller works either with APIExport or APIExportEndpointSlice, not both")
-	}
-	if apiExport == nil && endpointSlice == nil {
-		return errors.New("neither APIExport nor APIExportEndpointSlice provided")
-	}
-
 	discoveryClient, err := discovery.NewClient(localManager.GetConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create discovery client: %w", err)
