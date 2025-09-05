@@ -100,7 +100,7 @@ presubmits:
           command:
             - hack/ci/run-e2e-tests.sh
           env:
-            - name: KCP_TAG
+            - name: KCP_VERSION
               value: '0.27.1'
           resources:
             requests:
@@ -119,7 +119,7 @@ presubmits:
           command:
             - hack/ci/run-e2e-tests.sh
           env:
-            - name: KCP_TAG
+            - name: KCP_VERSION
               value: '0.28.1'
           resources:
             requests:
