@@ -85,11 +85,15 @@ func main() {
 
 func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 	v := version.NewAppVersion()
-	log.With(
-		"version", v.GitVersion,
-		"name", opts.AgentName,
-		"apiexport", opts.APIExportRef,
-	).Info("Moin, I'm the kcp Sync Agent")
+	hello := log.With("version", v.GitVersion, "name", opts.AgentName)
+
+	if opts.APIExportEndpointSliceRef != "" {
+		hello = hello.With("apiexportendpointslice", opts.APIExportEndpointSliceRef)
+	} else {
+		hello = hello.With("apiexport", opts.APIExportRef)
+	}
+
+	hello.Info("Moin, I'm the kcp Sync Agent")
 
 	// create the ctrl-runtime manager
 	mgr, err := setupLocalManager(ctx, opts)
@@ -114,10 +118,10 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 		return fmt.Errorf("failed to resolve APIExport/EndpointSlice: %w", err)
 	}
 
-	log.Infow("Resolved APIExport", "workspace", endpoint.APIExport.Path, "logicalcluster", endpoint.APIExport.Cluster)
+	log.Infow("Resolved APIExport", "name", endpoint.APIExport.Name, "workspace", endpoint.APIExport.Path, "logicalcluster", endpoint.APIExport.Cluster)
 
 	if s := endpoint.EndpointSlice; s != nil {
-		log.Infow("Using APIExportEndpointSlice", "workspace", s.Path, "logicalcluster", s.Cluster)
+		log.Infow("Using APIExportEndpointSlice", "name", endpoint.EndpointSlice.Name, "workspace", s.Path, "logicalcluster", s.Cluster)
 	}
 
 	// init the "permanent" kcp cluster connections
@@ -166,7 +170,7 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 	}
 
 	if err := startController("apiexport", func() error {
-		return apiexport.Add(mgr, managedKcpCluster, endpoint.APIExport.Cluster, log, opts.APIExportRef, opts.AgentName, opts.PublishedResourceSelector)
+		return apiexport.Add(mgr, managedKcpCluster, endpoint.APIExport.Cluster, log, endpoint.APIExport.Name, opts.AgentName, opts.PublishedResourceSelector)
 	}); err != nil {
 		return err
 	}
