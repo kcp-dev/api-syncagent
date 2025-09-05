@@ -129,18 +129,6 @@ func CreateAPIExport(t *testing.T, ctx context.Context, client ctrlruntimeclient
 		t.Fatalf("Failed to create APIExport: %v", err)
 	}
 
-	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
-		err = client.Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(apiExport), apiExport)
-		if err != nil {
-			return false, err
-		}
-
-		return conditions.IsTrue(apiExport, kcpapisv1alpha1.APIExportVirtualWorkspaceURLsReady), nil
-	})
-	if err != nil {
-		t.Fatalf("Failed to wait for APIExport virtual workspace to become ready: %v", err)
-	}
-
 	// grant permissions to access/manage the APIExport
 	if rbacSubject != nil {
 		clusterRoleName := "api-syncagent"
