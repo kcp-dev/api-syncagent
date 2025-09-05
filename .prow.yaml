@@ -106,9 +106,6 @@ presubmits:
             requests:
               memory: 4Gi
               cpu: 2
-          # docker-in-docker needs privileged mode
-          securityContext:
-            privileged: true
 
   - name: pull-api-syncagent-test-e2e-kcp-0.28
     always_run: true
@@ -128,6 +125,3 @@ presubmits:
             requests:
               memory: 4Gi
               cpu: 2
-          # docker-in-docker needs privileged mode
-          securityContext:
-            privileged: true
