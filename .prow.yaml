@@ -88,7 +88,7 @@ presubmits:
               memory: 4Gi
               cpu: 2
 
-  - name: pull-api-syncagent-test-e2e
+  - name: pull-api-syncagent-test-e2e-kcp-0.27
     always_run: true
     decorate: true
     clone_uri: "https://github.com/kcp-dev/api-syncagent"
@@ -99,6 +99,31 @@ presubmits:
         - image: ghcr.io/kcp-dev/infra/build:1.24.3-1
           command:
             - hack/ci/run-e2e-tests.sh
+          env:
+            - name: KCP_TAG
+              value: '0.27.1'
+          resources:
+            requests:
+              memory: 4Gi
+              cpu: 2
+          # docker-in-docker needs privileged mode
+          securityContext:
+            privileged: true
+
+  - name: pull-api-syncagent-test-e2e-kcp-0.28
+    always_run: true
+    decorate: true
+    clone_uri: "https://github.com/kcp-dev/api-syncagent"
+    labels:
+      preset-goproxy: "true"
+    spec:
+      containers:
+        - image: ghcr.io/kcp-dev/infra/build:1.24.3-1
+          command:
+            - hack/ci/run-e2e-tests.sh
+          env:
+            - name: KCP_TAG
+              value: '0.28.1'
           resources:
             requests:
               memory: 4Gi
