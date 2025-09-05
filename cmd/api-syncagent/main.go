@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/go-logr/zapr"
-	"github.com/kcp-dev/logicalcluster/v3"
 	"github.com/spf13/pflag"
 	"go.uber.org/zap"
 	reconcilerlog "k8c.io/reconciler/pkg/log"
@@ -33,27 +32,19 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/controller/apiexport"
 	"github.com/kcp-dev/api-syncagent/internal/controller/apiresourceschema"
 	"github.com/kcp-dev/api-syncagent/internal/controller/syncmanager"
-	"github.com/kcp-dev/api-syncagent/internal/kcp"
 	syncagentlog "github.com/kcp-dev/api-syncagent/internal/log"
 	"github.com/kcp-dev/api-syncagent/internal/version"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
 	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
-	kcpdevcore "github.com/kcp-dev/kcp/sdk/apis/core"
-	kcpdevcorev1alpha1 "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	ctrlruntime "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
-	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	ctrlruntimelog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -94,11 +85,15 @@ func main() {
 
 func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 	v := version.NewAppVersion()
-	log.With(
-		"version", v.GitVersion,
-		"name", opts.AgentName,
-		"apiexport", opts.APIExportRef,
-	).Info("Moin, I'm the kcp Sync Agent")
+	hello := log.With("version", v.GitVersion, "name", opts.AgentName)
+
+	if opts.APIExportEndpointSliceRef != "" {
+		hello = hello.With("apiexportendpointslice", opts.APIExportEndpointSliceRef)
+	} else {
+		hello = hello.With("apiexport", opts.APIExportRef)
+	}
+
+	hello.Info("Moin, I'm the kcp Sync Agent")
 
 	// create the ctrl-runtime manager
 	mgr, err := setupLocalManager(ctx, opts)
@@ -117,24 +112,42 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 		return fmt.Errorf("kcp kubeconfig does not point to a specific workspace")
 	}
 
-	// We check if the APIExport exists and extract information we need to set up our kcpCluster.
-	apiExport, lcPath, lcName, err := resolveAPIExport(ctx, kcpRestConfig, opts.APIExportRef)
+	// We check if the APIExport/APIExportEndpointSlice exists and extract information we need to set up our kcpCluster.
+	endpoint, err := resolveSyncEndpoint(ctx, kcpRestConfig, opts.APIExportEndpointSliceRef, opts.APIExportRef)
 	if err != nil {
-		return fmt.Errorf("failed to resolve APIExport: %w", err)
+		return fmt.Errorf("failed to resolve APIExport/EndpointSlice: %w", err)
 	}
 
-	log.Infow("Resolved APIExport", "workspace", lcPath, "logicalcluster", lcName)
+	log.Infow("Resolved APIExport", "name", endpoint.APIExport.Name, "workspace", endpoint.APIExport.Path, "logicalcluster", endpoint.APIExport.Cluster)
 
-	// init the "permanent" kcp cluster connection
-	kcpCluster, err := setupKcpCluster(kcpRestConfig, opts)
+	if s := endpoint.EndpointSlice; s != nil {
+		log.Infow("Using APIExportEndpointSlice", "name", endpoint.EndpointSlice.Name, "workspace", s.Path, "logicalcluster", s.Cluster)
+	}
+
+	// init the "permanent" kcp cluster connections
+
+	// always need the managedKcpCluster
+	managedKcpCluster, err := setupManagedKcpCluster(endpoint)
 	if err != nil {
-		return fmt.Errorf("failed to initialize kcp cluster: %w", err)
+		return fmt.Errorf("failed to initialize managed kcp cluster: %w", err)
 	}
 
 	// start the kcp cluster caches when the manager boots up
 	// (happens regardless of leader election status)
-	if err := mgr.Add(kcpCluster); err != nil {
-		return fmt.Errorf("failed to add kcp cluster runnable: %w", err)
+	if err := mgr.Add(managedKcpCluster); err != nil {
+		return fmt.Errorf("failed to add managed kcp cluster runnable: %w", err)
+	}
+
+	// the endpoint cluster can be nil
+	endpointKcpCluster, err := setupEndpointKcpCluster(endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to initialize endpoint kcp cluster: %w", err)
+	}
+
+	if endpointKcpCluster != nil {
+		if err := mgr.Add(endpointKcpCluster); err != nil {
+			return fmt.Errorf("failed to add endpoint kcp cluster runnable: %w", err)
+		}
 	}
 
 	startController := func(name string, creator func() error) error {
@@ -151,13 +164,13 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 	}
 
 	if err := startController("apiresourceschema", func() error {
-		return apiresourceschema.Add(mgr, kcpCluster, lcName, log, 4, opts.AgentName, opts.PublishedResourceSelector)
+		return apiresourceschema.Add(mgr, managedKcpCluster, endpoint.APIExport.Cluster, log, 4, opts.AgentName, opts.PublishedResourceSelector)
 	}); err != nil {
 		return err
 	}
 
 	if err := startController("apiexport", func() error {
-		return apiexport.Add(mgr, kcpCluster, lcName, log, opts.APIExportRef, opts.AgentName, opts.PublishedResourceSelector)
+		return apiexport.Add(mgr, managedKcpCluster, endpoint.APIExport.Cluster, log, endpoint.APIExport.Name, opts.AgentName, opts.PublishedResourceSelector)
 	}); err != nil {
 		return err
 	}
@@ -165,7 +178,20 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 	// This controller is called "sync" because it makes the most sense to the users, even though internally the relevant
 	// controller is the syncmanager (which in turn would start/stop the sync controllers).
 	if err := startController("sync", func() error {
-		return syncmanager.Add(ctx, mgr, kcpCluster, kcpRestConfig, log, apiExport, opts.PublishedResourceSelector, opts.Namespace, opts.AgentName)
+		cluster := endpointKcpCluster
+		if cluster == nil {
+			cluster = managedKcpCluster
+		}
+
+		var endpointSlice *kcpdevv1alpha1.APIExportEndpointSlice
+		if endpoint.EndpointSlice != nil {
+			endpointSlice = endpoint.EndpointSlice.APIExportEndpointSlice
+		}
+
+		// It doesn't matter which rest config we specify, as the URL will be overwritten with the
+		// virtual workspace URL anyway.
+
+		return syncmanager.Add(ctx, mgr, cluster, kcpRestConfig, log, endpoint.APIExport.APIExport, endpointSlice, opts.PublishedResourceSelector, opts.Namespace, opts.AgentName)
 	}); err != nil {
 		return err
 	}
@@ -219,74 +245,6 @@ func setupLocalManager(ctx context.Context, opts *Options) (manager.Manager, err
 	}
 
 	return mgr, nil
-}
-
-func resolveAPIExport(ctx context.Context, restConfig *rest.Config, apiExportRef string) (*kcpdevv1alpha1.APIExport, logicalcluster.Path, logicalcluster.Name, error) {
-	// construct temporary, uncached client
-	scheme := runtime.NewScheme()
-	if err := kcpdevcorev1alpha1.AddToScheme(scheme); err != nil {
-		return nil, logicalcluster.None, "", fmt.Errorf("failed to register scheme %s: %w", kcpdevcorev1alpha1.SchemeGroupVersion, err)
-	}
-	if err := kcpdevv1alpha1.AddToScheme(scheme); err != nil {
-		return nil, logicalcluster.None, "", fmt.Errorf("failed to register scheme %s: %w", kcpdevv1alpha1.SchemeGroupVersion, err)
-	}
-
-	client, err := ctrlruntimeclient.New(restConfig, ctrlruntimeclient.Options{
-		Scheme: scheme,
-	})
-	if err != nil {
-		return nil, logicalcluster.None, "", fmt.Errorf("failed to create service reader: %w", err)
-	}
-
-	apiExport := &kcpdevv1alpha1.APIExport{}
-	key := types.NamespacedName{Name: apiExportRef}
-	if err := client.Get(ctx, key, apiExport); err != nil {
-		return nil, logicalcluster.None, "", fmt.Errorf("failed to get APIExport %q: %w", apiExportRef, err)
-	}
-
-	// kcp's controller-runtime fork always caches objects including their logicalcluster names.
-	// Our app technically doesn't care about workspaces / logical clusters, but we still need to
-	// supply the correct logicalcluster when querying for objects.
-	// We could take the cluster name from the Service itself, but since we want to log the nicer
-	// looking cluster _path_, we fetch the workspace's own logicalcluster object.
-	lc := &kcpdevcorev1alpha1.LogicalCluster{}
-	key = types.NamespacedName{Name: kcp.IdentityClusterName}
-	if err := client.Get(ctx, key, lc); err != nil {
-		return nil, logicalcluster.None, "", fmt.Errorf("failed to resolve current workspace: %w", err)
-	}
-
-	lcName := logicalcluster.From(lc)
-	lcPath := logicalcluster.NewPath(lc.Annotations[kcpdevcore.LogicalClusterPathAnnotationKey])
-
-	return apiExport, lcPath, lcName, nil
-}
-
-// setupKcpCluster sets up a plain, non-kcp-aware ctrl-runtime Cluster object
-// that is solvely used to interact with the APIExport and APIResourceSchemas.
-func setupKcpCluster(restConfig *rest.Config, opts *Options) (cluster.Cluster, error) {
-	scheme := runtime.NewScheme()
-
-	if err := kcpdevv1alpha1.AddToScheme(scheme); err != nil {
-		return nil, fmt.Errorf("failed to register scheme %s: %w", kcpdevv1alpha1.SchemeGroupVersion, err)
-	}
-
-	if err := kcpdevcorev1alpha1.AddToScheme(scheme); err != nil {
-		return nil, fmt.Errorf("failed to register scheme %s: %w", kcpdevcorev1alpha1.SchemeGroupVersion, err)
-	}
-
-	return cluster.New(restConfig, func(o *cluster.Options) {
-		o.Scheme = scheme
-		// RBAC in kcp might be very tight and might not allow to list/watch all objects;
-		// restrict the cache's selectors accordingly so we can still make use of caching.
-		o.Cache = cache.Options{
-			Scheme: scheme,
-			ByObject: map[ctrlruntimeclient.Object]cache.ByObject{
-				&kcpdevv1alpha1.APIExport{}: {
-					Field: fields.SelectorFromSet(fields.Set{"metadata.name": opts.APIExportRef}),
-				},
-			},
-		}
-	})
 }
 
 func loadKubeconfig(filename string) (*rest.Config, error) {
