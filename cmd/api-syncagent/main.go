@@ -36,6 +36,8 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/version"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
+	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -177,10 +179,15 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 			cluster = managedKcpCluster
 		}
 
+		var endpointSlice *kcpdevv1alpha1.APIExportEndpointSlice
+		if endpoint.EndpointSlice != nil {
+			endpointSlice = endpoint.EndpointSlice.APIExportEndpointSlice
+		}
+
 		// It doesn't matter which rest config we specify, as the URL will be overwritten with the
 		// virtual workspace URL anyway.
 
-		return syncmanager.Add(ctx, mgr, cluster, kcpRestConfig, log, endpoint.APIExport.APIExport, endpoint.EndpointSlice.APIExportEndpointSlice, opts.PublishedResourceSelector, opts.Namespace, opts.AgentName)
+		return syncmanager.Add(ctx, mgr, cluster, kcpRestConfig, log, endpoint.APIExport.APIExport, endpointSlice, opts.PublishedResourceSelector, opts.Namespace, opts.AgentName)
 	}); err != nil {
 		return err
 	}

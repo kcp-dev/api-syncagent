@@ -22,8 +22,9 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/kcp-dev/api-syncagent/internal/kcp"
 	"github.com/kcp-dev/logicalcluster/v3"
+
+	"github.com/kcp-dev/api-syncagent/internal/kcp"
 
 	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	kcpdevcore "github.com/kcp-dev/kcp/sdk/apis/core"
@@ -53,7 +54,7 @@ import (
 // either the APIExport or the APIExportEndpointSlice.
 func setupEndpointKcpCluster(endpoint *syncEndpoint) (cluster.Cluster, error) {
 	// no need for a dedicated endpoint cluster
-	if endpoint.APIExport.Cluster == endpoint.EndpointSlice.Cluster {
+	if endpoint.EndpointSlice == nil || endpoint.EndpointSlice.Cluster == endpoint.APIExport.Cluster {
 		return nil, nil
 	}
 
