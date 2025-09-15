@@ -88,13 +88,31 @@ func TestAPIExportEndpointSliceSameCluster(t *testing.T) {
 		t.Fatalf("Failed to create PublishedResource: %v", err)
 	}
 
+	// In kcp 0.27, we have to manually create the AEES. To make this test work consistently with
+	// 0.27 and later versions, we simply always create one.
+	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
+	orgClient := kcpClusterClient.Cluster(logicalcluster.NewPath("root").Join(orgWorkspace))
+
+	endpointSlice := &kcpdevv1alpha1.APIExportEndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dummy",
+		},
+		Spec: kcpdevv1alpha1.APIExportEndpointSliceSpec{
+			APIExport: kcpdevv1alpha1.ExportBindingReference{
+				Name: apiExportName,
+			},
+		},
+	}
+
+	t.Logf("Creating APIExportEndpointSlice %q…", endpointSlice.Name)
+	if err := orgClient.Create(ctx, endpointSlice); err != nil {
+		t.Fatalf("Failed to create APIExportEndpointSlice: %v", err)
+	}
+
 	// start the agent in the background to update the APIExport with the CronTabs API;
-	// use the export's name because kcp created an endpoint slice of the same name
-	utils.RunEndpointSliceAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunEndpointSliceAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, endpointSlice.Name)
 
 	// wait until the API is available
-	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
-
 	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
 	teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
