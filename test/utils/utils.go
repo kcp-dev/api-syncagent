@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -204,4 +205,23 @@ func YAMLToUnstructured(t *testing.T, data string) *unstructured.Unstructured {
 	}
 
 	return ToUnstructured(t, obj)
+}
+
+func KCPMinor() int {
+	version := os.Getenv("KCP_VERSION")
+	if version == "" {
+		panic("No $KCP_VERSION environment variable defined.")
+	}
+
+	parts := strings.SplitN(version, ".", 3)
+	if len(parts) != 3 {
+		panic("Invalid $KCP_VERSION, must be X.Y.Z.")
+	}
+
+	minor, err := strconv.ParseInt(parts[1], 10, 32)
+	if err != nil {
+		panic(fmt.Sprintf("Invalid $KCP_VERSION: not parseable: %v", err))
+	}
+
+	return int(minor)
 }

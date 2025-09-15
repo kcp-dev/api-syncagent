@@ -122,6 +122,14 @@ func TestAPIExportEndpointSliceSameCluster(t *testing.T) {
 		Resource: "crontabs",
 	})
 
+	// In kcp 0.27, the binding' status is not perfectly in-sync with the actual APIs available in
+	// the workspace; since this is fixed in 0.28+ and we really care about the APIBinding, not necessarily
+	// the Kubernetes magic behind it, we keep the loop above but on 0.27 add a small synthetic delay.
+	// TODO: Remove this once we do not support kcp 0.27 anymore.
+	if utils.KCPMinor() < 28 {
+		time.Sleep(2 * time.Second)
+	}
+
 	// create a Crontab object in a team workspace
 	t.Log("Creating CronTab in kcp…")
 	crontab := utils.YAMLToUnstructured(t, `
@@ -257,6 +265,11 @@ func TestAPIExportEndpointSliceDifferentCluster(t *testing.T) {
 		Version:  "v1",
 		Resource: "crontabs",
 	})
+
+	// TODO: Remove this once we do not support kcp 0.27 anymore.
+	if utils.KCPMinor() < 28 {
+		time.Sleep(2 * time.Second)
+	}
 
 	// create a Crontab object in a team workspace
 	t.Log("Creating CronTab in kcp…")
