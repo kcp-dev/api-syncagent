@@ -25,13 +25,22 @@ import (
 
 	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 )
 
 // createAPIExportReconciler creates the reconciler for the APIExport.
 // WARNING: The APIExport in this is NOT created by the Sync Agent, it's created
 // by a controller in kcp. Make sure you don't create a reconciling conflict!
-func (r *Reconciler) createAPIExportReconciler(availableResourceSchemas sets.Set[string], claimedResourceKinds sets.Set[string], agentName string, apiExportName string) reconciling.NamedAPIExportReconcilerFactory {
+func (r *Reconciler) createAPIExportReconciler(
+	availableResourceSchemas sets.Set[string],
+	claimedResourceKinds sets.Set[string],
+	agentName string,
+	apiExportName string,
+	recorder record.EventRecorder,
+) reconciling.NamedAPIExportReconcilerFactory {
 	return func() (string, reconciling.APIExportReconciler) {
 		return apiExportName, func(existing *kcpdevv1alpha1.APIExport) (*kcpdevv1alpha1.APIExport, error) {
 			if existing.Annotations == nil {
@@ -40,7 +49,10 @@ func (r *Reconciler) createAPIExportReconciler(availableResourceSchemas sets.Set
 			existing.Annotations[syncagentv1alpha1.AgentNameAnnotation] = agentName
 
 			// combine existing schemas with new ones
-			existing.Spec.LatestResourceSchemas = mergeResourceSchemas(existing.Spec.LatestResourceSchemas, availableResourceSchemas)
+			newSchemas := mergeResourceSchemas(existing.Spec.LatestResourceSchemas, availableResourceSchemas)
+			createSchemaEvents(existing, existing.Spec.LatestResourceSchemas, newSchemas, recorder)
+
+			existing.Spec.LatestResourceSchemas = newSchemas
 
 			// To allow admins to configure additional permission claims, sometimes
 			// useful for debugging, we do not override the permission claims, but
@@ -65,6 +77,10 @@ func (r *Reconciler) createAPIExportReconciler(availableResourceSchemas sets.Set
 					},
 					All: true,
 				})
+			}
+
+			if missingClaims.Len() > 0 {
+				recorder.Eventf(existing, corev1.EventTypeNormal, "AddingPermissionClaims", "Added new permission claim(s) for all %s.", strings.Join(sets.List(missingClaims), ", "))
 			}
 
 			// prevent reconcile loops by ensuring a stable order
@@ -111,6 +127,19 @@ func mergeResourceSchemas(existing []string, configured sets.Set[string]) []stri
 	})
 
 	return result
+}
+
+func createSchemaEvents(obj runtime.Object, oldSchemas, newSchemas []string, recorder record.EventRecorder) {
+	oldSet := sets.New(oldSchemas...)
+	newSet := sets.New(newSchemas...)
+
+	if change := sets.List(newSet.Difference(oldSet)); len(change) > 0 {
+		recorder.Eventf(obj, corev1.EventTypeNormal, "AddingResourceSchemas", "Added new resource schema(s) %s.", strings.Join(change, ", "))
+	}
+
+	if change := sets.List(oldSet.Difference(newSet)); len(change) > 0 {
+		recorder.Eventf(obj, corev1.EventTypeWarning, "RemovingResourceSchemas", "Removed resource schema(s) %s.", strings.Join(change, ", "))
+	}
 }
 
 func parseResourceGroup(schema string) string {

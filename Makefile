@@ -118,6 +118,10 @@ $(ENVTEST):
 test:
 	./hack/run-tests.sh
 
+.PHONY: test-e2e
+test-e2e: $(ENVTEST) $(KCP)
+	./hack/run-e2e-tests.sh
+
 .PHONY: codegen
 codegen: $(YQ)
 	hack/update-codegen-crds.sh

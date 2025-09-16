@@ -295,8 +295,6 @@ type controllerShim struct {
 }
 
 func (s *controllerShim) Engage(ctx context.Context, clusterName string, cl cluster.Cluster) error {
-	s.reconciler.log.Infof("Engage(%q)\n", clusterName)
-
 	for _, worker := range s.reconciler.syncWorkers {
 		if err := worker.controller.Engage(ctx, clusterName, cl); err != nil {
 			return err
