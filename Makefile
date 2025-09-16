@@ -22,8 +22,16 @@ GIT_VERSION = $(shell git describe --tags --always --match='v*')
 LDFLAGS += -extldflags '-static' \
   -X github.com/kcp-dev/api-syncagent/internal/version.gitVersion=$(GIT_VERSION) \
   -X github.com/kcp-dev/api-syncagent/internal/version.gitHead=$(GIT_HEAD)
+LDFLAGS_EXTRA ?= -w
+
+ifdef DEBUG_BUILD
+GOFLAGS = -mod=readonly
+LDFLAGS_EXTRA =
+GOTOOLFLAGS_EXTRA = -gcflags=all="-N -l"
+endif
+
 BUILD_DEST ?= _build
-GOTOOLFLAGS ?= $(GOBUILDFLAGS) -ldflags '-w $(LDFLAGS)' $(GOTOOLFLAGS_EXTRA)
+GOTOOLFLAGS ?= $(GOBUILDFLAGS) -ldflags '$(LDFLAGS) $(LDFLAGS_EXTRA)' $(GOTOOLFLAGS_EXTRA)
 GOARCH ?= $(shell go env GOARCH)
 GOOS ?= $(shell go env GOOS)
 
