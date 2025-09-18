@@ -36,7 +36,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -74,7 +73,9 @@ type Reconciler struct {
 	stateNamespace  string
 	agentName       string
 
-	apiExport *kcpapisv1alpha1.APIExport
+	// endpointSlice is preferred over apiExport
+	apiExport     *kcpapisv1alpha1.APIExport
+	endpointSlice *kcpapisv1alpha1.APIExportEndpointSlice
 
 	// URL for which the current vwCluster instance has been created
 	vwURL string
@@ -110,6 +111,7 @@ func Add(
 	kcpRestConfig *rest.Config,
 	log *zap.SugaredLogger,
 	apiExport *kcpapisv1alpha1.APIExport,
+	endpointSlice *kcpapisv1alpha1.APIExportEndpointSlice,
 	prFilter labels.Selector,
 	stateNamespace string,
 	agentName string,
@@ -123,6 +125,7 @@ func Add(
 		ctx:             ctx,
 		localManager:    localManager,
 		apiExport:       apiExport,
+		endpointSlice:   endpointSlice,
 		kcpCluster:      kcpCluster,
 		kcpRestConfig:   kcpRestConfig,
 		log:             log,
@@ -134,19 +137,25 @@ func Add(
 		syncWorkers:     map[string]syncWorker{},
 	}
 
-	_, err = builder.ControllerManagedBy(localManager).
+	bldr := builder.ControllerManagedBy(localManager).
 		Named(ControllerName).
 		WithOptions(controller.Options{
 			// this controller is meant to control others, so we only want 1 thread
 			MaxConcurrentReconciles: 1,
 		}).
-		// Watch for changes to APIExport on the kcp side to start/restart the actual syncing controllers;
-		// the cache is already restricted by a fieldSelector in the main.go to respect the RBAC restrictions,
-		// so there is no need here to add an additional filter.
-		WatchesRawSource(source.Kind(kcpCluster.GetCache(), &kcpapisv1alpha1.APIExport{}, controllerutil.EnqueueConst[*kcpapisv1alpha1.APIExport]("dummy"))).
 		// Watch for changes to the PublishedResources
-		Watches(&syncagentv1alpha1.PublishedResource{}, controllerutil.EnqueueConst[ctrlruntimeclient.Object]("dummy"), builder.WithPredicates(predicate.ByLabels(prFilter))).
-		Build(reconciler)
+		Watches(&syncagentv1alpha1.PublishedResource{}, controllerutil.EnqueueConst[ctrlruntimeclient.Object]("dummy"), builder.WithPredicates(predicate.ByLabels(prFilter)))
+
+	// Watch for changes to APIExport/EndpointSlice on the kcp side to start/restart the actual syncing controllers;
+	// the cache is already restricted by a fieldSelector in the main.go to respect the RBAC restrictions,
+	// so there is no need here to add an additional filter.
+	if endpointSlice != nil {
+		bldr.WatchesRawSource(source.Kind(kcpCluster.GetCache(), &kcpapisv1alpha1.APIExportEndpointSlice{}, controllerutil.EnqueueConst[*kcpapisv1alpha1.APIExportEndpointSlice]("dummy")))
+	} else {
+		bldr.WatchesRawSource(source.Kind(kcpCluster.GetCache(), &kcpapisv1alpha1.APIExport{}, controllerutil.EnqueueConst[*kcpapisv1alpha1.APIExport]("dummy")))
+	}
+
+	_, err = bldr.Build(reconciler)
 
 	return err
 }
@@ -155,30 +164,41 @@ func (r *Reconciler) Reconcile(ctx context.Context, _ reconcile.Request) (reconc
 	log := r.log.Named(ControllerName)
 	log.Debug("Processing")
 
-	key := types.NamespacedName{Name: r.apiExport.Name}
+	var err error
 
-	apiExport := &kcpapisv1alpha1.APIExport{}
-	if err := r.kcpCluster.GetClient().Get(ctx, key, apiExport); ctrlruntimeclient.IgnoreNotFound(err) != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to retrieve APIExport: %w", err)
+	if r.endpointSlice != nil {
+		if err := r.kcpCluster.GetClient().Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(r.endpointSlice), r.endpointSlice); err != nil {
+			return reconcile.Result{}, fmt.Errorf("failed to retrieve APIExportEndpointSlice: %w", err)
+		}
+
+		urls := r.endpointSlice.Status.APIExportEndpoints
+
+		if len(urls) == 0 {
+			// the virtual workspace is not ready yet
+			log.Warn("APIExportEndpointSlice has no URLs.")
+		} else {
+			err = r.reconcile(ctx, log, urls[0].URL)
+		}
+	} else {
+		if err := r.kcpCluster.GetClient().Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(r.apiExport), r.apiExport); err != nil {
+			return reconcile.Result{}, fmt.Errorf("failed to retrieve APIExport: %w", err)
+		}
+
+		//nolint:staticcheck
+		urls := r.apiExport.Status.VirtualWorkspaces
+
+		if len(urls) == 0 {
+			// the virtual workspace is not ready yet
+			log.Warn("APIExport has no virtual workspace URLs.")
+		} else {
+			err = r.reconcile(ctx, log, urls[0].URL)
+		}
 	}
 
-	return reconcile.Result{}, r.reconcile(ctx, log, apiExport)
+	return reconcile.Result{}, err
 }
 
-func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, apiExport *kcpapisv1alpha1.APIExport) error {
-	// We're not yet making use of APIEndpointSlices, as we don't even fully
-	// support a sharded kcp setup yet. Hence for now we're safe just using
-	// this deprecated VW URL.
-	//nolint:staticcheck
-	urls := apiExport.Status.VirtualWorkspaces
-
-	// the virtual workspace is not ready yet
-	if len(urls) == 0 {
-		return nil
-	}
-
-	vwURL := urls[0].URL
-
+func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, vwURL string) error {
 	// if the VW URL changed, stop the manager and all sync controllers
 	if r.vwURL != "" && vwURL != r.vwURL {
 		r.shutdown(log)

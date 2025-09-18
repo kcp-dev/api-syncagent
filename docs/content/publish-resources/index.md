@@ -2,8 +2,8 @@
 
 The guide describes the process of making a resource (usually defined by a CustomResourceDefinition)
 of one Kubernetes cluster (the "service cluster" or "local cluster") available for use in kcp. This
-involves setting up an `APIExport` and then installing the Sync Agent and defining
-`PublishedResources` in the local cluster.
+involves setting up an `APIExport`, potentially an `APIExportEndpointSlice` and then installing the
+Sync Agent and defining `PublishedResources` in the local cluster.
 
 All of the documentation and API types are worded and named from the perspective of a service owner,
 the person(s) who own a service and want to make it available to consumers in kcp.
@@ -23,7 +23,7 @@ versions and even change API group, versions and names in transit (for example p
 the service cluster as v1beta1 within kcp). This process of changing the identity of a CRD is called
 "projection" in the agent.
 
-All published resources together form the APIExport. When a service is enabled in a workspace
+All published resources together form the `APIExport`. When a service is enabled in a workspace
 (i.e. it is bound to it), users can manage objects for the projected resources described by the
 published resources. These objects will be synced from the workspace onto the service cluster,
 where they are meant to be processed in whatever way the service owners desire. Any possible
