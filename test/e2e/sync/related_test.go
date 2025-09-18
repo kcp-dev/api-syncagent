@@ -405,6 +405,72 @@ func TestSyncRelatedObjects(t *testing.T) {
 		//////////////////////////////////////////////////////////////////////////////////////////////
 
 		{
+			name:      "use cluster-related fields in label selector",
+			workspace: "sync-cluster-fields-selected-secret-up",
+			mainResource: crds.Crontab{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-crontab",
+					Namespace: "default",
+				},
+				Spec: crds.CrontabSpec{
+					CronSpec: "* * *",
+					Image:    "ubuntu:latest",
+				},
+			},
+			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
+				Identifier: "credentials",
+				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
+				Kind:       "Secret",
+				Object: syncagentv1alpha1.RelatedResourceObject{
+					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
+						Selector: &syncagentv1alpha1.RelatedResourceObjectSelector{
+							LabelSelector: metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"find": "foo-{{ .ClusterName | len }}",
+								},
+							},
+							Rewrite: syncagentv1alpha1.RelatedResourceSelectorRewrite{
+								Template: &syncagentv1alpha1.TemplateExpression{
+									// same fixed name on both sides
+									Template: "my-credentials",
+								},
+							},
+						},
+					},
+				},
+			},
+			sourceRelatedObject: corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "unknown-name",
+					Namespace: "synced-default",
+					Labels: map[string]string{
+						"find": "foo-16",
+					},
+				},
+				Data: map[string][]byte{
+					"password": []byte("hunter2"),
+				},
+				Type: corev1.SecretTypeOpaque,
+			},
+
+			expectedSyncedRelatedObject: corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-credentials",
+					Namespace: "default",
+					Labels: map[string]string{
+						"find": "foo-16",
+					},
+				},
+				Data: map[string][]byte{
+					"password": []byte("hunter2"),
+				},
+				Type: corev1.SecretTypeOpaque,
+			},
+		},
+
+		//////////////////////////////////////////////////////////////////////////////////////////////
+
+		{
 			name:      "find Secret based on templated label selector",
 			workspace: "sync-templated-selected-secret-up",
 			mainResource: crds.Crontab{

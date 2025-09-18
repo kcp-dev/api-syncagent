@@ -599,10 +599,10 @@ func templateLabelSelector(relatedOrigin, relatedDest syncSide, origin syncagent
 
 func remapSyncSides(relatedOrigin, relatedDest syncSide, origin syncagentv1alpha1.RelatedResourceOrigin) (localSide, remoteSide syncSide) {
 	if origin == syncagentv1alpha1.RelatedResourceOriginKcp {
-		return relatedOrigin, relatedDest
+		return relatedDest, relatedOrigin
 	}
 
-	return relatedDest, relatedOrigin
+	return relatedOrigin, relatedDest
 }
 
 func oppositeSide(origin syncagentv1alpha1.RelatedResourceOrigin) syncagentv1alpha1.RelatedResourceOrigin {
