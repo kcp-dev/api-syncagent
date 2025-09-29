@@ -17,6 +17,7 @@ limitations under the License.
 package apiexport
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -36,7 +37,7 @@ import (
 // by a controller in kcp. Make sure you don't create a reconciling conflict!
 func (r *Reconciler) createAPIExportReconciler(
 	availableResourceSchemas sets.Set[string],
-	claimedResourceKinds sets.Set[string],
+	claimedResourceKinds sets.Set[kcpdevv1alpha1.GroupResource],
 	agentName string,
 	apiExportName string,
 	recorder record.EventRecorder,
@@ -59,28 +60,38 @@ func (r *Reconciler) createAPIExportReconciler(
 			// only ensure the ones originating from the published resources;
 			// step 1 is to collect all existing claims with the same properties
 			// as ours.
-			existingClaims := sets.New[string]()
+			existingClaims := sets.New[kcpdevv1alpha1.GroupResource]()
 			for _, claim := range existing.Spec.PermissionClaims {
-				if claim.All && claim.Group == "" && len(claim.ResourceSelector) == 0 {
-					existingClaims.Insert(claim.Resource)
+				if claim.All && len(claim.ResourceSelector) == 0 {
+					existingClaims.Insert(claim.GroupResource)
 				}
 			}
 
 			missingClaims := claimedResourceKinds.Difference(existingClaims)
 
+			claimsToAdd := missingClaims.UnsortedList()
+			slices.SortStableFunc(claimsToAdd, func(a, b kcpdevv1alpha1.GroupResource) int {
+				if a.Group != b.Group {
+					return strings.Compare(a.Group, b.Group)
+				}
+
+				return strings.Compare(a.Resource, b.Resource)
+			})
+
 			// add our missing claims
-			for _, claimed := range sets.List(missingClaims) {
+			for _, claimed := range claimsToAdd {
 				existing.Spec.PermissionClaims = append(existing.Spec.PermissionClaims, kcpdevv1alpha1.PermissionClaim{
-					GroupResource: kcpdevv1alpha1.GroupResource{
-						Group:    "",
-						Resource: claimed,
-					},
-					All: true,
+					GroupResource: claimed,
+					All:           true,
 				})
 			}
 
 			if missingClaims.Len() > 0 {
-				recorder.Eventf(existing, corev1.EventTypeNormal, "AddingPermissionClaims", "Added new permission claim(s) for all %s.", strings.Join(sets.List(missingClaims), ", "))
+				claims := make([]string, 0, len(claimsToAdd))
+				for _, claimed := range claimsToAdd {
+					claims = append(claims, groupResourceToString(claimed))
+				}
+				recorder.Eventf(existing, corev1.EventTypeNormal, "AddingPermissionClaims", "Added new permission claim(s) for all %s.", strings.Join(claims, ", "))
 			}
 
 			// prevent reconcile loops by ensuring a stable order
@@ -99,6 +110,14 @@ func (r *Reconciler) createAPIExportReconciler(
 			return existing, nil
 		}
 	}
+}
+
+func groupResourceToString(gr kcpdevv1alpha1.GroupResource) string {
+	if gr.Group == "" {
+		return gr.Resource
+	}
+
+	return fmt.Sprintf("%s/%s", gr.Group, gr.Resource)
 }
 
 func mergeResourceSchemas(existing []string, configured sets.Set[string]) []string {

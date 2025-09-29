@@ -287,6 +287,16 @@ func BindToAPIExport(t *testing.T, ctx context.Context, client ctrlruntimeclient
 					},
 					State: kcpapisv1alpha1.ClaimAccepted,
 				},
+				{
+					PermissionClaim: kcpapisv1alpha1.PermissionClaim{
+						GroupResource: kcpapisv1alpha1.GroupResource{
+							Group:    "core.kcp.io",
+							Resource: "logicalclusters",
+						},
+						All: true,
+					},
+					State: kcpapisv1alpha1.ClaimAccepted,
+				},
 			},
 		},
 	}

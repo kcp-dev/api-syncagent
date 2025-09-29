@@ -29,6 +29,7 @@ import (
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
 	kcpapisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	kcpcorev1alpha1 "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 	apiexportprovider "github.com/kcp-dev/multicluster-provider/apiexport"
 	mccontroller "sigs.k8s.io/multicluster-runtime/pkg/controller"
 	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
@@ -246,6 +247,10 @@ func (r *Reconciler) ensureManager(log *zap.SugaredLogger, vwURL string) error {
 
 	if err := kcpapisv1alpha1.AddToScheme(scheme); err != nil {
 		return fmt.Errorf("failed to register scheme %s: %w", kcpapisv1alpha1.SchemeGroupVersion, err)
+	}
+
+	if err := kcpcorev1alpha1.AddToScheme(scheme); err != nil {
+		return fmt.Errorf("failed to register scheme %s: %w", kcpcorev1alpha1.SchemeGroupVersion, err)
 	}
 
 	if r.vwProvider == nil {
