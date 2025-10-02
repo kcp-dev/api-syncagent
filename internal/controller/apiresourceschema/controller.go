@@ -174,7 +174,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubR
 	if apierrors.IsNotFound(err) {
 		ars, err := kcp.CreateAPIResourceSchema(projectedCRD, arsName, r.agentName)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create APIResourceSchema: %w", err)
+			return nil, fmt.Errorf("failed to construct APIResourceSchema: %w", err)
 		}
 
 		log.With("name", arsName).Info("Creating APIResourceSchema…")
