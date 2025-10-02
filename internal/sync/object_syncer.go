@@ -30,9 +30,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/api/meta"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -325,10 +327,22 @@ func (s *objectSyncer) ensureDestinationObject(ctx context.Context, log *zap.Sug
 		return fmt.Errorf("failed to create destination object: %w", err)
 	}
 
+    log.Debugw("Starting ensureDestinationObject",
+        "sourceNS", source.object.GetNamespace(),
+        "destNS", destObj.GetNamespace(),
+        "destGVK", destObj.GroupVersionKind(),
+        "destName", destObj.GetName(),
+    )
 	// make sure the target namespace on the destination cluster exists
-	if err := s.ensureNamespace(ctx, log, dest.client, destObj.GetNamespace()); err != nil {
+	if err := s.ensureNamespace(ctx, log, dest.client, source, destObj.GetNamespace()); err != nil {
+	    log.Errorw("ensureNamespace failed",
+            "namespace", destObj.GetNamespace(),
+            "error", err,
+        )
 		return fmt.Errorf("failed to ensure destination namespace: %w", err)
 	}
+
+    log.Debugw("Namespace ensured", "namespace", destObj.GetNamespace())
 
 	// remove source metadata (like UID and generation, but also labels and annotations belonging to
 	// the sync-agent) to allow destination object creation to succeed
@@ -402,31 +416,60 @@ func (s *objectSyncer) adoptExistingDestinationObject(ctx context.Context, log *
 	return nil
 }
 
-func (s *objectSyncer) ensureNamespace(ctx context.Context, log *zap.SugaredLogger, client ctrlruntimeclient.Client, namespace string) error {
-	// cluster-scoped objects do not need namespaces
-	if namespace == "" {
-		return nil
-	}
+func (s *objectSyncer) ensureNamespace(ctx context.Context, log *zap.SugaredLogger, client ctrlruntimeclient.Client, source syncSide, namespace string) error {
+    // cluster-scoped objects do not need namespaces
+    if namespace == "" {
+        return nil
+    }
 
-	// Use a get-then-create approach to benefit from having a cache; otherwise if we always
-	// send a create request, we're needlessly spamming the kube apiserver. Yes, this approach
-	// is a race condition and we have to check for AlreadyExists later down the line, but that
-	// only occurs on cold caches. During normal operations this should be more efficient.
-	ns := &corev1.Namespace{}
-	if err := client.Get(ctx, types.NamespacedName{Name: namespace}, ns); ctrlruntimeclient.IgnoreNotFound(err) != nil {
-		return fmt.Errorf("failed to check: %w", err)
-	}
+    // Check if the destination namespace already exists
+    destNs := &corev1.Namespace{}
+    if err := client.Get(ctx, types.NamespacedName{Name: namespace}, destNs); ctrlruntimeclient.IgnoreNotFound(err) != nil {
+        log.Errorw("Failed to fetch destination namespace", "namespace", namespace, "error", err)
+        return fmt.Errorf("failed to check destination namespace %q: %w", namespace, err)
+    }
 
-	if ns.Name == "" {
-		ns.Name = namespace
+    // Only build a new namespace if one doesn’t exist
+    if destNs.Name == "" {
+        // Check if permissions claims on source namespace allow us to access metadata
+        sourceNs := &corev1.Namespace{}
+        labels, annotations := map[string]string{}, map[string]string{}
 
-		log.Debugw("Creating namespace…", "namespace", namespace)
-		if err := client.Create(ctx, ns); err != nil && !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("failed to create: %w", err)
-		}
-	}
+        if err := source.client.Get(ctx, types.NamespacedName{Name: source.object.GetNamespace()}, sourceNs); err != nil {
+            switch {
+            case apierrors.IsForbidden(err):
+                log.Warnw("Skipping namespace metadata: missing permission to read source namespace", "namespace", namespace)
+            case apierrors.IsNotFound(err):
+                log.Warnw("Source namespace not found, creating destination without metadata", "namespace", namespace)
+            case meta.IsNoMatchError(err):
+                log.Warnw("Skipping namespace metadata: APIExport does not expose Namespace", "namespace", namespace)
+            default:
+                log.Errorw("failed to fetch source namespace", "sourceNS", source.object.GetNamespace(), "error", err)
+                return fmt.Errorf("failed to fetch source namespace %q: %w", source.object.GetNamespace(), err)
+            }
+        } else {
+            labels = sourceNs.Labels
+            annotations = sourceNs.Annotations
+            log.Debugw("Fetched source namespace metadata", "labels", labels, "annotations", annotations)
+        }
 
-	return nil
+        ns := &corev1.Namespace{
+            ObjectMeta: metav1.ObjectMeta{
+                Name:        namespace,
+                Labels:      labels,
+                Annotations: annotations,
+            },
+        }
+
+        log.Debugw("Creating namespace", "namespace", namespace)
+        if err := client.Create(ctx, ns); err != nil && !apierrors.IsAlreadyExists(err) {
+            log.Errorw("Failed to create destination namespace", "namespace", namespace, "error", err)
+            return fmt.Errorf("failed to create namespace %q: %w", namespace, err)
+        }
+        log.Debugw("Namespace created or already existed", "namespace", namespace)
+    }
+
+    return nil
 }
 
 func (s *objectSyncer) handleDeletion(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
