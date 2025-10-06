@@ -60,7 +60,7 @@ func TestSyncSimpleObject(t *testing.T) {
 		"test/crds/crontab.yaml",
 	})
 
-	// publish Crontabs and Backups
+	// publish Crontabs
 	t.Logf("Publishing CRDs…")
 	prCrontabs := &syncagentv1alpha1.PublishedResource{
 		ObjectMeta: metav1.ObjectMeta{
@@ -837,5 +837,153 @@ spec:
 
 	if value := copy.GetAnnotations()[ann]; value != teamClusterPath.String() {
 		t.Fatalf("Expected %s annotation to be %q, but is %q.", ann, teamClusterPath.String(), value)
+	}
+}
+
+func TestSyncMultiResources(t *testing.T) {
+	const (
+		apiExportName = "kcp.example.com"
+		kcpGroupName  = "kcp.example.com"
+		orgWorkspace  = "sync-multi-resources"
+	)
+
+	ctx := t.Context()
+	ctrlruntime.SetLogger(logr.Discard())
+
+	// setup a test environment in kcp
+	orgKubconfig := utils.CreateOrganization(t, ctx, orgWorkspace, apiExportName)
+
+	// start a service cluster
+	envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
+		"test/crds/crontab.yaml",
+	})
+
+	// publish Crontabs and ConfigMaps
+	t.Logf("Publishing CRDs…")
+	prCrontabs := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "publish-crontabs",
+		},
+		Spec: syncagentv1alpha1.PublishedResourceSpec{
+			Resource: syncagentv1alpha1.SourceResourceDescriptor{
+				APIGroup: "example.com",
+				Version:  "v1",
+				Kind:     "CronTab",
+			},
+			// These rules make finding the local object easier, but should not be used in production.
+			Naming: &syncagentv1alpha1.ResourceNaming{
+				Name:      "{{ .Object.metadata.name }}",
+				Namespace: "synced-{{ .Object.metadata.namespace }}",
+			},
+			Projection: &syncagentv1alpha1.ResourceProjection{
+				Group: kcpGroupName,
+			},
+		},
+	}
+
+	prConfigMaps := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "publish-configmaps",
+		},
+		Spec: syncagentv1alpha1.PublishedResourceSpec{
+			Resource: syncagentv1alpha1.SourceResourceDescriptor{
+				APIGroup: "",
+				Version:  "v1",
+				Kind:     "ConfigMap",
+			},
+			// These rules make finding the local object easier, but should not be used in production.
+			Naming: &syncagentv1alpha1.ResourceNaming{
+				Name:      "{{ .Object.metadata.name }}",
+				Namespace: "synced-{{ .Object.metadata.namespace }}",
+			},
+			Projection: &syncagentv1alpha1.ResourceProjection{
+				Group: kcpGroupName,
+				Kind:  "KubeConfigMap",
+			},
+		},
+	}
+
+	if err := envtestClient.Create(ctx, prCrontabs); err != nil {
+		t.Fatalf("Failed to create PublishedResource for CronTabs: %v", err)
+	}
+
+	if err := envtestClient.Create(ctx, prConfigMaps); err != nil {
+		t.Fatalf("Failed to create PublishedResource for ConfigMaps: %v", err)
+	}
+
+	// start the agent in the background to update the APIExport with the CronTabs API
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+
+	// wait until the API is available
+	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
+
+	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
+	teamClient := kcpClusterClient.Cluster(teamClusterPath)
+
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
+		Group:    kcpGroupName,
+		Version:  "v1",
+		Resource: "crontabs",
+	})
+
+	// create a Crontab object in a team workspace
+	t.Log("Creating CronTab in kcp…")
+	crontab := utils.YAMLToUnstructured(t, `
+apiVersion: kcp.example.com/v1
+kind: CronTab
+metadata:
+  namespace: default
+  name: my-crontab
+spec:
+  cronSpec: '* * *'
+  image: ubuntu:latest
+`)
+
+	if err := teamClient.Create(ctx, crontab); err != nil {
+		t.Fatalf("Failed to create CronTab in kcp: %v", err)
+	}
+
+	// wait for the agent to sync the object down into the service cluster
+
+	t.Logf("Wait for CronTab to be synced…")
+	copy := &unstructured.Unstructured{}
+	copy.SetAPIVersion("example.com/v1")
+	copy.SetKind("CronTab")
+
+	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
+		copyKey := types.NamespacedName{Namespace: "synced-default", Name: "my-crontab"}
+		return envtestClient.Get(ctx, copyKey, copy) == nil, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for CronTab object to be synced down: %v", err)
+	}
+
+	// create a ConfigMap object in a team workspace
+	t.Log("Creating KubeConfigMap in kcp…")
+	configmap := utils.YAMLToUnstructured(t, `
+apiVersion: kcp.example.com/v1
+kind: KubeConfigMap
+metadata:
+  namespace: default
+  name: my-configmap
+data:
+  dummydata: dummydata
+`)
+
+	if err := teamClient.Create(ctx, configmap); err != nil {
+		t.Fatalf("Failed to create KubeConfigMap in kcp: %v", err)
+	}
+
+	// wait for the agent to sync the object down into the service cluster
+
+	t.Logf("Wait for KubeConfigMap to be synced…")
+	copyCM := &corev1.ConfigMap{}
+
+	err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
+		copyKey := types.NamespacedName{Namespace: "synced-default", Name: "my-configmap"}
+		return envtestClient.Get(ctx, copyKey, copyCM) == nil, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for ConfigMap object to be synced down: %v", err)
 	}
 }
