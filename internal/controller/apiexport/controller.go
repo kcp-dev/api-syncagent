@@ -128,7 +128,7 @@ func (r *Reconciler) reconcile(ctx context.Context) error {
 
 	// for each PR, we note down the created ARS and also the GVKs of related resources
 	arsList := sets.New[string]()
-	claimedResources := sets.New[string]()
+	claimedResources := sets.New[kcpdevv1alpha1.GroupResource]()
 
 	// PublishedResources use kinds, but the PermissionClaims use resource names (plural),
 	// so we must translate accordingly
@@ -139,7 +139,17 @@ func (r *Reconciler) reconcile(ctx context.Context) error {
 
 		// to evaluate the namespace filter, the agent needs to fetch the namespace
 		if filter := pubResource.Spec.Filter; filter != nil && filter.Namespace != nil {
-			claimedResources.Insert("namespaces")
+			claimedResources.Insert(kcpdevv1alpha1.GroupResource{
+				Group:    "",
+				Resource: "namespaces",
+			})
+		}
+
+		if pubResource.Spec.EnableWorkspacePaths {
+			claimedResources.Insert(kcpdevv1alpha1.GroupResource{
+				Group:    "core.kcp.io",
+				Resource: "logicalclusters",
+			})
 		}
 
 		for _, rr := range pubResource.Spec.Related {
@@ -150,18 +160,27 @@ func (r *Reconciler) reconcile(ctx context.Context) error {
 				return fmt.Errorf("unknown related resource kind %q: %w", rr.Kind, err)
 			}
 
-			claimedResources.Insert(resource.Resource)
+			claimedResources.Insert(kcpdevv1alpha1.GroupResource{
+				Group:    "",
+				Resource: resource.Resource,
+			})
 		}
 	}
 
 	// Related resources (Secrets, ConfigMaps) are namespaced and so the Sync Agent will
 	// always need to be able to see and manage namespaces.
 	if claimedResources.Len() > 0 {
-		claimedResources.Insert("namespaces")
+		claimedResources.Insert(kcpdevv1alpha1.GroupResource{
+			Group:    "",
+			Resource: "namespaces",
+		})
 	}
 
 	// We always want to create events.
-	claimedResources.Insert("events")
+	claimedResources.Insert(kcpdevv1alpha1.GroupResource{
+		Group:    "",
+		Resource: "events",
+	})
 
 	if arsList.Len() == 0 {
 		r.log.Debug("No ready PublishedResources available.")
