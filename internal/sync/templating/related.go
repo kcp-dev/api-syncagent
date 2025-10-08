@@ -38,18 +38,18 @@ type relatedObjectContext struct {
 	// ClusterName is the internal cluster identifier (e.g. "34hg2j4gh24jdfgf")
 	// of the kcp workspace that the synchronization is currently processing. This
 	// value is set for both evaluations, regardless of side.
-	ClusterName logicalcluster.Name
+	ClusterName string
 	// ClusterPath is the workspace path (e.g. "root:customer:projectx"). This
 	// value is set for both evaluations, regardless of side.
-	ClusterPath logicalcluster.Path
+	ClusterPath string
 }
 
 func NewRelatedObjectContext(object *unstructured.Unstructured, side syncagentv1alpha1.RelatedResourceOrigin, clusterName logicalcluster.Name, clusterPath logicalcluster.Path) relatedObjectContext {
 	return relatedObjectContext{
 		Side:        side,
 		Object:      object.Object,
-		ClusterName: clusterName,
-		ClusterPath: clusterPath,
+		ClusterName: clusterName.String(),
+		ClusterPath: clusterPath.String(),
 	}
 }
 
@@ -64,17 +64,17 @@ type relatedObjectLabelContext struct {
 	// ClusterName is the internal cluster identifier (e.g. "34hg2j4gh24jdfgf")
 	// of the kcp workspace that the synchronization is currently processing
 	// (where the remote object exists).
-	ClusterName logicalcluster.Name
+	ClusterName string
 	// ClusterPath is the workspace path (e.g. "root:customer:projectx").
-	ClusterPath logicalcluster.Path
+	ClusterPath string
 }
 
 func NewRelatedObjectLabelContext(localObject, remoteObject *unstructured.Unstructured, clusterName logicalcluster.Name, clusterPath logicalcluster.Path) relatedObjectLabelContext {
 	return relatedObjectLabelContext{
 		LocalObject:  localObject.Object,
 		RemoteObject: remoteObject.Object,
-		ClusterName:  clusterName,
-		ClusterPath:  clusterPath,
+		ClusterName:  clusterName.String(),
+		ClusterPath:  clusterPath.String(),
 	}
 }
 
@@ -103,9 +103,9 @@ type relatedObjectLabelRewriteContext struct {
 	// ClusterName is the internal cluster identifier (e.g. "34hg2j4gh24jdfgf")
 	// of the kcp workspace that the synchronization is currently processing
 	// (where the remote object exists).
-	ClusterName logicalcluster.Name
+	ClusterName string
 	// ClusterPath is the workspace path (e.g. "root:customer:projectx").
-	ClusterPath logicalcluster.Path
+	ClusterPath string
 }
 
 func NewRelatedObjectLabelRewriteContext(value string, localObject, remoteObject, relatedObject *unstructured.Unstructured, clusterName logicalcluster.Name, clusterPath logicalcluster.Path) relatedObjectLabelRewriteContext {
@@ -113,8 +113,8 @@ func NewRelatedObjectLabelRewriteContext(value string, localObject, remoteObject
 		Value:        value,
 		LocalObject:  localObject.Object,
 		RemoteObject: remoteObject.Object,
-		ClusterName:  clusterName,
-		ClusterPath:  clusterPath,
+		ClusterName:  clusterName.String(),
+		ClusterPath:  clusterPath.String(),
 	}
 
 	if relatedObject != nil {
