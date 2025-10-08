@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-logr/zapr"
 	"github.com/kcp-dev/logicalcluster/v3"
 	"go.uber.org/zap"
 
@@ -125,6 +126,7 @@ func Create(
 		Reconciler:              reconciler,
 		MaxConcurrentReconciles: numWorkers,
 		SkipNameValidation:      ptr.To(true),
+		Logger:                  zapr.NewLogger(log.Desugar()),
 	}
 
 	log.Info("Setting up unmanaged controller...")
