@@ -35,16 +35,16 @@ type localObjectNamingContext struct {
 	// Object is the full remote object found in a kcp workspace.
 	Object map[string]any
 	// ClusterName is the internal cluster identifier (e.g. "34hg2j4gh24jdfgf").
-	ClusterName logicalcluster.Name
+	ClusterName string
 	// ClusterPath is the workspace path (e.g. "root:customer:projectx").
-	ClusterPath logicalcluster.Path
+	ClusterPath string
 }
 
 func newLocalObjectNamingContext(object *unstructured.Unstructured, clusterName logicalcluster.Name, workspacePath logicalcluster.Path) localObjectNamingContext {
 	return localObjectNamingContext{
 		Object:      object.Object,
-		ClusterName: clusterName,
-		ClusterPath: workspacePath,
+		ClusterName: clusterName.String(),
+		ClusterPath: workspacePath.String(),
 	}
 }
 
