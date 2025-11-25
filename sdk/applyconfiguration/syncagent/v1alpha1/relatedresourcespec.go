@@ -25,11 +25,16 @@ import (
 // RelatedResourceSpecApplyConfiguration represents a declarative configuration of the RelatedResourceSpec type for use
 // with apply.
 type RelatedResourceSpecApplyConfiguration struct {
-	Identifier *string                                  `json:"identifier,omitempty"`
-	Origin     *syncagentv1alpha1.RelatedResourceOrigin `json:"origin,omitempty"`
-	Kind       *string                                  `json:"kind,omitempty"`
-	Object     *RelatedResourceObjectApplyConfiguration `json:"object,omitempty"`
-	Mutation   *ResourceMutationSpecApplyConfiguration  `json:"mutation,omitempty"`
+	Identifier   *string                                      `json:"identifier,omitempty"`
+	Origin       *syncagentv1alpha1.RelatedResourceOrigin     `json:"origin,omitempty"`
+	Group        *string                                      `json:"group,omitempty"`
+	Version      *string                                      `json:"version,omitempty"`
+	Resource     *string                                      `json:"resource,omitempty"`
+	Kind         *string                                      `json:"kind,omitempty"`
+	IdentityHash *string                                      `json:"identityHash,omitempty"`
+	Projection   *RelatedResourceProjectionApplyConfiguration `json:"projection,omitempty"`
+	Object       *RelatedResourceObjectApplyConfiguration     `json:"object,omitempty"`
+	Mutation     *ResourceMutationSpecApplyConfiguration      `json:"mutation,omitempty"`
 }
 
 // RelatedResourceSpecApplyConfiguration constructs a declarative configuration of the RelatedResourceSpec type for use with
@@ -54,11 +59,51 @@ func (b *RelatedResourceSpecApplyConfiguration) WithOrigin(value syncagentv1alph
 	return b
 }
 
+// WithGroup sets the Group field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Group field is set to the value of the last call.
+func (b *RelatedResourceSpecApplyConfiguration) WithGroup(value string) *RelatedResourceSpecApplyConfiguration {
+	b.Group = &value
+	return b
+}
+
+// WithVersion sets the Version field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Version field is set to the value of the last call.
+func (b *RelatedResourceSpecApplyConfiguration) WithVersion(value string) *RelatedResourceSpecApplyConfiguration {
+	b.Version = &value
+	return b
+}
+
+// WithResource sets the Resource field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Resource field is set to the value of the last call.
+func (b *RelatedResourceSpecApplyConfiguration) WithResource(value string) *RelatedResourceSpecApplyConfiguration {
+	b.Resource = &value
+	return b
+}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *RelatedResourceSpecApplyConfiguration) WithKind(value string) *RelatedResourceSpecApplyConfiguration {
 	b.Kind = &value
+	return b
+}
+
+// WithIdentityHash sets the IdentityHash field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the IdentityHash field is set to the value of the last call.
+func (b *RelatedResourceSpecApplyConfiguration) WithIdentityHash(value string) *RelatedResourceSpecApplyConfiguration {
+	b.IdentityHash = &value
+	return b
+}
+
+// WithProjection sets the Projection field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Projection field is set to the value of the last call.
+func (b *RelatedResourceSpecApplyConfiguration) WithProjection(value *RelatedResourceProjectionApplyConfiguration) *RelatedResourceSpecApplyConfiguration {
+	b.Projection = value
 	return b
 }
 

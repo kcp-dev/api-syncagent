@@ -49,6 +49,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &syncagentv1alpha1.RelatedResourceObjectSelectorApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RelatedResourceObjectSpec"):
 		return &syncagentv1alpha1.RelatedResourceObjectSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("RelatedResourceProjection"):
+		return &syncagentv1alpha1.RelatedResourceProjectionApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RelatedResourceSelectorRewrite"):
 		return &syncagentv1alpha1.RelatedResourceSelectorRewriteApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RelatedResourceSpec"):
@@ -71,6 +73,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &syncagentv1alpha1.ResourceTemplateMutationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SourceResourceDescriptor"):
 		return &syncagentv1alpha1.SourceResourceDescriptorApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SynchronizationSpec"):
+		return &syncagentv1alpha1.SynchronizationSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TemplateExpression"):
 		return &syncagentv1alpha1.TemplateExpressionApplyConfiguration{}
 

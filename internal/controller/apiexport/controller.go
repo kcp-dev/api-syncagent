@@ -26,13 +26,16 @@ import (
 
 	"github.com/kcp-dev/api-syncagent/internal/controllerutil"
 	predicateutil "github.com/kcp-dev/api-syncagent/internal/controllerutil/predicate"
+	"github.com/kcp-dev/api-syncagent/internal/projection"
 	"github.com/kcp-dev/api-syncagent/internal/resources/reconciling"
+	"github.com/kcp-dev/api-syncagent/internal/validation"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
 	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -109,10 +112,16 @@ func Add(
 
 func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	r.log.Debug("Processing")
-	return reconcile.Result{}, r.reconcile(ctx)
+
+	apiExport := &kcpdevv1alpha1.APIExport{}
+	if err := r.kcpClient.Get(ctx, types.NamespacedName{Name: r.apiExportName}, apiExport); err != nil {
+		return reconcile.Result{}, ctrlruntimeclient.IgnoreNotFound(err)
+	}
+
+	return reconcile.Result{}, r.reconcile(ctx, apiExport)
 }
 
-func (r *Reconciler) reconcile(ctx context.Context) error {
+func (r *Reconciler) reconcile(ctx context.Context, apiExport *kcpdevv1alpha1.APIExport) error {
 	// find all PublishedResources
 	pubResources := &syncagentv1alpha1.PublishedResourceList{}
 	if err := r.localClient.List(ctx, pubResources, &ctrlruntimeclient.ListOptions{
@@ -121,75 +130,99 @@ func (r *Reconciler) reconcile(ctx context.Context) error {
 		return fmt.Errorf("failed to list PublishedResources: %w", err)
 	}
 
-	// filter out those PRs that have not yet been processed into an ARS
+	// filter out those PRs that are invalid; we keep those that are not yet converted into ARS,
+	// just to reduce the amount of re-reconciles when the agent processes a number of PRs in a row
+	// and would constantly update the APIExport; instead we rely on kcp to handle the eventual
+	// consistency.
+	// This allows us to already determine all resources we "own", which helps us in
+	// bilding the proper permission claims if one of the related resources is using a resource
+	// type managed via PublishedResource. Otherwise the controller might not see the PR for the
+	// related resource and temporarily incorrectly assume it needs to add a permission claim.
 	filteredPubResources := slices.DeleteFunc(pubResources.Items, func(pr syncagentv1alpha1.PublishedResource) bool {
-		return pr.Status.ResourceSchemaName == ""
+		// TODO: Turn this into a webhook or CEL expressions.
+		err := validation.ValidatePublishedResource(&pr)
+		if err != nil {
+			r.log.With("pr", pr.Name, "error", err).Warn("Ignoring invalid PublishedResource.")
+		}
+
+		return err != nil
 	})
 
 	// for each PR, we note down the created ARS and also the GVKs of related resources
-	arsList := sets.New[string]()
-	claimedResources := sets.New[kcpdevv1alpha1.GroupResource]()
+	newARSList := sets.New[string]()
+	for _, pubResource := range filteredPubResources {
+		newARSList.Insert(pubResource.Status.ResourceSchemaName)
+	}
 
-	// PublishedResources use kinds, but the PermissionClaims use resource names (plural),
-	// so we must translate accordingly
-	mapper := r.kcpClient.RESTMapper()
+	// To determine if the GVR of a related resource needs to be listed as a permission claim,
+	// we first need to figure out all the GVRs our APIExport contains. This is not just the
+	// list of ARS we just built, but also potentially other ARS's that exist in the APIExport
+	// and that we would not touch.
+	allARSList := mergeResourceSchemas(apiExport.Spec.LatestResourceSchemas, newARSList)
+
+	// turn the flat list of schema names ("version.resource.group") into a lookup table consisting
+	// of group/resource only
+	ourOwnResources := sets.New[schema.GroupResource]()
+	for _, schemaName := range allARSList {
+		gvr, err := parseSchemaName(schemaName)
+		if err != nil {
+			return fmt.Errorf("failed to assemble own resources: %w", err)
+		}
+
+		ourOwnResources.Insert(gvr.GroupResource())
+	}
+
+	// Now we can finally assemble the list of required permission claims.
+	claimedResources := sets.New[permissionClaim]()
 
 	for _, pubResource := range filteredPubResources {
-		arsList.Insert(pubResource.Status.ResourceSchemaName)
-
 		// to evaluate the namespace filter, the agent needs to fetch the namespace
 		if filter := pubResource.Spec.Filter; filter != nil && filter.Namespace != nil {
-			claimedResources.Insert(kcpdevv1alpha1.GroupResource{
+			claimedResources.Insert(permissionClaim{
 				Group:    "",
 				Resource: "namespaces",
 			})
 		}
 
 		if pubResource.Spec.EnableWorkspacePaths {
-			claimedResources.Insert(kcpdevv1alpha1.GroupResource{
+			claimedResources.Insert(permissionClaim{
 				Group:    "core.kcp.io",
 				Resource: "logicalclusters",
 			})
 		}
 
+		// Add a claim for every foreign (!) related resource, but make sure to
+		// project the GVR of related resources to their kcp-side equivalent first
+		// if they originate on the service cluster.
 		for _, rr := range pubResource.Spec.Related {
-			resource, err := mapper.ResourceFor(schema.GroupVersionResource{
-				Resource: rr.Kind,
-			})
-			if err != nil {
-				return fmt.Errorf("unknown related resource kind %q: %w", rr.Kind, err)
-			}
+			kcpGVR := projection.RelatedResourceKcpGVR(&rr)
 
-			claimedResources.Insert(kcpdevv1alpha1.GroupResource{
+			// We always want to see namespaces, for simplicity. Technically if we knew the scope
+			// of every related resource, we could determine if a namespace claim is truly necessary.
+			claimedResources.Insert(permissionClaim{
 				Group:    "",
-				Resource: resource.Resource,
+				Resource: "namespaces",
 			})
+
+			if !ourOwnResources.Has(kcpGVR.GroupResource()) {
+				claimedResources.Insert(permissionClaim{
+					Group:        kcpGVR.Group,
+					Resource:     kcpGVR.Resource,
+					IdentityHash: rr.IdentityHash,
+				})
+			}
 		}
 	}
 
-	// Related resources (Secrets, ConfigMaps) are namespaced and so the Sync Agent will
-	// always need to be able to see and manage namespaces.
-	if claimedResources.Len() > 0 {
-		claimedResources.Insert(kcpdevv1alpha1.GroupResource{
-			Group:    "",
-			Resource: "namespaces",
-		})
-	}
-
 	// We always want to create events.
-	claimedResources.Insert(kcpdevv1alpha1.GroupResource{
+	claimedResources.Insert(permissionClaim{
 		Group:    "",
 		Resource: "events",
 	})
 
-	if arsList.Len() == 0 {
-		r.log.Debug("No ready PublishedResources available.")
-		return nil
-	}
-
 	// reconcile an APIExport in kcp
 	factories := []reconciling.NamedAPIExportReconcilerFactory{
-		r.createAPIExportReconciler(arsList, claimedResources, r.agentName, r.apiExportName, r.recorder),
+		r.createAPIExportReconciler(newARSList, claimedResources, r.agentName, r.apiExportName, r.recorder),
 	}
 
 	if err := reconciling.ReconcileAPIExports(ctx, factories, "", r.kcpClient); err != nil {

@@ -28,16 +28,34 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 )
+
+// permissionClaim is the same as kcp's PermissionClaim, just trimmed down to
+// kind, group and identity and more importantly, without all the other fields
+// that makes this struct not comparable (i.e. not suitable for a Set).
+type permissionClaim struct {
+	Group        string
+	Resource     string
+	IdentityHash string
+}
+
+func (c permissionClaim) String() string {
+	if c.Group == "" {
+		return c.Resource
+	}
+
+	return fmt.Sprintf("%s/%s", c.Group, c.Resource)
+}
 
 // createAPIExportReconciler creates the reconciler for the APIExport.
 // WARNING: The APIExport in this is NOT created by the Sync Agent, it's created
 // by a controller in kcp. Make sure you don't create a reconciling conflict!
 func (r *Reconciler) createAPIExportReconciler(
 	availableResourceSchemas sets.Set[string],
-	claimedResourceKinds sets.Set[kcpdevv1alpha1.GroupResource],
+	claimedResourceKinds sets.Set[permissionClaim],
 	agentName string,
 	apiExportName string,
 	recorder record.EventRecorder,
@@ -60,17 +78,21 @@ func (r *Reconciler) createAPIExportReconciler(
 			// only ensure the ones originating from the published resources;
 			// step 1 is to collect all existing claims with the same properties
 			// as ours.
-			existingClaims := sets.New[kcpdevv1alpha1.GroupResource]()
+			existingClaims := sets.New[permissionClaim]()
 			for _, claim := range existing.Spec.PermissionClaims {
 				if claim.All && len(claim.ResourceSelector) == 0 {
-					existingClaims.Insert(claim.GroupResource)
+					existingClaims.Insert(permissionClaim{
+						Group:        claim.Group,
+						Resource:     claim.Resource,
+						IdentityHash: claim.IdentityHash,
+					})
 				}
 			}
 
 			missingClaims := claimedResourceKinds.Difference(existingClaims)
 
 			claimsToAdd := missingClaims.UnsortedList()
-			slices.SortStableFunc(claimsToAdd, func(a, b kcpdevv1alpha1.GroupResource) int {
+			slices.SortStableFunc(claimsToAdd, func(a, b permissionClaim) int {
 				if a.Group != b.Group {
 					return strings.Compare(a.Group, b.Group)
 				}
@@ -81,15 +103,19 @@ func (r *Reconciler) createAPIExportReconciler(
 			// add our missing claims
 			for _, claimed := range claimsToAdd {
 				existing.Spec.PermissionClaims = append(existing.Spec.PermissionClaims, kcpdevv1alpha1.PermissionClaim{
-					GroupResource: claimed,
-					All:           true,
+					GroupResource: kcpdevv1alpha1.GroupResource{
+						Group:    claimed.Group,
+						Resource: claimed.Resource,
+					},
+					All:          true,
+					IdentityHash: claimed.IdentityHash,
 				})
 			}
 
 			if missingClaims.Len() > 0 {
 				claims := make([]string, 0, len(claimsToAdd))
 				for _, claimed := range claimsToAdd {
-					claims = append(claims, groupResourceToString(claimed))
+					claims = append(claims, claimed.String())
 				}
 				recorder.Eventf(existing, corev1.EventTypeNormal, "AddingPermissionClaims", "Added new permission claim(s) for all %s.", strings.Join(claims, ", "))
 			}
@@ -110,14 +136,6 @@ func (r *Reconciler) createAPIExportReconciler(
 			return existing, nil
 		}
 	}
-}
-
-func groupResourceToString(gr kcpdevv1alpha1.GroupResource) string {
-	if gr.Group == "" {
-		return gr.Resource
-	}
-
-	return fmt.Sprintf("%s/%s", gr.Group, gr.Resource)
 }
 
 func mergeResourceSchemas(existing []string, configured sets.Set[string]) []string {
@@ -162,8 +180,23 @@ func createSchemaEvents(obj runtime.Object, oldSchemas, newSchemas []string, rec
 }
 
 func parseResourceGroup(schema string) string {
-	// <version>.<resource>.<group>
-	parts := strings.SplitN(schema, ".", 2)
+	gvr, _ := parseSchemaName(schema)
+	return gvr.GroupResource().String()
+}
 
-	return parts[1]
+// parseSchemaName parses an APIResourceSchema name and returns it in form of
+// a GVR. Note: the version in the result will not be a Kubernetes version, but
+// the version of the ARS!
+func parseSchemaName(name string) (schema.GroupVersionResource, error) {
+	// <version>.<resource>.<group>
+	parts := strings.SplitN(name, ".", 3)
+	if len(parts) != 3 {
+		return schema.GroupVersionResource{}, fmt.Errorf("invalid schema name %q, must consist of version.resource.group.", name)
+	}
+
+	return schema.GroupVersionResource{
+		Group:    parts[2],
+		Version:  parts[0],
+		Resource: parts[1],
+	}, nil
 }

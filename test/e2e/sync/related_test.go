@@ -30,15 +30,21 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/kcp-dev/logicalcluster/v3"
 
+	"github.com/kcp-dev/api-syncagent/internal/projection"
 	"github.com/kcp-dev/api-syncagent/internal/test/diff"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
-	"github.com/kcp-dev/api-syncagent/test/crds"
+	crds "github.com/kcp-dev/api-syncagent/test/crds/example/v1"
 	"github.com/kcp-dev/api-syncagent/test/utils"
+
+	kcpapisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrlruntime "sigs.k8s.io/controller-runtime"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -88,6 +94,8 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
+				Group:      "",
+				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Template: &syncagentv1alpha1.TemplateExpression{
@@ -139,6 +147,8 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginKcp,
 				Kind:       "Secret",
+				Group:      "",
+				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Template: &syncagentv1alpha1.TemplateExpression{
@@ -190,6 +200,8 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
+				Group:      "",
+				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Template: &syncagentv1alpha1.TemplateExpression{
@@ -245,6 +257,8 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginKcp,
 				Kind:       "Secret",
+				Group:      "",
+				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Template: &syncagentv1alpha1.TemplateExpression{
@@ -300,6 +314,8 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
+				Group:      "",
+				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Template: &syncagentv1alpha1.TemplateExpression{
@@ -355,6 +371,8 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
+				Group:      "",
+				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Selector: &syncagentv1alpha1.RelatedResourceObjectSelector{
@@ -421,6 +439,8 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
+				Group:      "",
+				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Selector: &syncagentv1alpha1.RelatedResourceObjectSelector{
@@ -487,6 +507,8 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
+				Group:      "",
+				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Selector: &syncagentv1alpha1.RelatedResourceObjectSelector{
@@ -579,7 +601,7 @@ func TestSyncRelatedObjects(t *testing.T) {
 			}
 
 			// start the agent in the background to update the APIExport with the CronTabs API
-			utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+			utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 			// wait until the API is available
 			kcpClusterClient := utils.GetKcpAdminClusterClient(t)
@@ -631,7 +653,7 @@ func TestSyncRelatedObjects(t *testing.T) {
 				t.Fatalf("Failed to wait for Secret to be synced: %v", err)
 			}
 
-			if err := compareSecrets(copySecret, testcase.expectedSyncedRelatedObject); err != nil {
+			if err := compareSecrets(t, copySecret, testcase.expectedSyncedRelatedObject); err != nil {
 				t.Fatalf("Synced secret does not match expected Secret:\n%v", err)
 			}
 		})
@@ -710,6 +732,8 @@ func TestSyncRelatedMultiObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
+				Group:      "",
+				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
@@ -818,6 +842,8 @@ func TestSyncRelatedMultiObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
+				Group:      "",
+				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
@@ -942,7 +968,7 @@ func TestSyncRelatedMultiObjects(t *testing.T) {
 			}
 
 			// start the agent in the background to update the APIExport with the Backups API
-			utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+			utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 			// wait until the API is available
 			utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
@@ -970,7 +996,7 @@ func TestSyncRelatedMultiObjects(t *testing.T) {
 					return fmt.Errorf("failed to get copy of Secret %v: %w", ctrlruntimeclient.ObjectKeyFromObject(&expected), err)
 				}
 
-				if err := compareSecrets(*copySecret, expected); err != nil {
+				if err := compareSecrets(t, *copySecret, expected); err != nil {
 					return fmt.Errorf("synced secret does not match expected Secret:\n%w", err)
 				}
 
@@ -1000,22 +1026,594 @@ func TestSyncRelatedMultiObjects(t *testing.T) {
 	}
 }
 
-func compareSecrets(actual, expected corev1.Secret) error {
-	// ensure the secret in kcp does not have any sync-related metadata
-	maps.DeleteFunc(actual.Labels, func(k, v string) bool {
-		return strings.HasPrefix(k, "claimed.internal.apis.kcp.io/")
-	})
+func TestSyncNonStandardRelatedResources(t *testing.T) {
+	const apiExportName = "kcp.example.com"
 
-	delete(actual.Annotations, "kcp.io/cluster")
-	if len(actual.Annotations) == 0 {
-		actual.Annotations = nil
+	ctrlruntime.SetLogger(logr.Discard())
+
+	testcases := []struct {
+		// the name of this testcase
+		name string
+		// the org workspace everything should happen in
+		workspace string
+		// the configuration for the related resource
+		relatedConfig syncagentv1alpha1.RelatedResourceSpec
+		// the primary object created by the user in kcp
+		mainResource crds.Crontab
+		// the original related object (will automatically be created on either the
+		// kcp or service side, depending on the relatedConfig above)
+		sourceRelatedObject ctrlruntimeclient.Object
+		// expectation: this is how the copy of the related object should look
+		// like after the sync has completed
+		expectedSyncedRelatedObject ctrlruntimeclient.Object
+	}{
+		{
+			name:      "turn a related ConfigMap into a Secret",
+			workspace: "sync-related-configmap-to-secret",
+			mainResource: crds.Crontab{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kcp.example.com/v1",
+					Kind:       "CronTab",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-crontab",
+					Namespace: "default",
+				},
+				Spec: crds.CrontabSpec{},
+			},
+			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
+				Identifier: "credentials",
+				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
+				Resource:   "configmaps",
+				Group:      "",
+				Version:    "v1",
+				Projection: &syncagentv1alpha1.RelatedResourceProjection{
+					Resource: "secrets",
+				},
+				Object: syncagentv1alpha1.RelatedResourceObject{
+					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
+						Template: &syncagentv1alpha1.TemplateExpression{
+							// same fixed value on both sides
+							Template: "my-credentials",
+						},
+					},
+				},
+			},
+			sourceRelatedObject: &corev1.ConfigMap{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "ConfigMap",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-credentials",
+					Namespace: "synced-default",
+				},
+				Data: map[string]string{
+					"password": "aHVudGVyMg==",
+				},
+			},
+			expectedSyncedRelatedObject: &corev1.Secret{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Secret",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-credentials",
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"password": []byte("hunter2"),
+				},
+				Type: corev1.SecretTypeOpaque,
+			},
+		},
+
+		//////////////////////////////////////////////////////////////////////////////////////////////
+
+		{
+			name:      "use a resource from the same APIExport as a related resource",
+			workspace: "sync-related-same-apiexport",
+			mainResource: crds.Crontab{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kcp.example.com/v1",
+					Kind:       "CronTab",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-crontab",
+					Namespace: "default",
+				},
+				Spec: crds.CrontabSpec{
+					CronSpec: "* * *",
+					Image:    "ubuntu:latest",
+				},
+			},
+			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
+				Identifier: "the-backup",
+				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
+				Resource:   "backups",
+				Group:      "eksempel.no",
+				Version:    "v1",
+				Projection: &syncagentv1alpha1.RelatedResourceProjection{
+					Group: "kcp.example.com",
+				},
+				Object: syncagentv1alpha1.RelatedResourceObject{
+					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
+						Template: &syncagentv1alpha1.TemplateExpression{
+							// same fixed value on both sides
+							Template: "my-backup",
+						},
+					},
+				},
+			},
+			sourceRelatedObject: &crds.Backup{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "eksempel.no/v1",
+					Kind:       "Backup",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-backup",
+					Namespace: "synced-default",
+				},
+				Spec: crds.BackupSpec{},
+			},
+			expectedSyncedRelatedObject: &crds.Backup{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kcp.example.com/v1",
+					Kind:       "Backup",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-backup",
+					Namespace: "default",
+				},
+				Spec: crds.BackupSpec{},
+			},
+		},
 	}
 
-	actual.CreationTimestamp = expected.CreationTimestamp
-	actual.Generation = expected.Generation
-	actual.ResourceVersion = expected.ResourceVersion
-	actual.ManagedFields = expected.ManagedFields
-	actual.UID = expected.UID
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			// setup a test environment in kcp
+			orgKubconfig := utils.CreateOrganization(t, ctx, testcase.workspace, apiExportName)
+
+			// start a service cluster
+			envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
+				"test/crds/crontab.yaml",
+				"test/crds/backup.yaml",
+			})
+
+			// publish Crontabs and Backups
+			t.Logf("Publishing CRDs…")
+			prCrontabs := &syncagentv1alpha1.PublishedResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "publish-crontabs",
+				},
+				Spec: syncagentv1alpha1.PublishedResourceSpec{
+					Resource: syncagentv1alpha1.SourceResourceDescriptor{
+						APIGroup: "example.com",
+						Version:  "v1",
+						Kind:     "CronTab",
+					},
+					// These rules make finding the local object easier, but should not be used in production.
+					Naming: &syncagentv1alpha1.ResourceNaming{
+						Name:      "{{ .Object.metadata.name }}",
+						Namespace: "synced-{{ .Object.metadata.namespace }}",
+					},
+					Projection: &syncagentv1alpha1.ResourceProjection{
+						Group: "kcp.example.com",
+					},
+					Related: []syncagentv1alpha1.RelatedResourceSpec{testcase.relatedConfig},
+				},
+			}
+
+			if err := envtestClient.Create(ctx, prCrontabs); err != nil {
+				t.Fatalf("Failed to create PublishedResource: %v", err)
+			}
+
+			// backups are published to be used as related resources only
+			prBackups := &syncagentv1alpha1.PublishedResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "publish-backups",
+				},
+				Spec: syncagentv1alpha1.PublishedResourceSpec{
+					Resource: syncagentv1alpha1.SourceResourceDescriptor{
+						APIGroup: "eksempel.no",
+						Version:  "v1",
+						Kind:     "Backup",
+					},
+					Projection: &syncagentv1alpha1.ResourceProjection{
+						Group: "kcp.example.com",
+					},
+					Synchronization: &syncagentv1alpha1.SynchronizationSpec{
+						Enabled: false,
+					},
+				},
+			}
+
+			if err := envtestClient.Create(ctx, prBackups); err != nil {
+				t.Fatalf("Failed to create PublishedResource: %v", err)
+			}
+
+			// t.Logf("waiting...")
+			// time.Sleep(20 * time.Second)
+
+			// start the agent in the background to update the APIExport with the CronTabs API
+			utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
+
+			// wait until the API is available
+			kcpClusterClient := utils.GetKcpAdminClusterClient(t)
+
+			teamClusterPath := logicalcluster.NewPath("root").Join(testcase.workspace).Join("team-1")
+			teamClient := kcpClusterClient.Cluster(teamClusterPath)
+
+			utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
+				Group:    apiExportName,
+				Version:  "v1",
+				Resource: "crontabs",
+			})
+
+			// create a Crontab object in a team workspace
+			t.Log("Creating CronTab in kcp…")
+
+			crontab := utils.ToUnstructured(t, &testcase.mainResource)
+			if err := teamClient.Create(ctx, crontab); err != nil {
+				t.Fatalf("Failed to create CronTab in kcp: %v", err)
+			}
+
+			// fake operator: create a related object as a result of processing the main object
+			t.Logf("Creating original related object on the %s side…", testcase.relatedConfig.Origin)
+
+			originClient := envtestClient
+			destClient := teamClient
+
+			if testcase.relatedConfig.Origin == syncagentv1alpha1.RelatedResourceOriginKcp {
+				originClient, destClient = destClient, originClient
+			}
+
+			ensureNamespace(t, ctx, originClient, testcase.sourceRelatedObject.GetNamespace())
+
+			relatedObject := utils.ToUnstructured(t, &testcase.sourceRelatedObject)
+			if err := originClient.Create(ctx, relatedObject); err != nil {
+				t.Fatalf("Failed to create related object: %v", err)
+			}
+
+			// wait for the agent to do its magic
+			t.Log("Wait for related object to be synced…")
+			projectedGVR := projection.RelatedResourceProjectedGVR(&testcase.relatedConfig)
+			projectedGVK, err := destClient.RESTMapper().KindFor(projectedGVR)
+			if err != nil {
+				t.Fatalf("Failed to resolve projected GVR %v: %v", projectedGVR, err)
+			}
+
+			copiedRelatedObject := &unstructured.Unstructured{}
+			copiedRelatedObject.SetAPIVersion(projectedGVK.GroupVersion().String())
+			copiedRelatedObject.SetKind(projectedGVK.Kind)
+
+			err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
+				copyKey := ctrlruntimeclient.ObjectKeyFromObject(testcase.expectedSyncedRelatedObject)
+				return destClient.Get(ctx, copyKey, copiedRelatedObject) == nil, nil
+			})
+			if err != nil {
+				t.Fatalf("Failed to wait for related object to be synced: %v", err)
+			}
+
+			if err := compareUnstructured(copiedRelatedObject, toUnstructured(t, testcase.expectedSyncedRelatedObject)); err != nil {
+				t.Fatalf("Synced copy does not match expected object:\n%v", err)
+			}
+		})
+	}
+}
+
+func TestSyncNonStandardRelatedResourcesMultipleAPIExports(t *testing.T) {
+	const (
+		initechAPIExportName  = "initech.example.com"
+		initroidAPIExportName = "initroid.example.com"
+	)
+
+	ctrlruntime.SetLogger(logr.Discard())
+
+	testcases := []struct {
+		// the name of this testcase
+		name string
+		// the org workspacePrefix prefix everything should happen in; this test will create
+		// two organizations with one APIExport each
+		workspacePrefix string
+		// the configuration for the related resource
+		relatedConfig syncagentv1alpha1.RelatedResourceSpec
+		// the primary object created by the user in kcp
+		mainResource crds.Crontab
+		// the original related object (will automatically be created on either the
+		// kcp or service side, depending on the relatedConfig above)
+		sourceRelatedObject ctrlruntimeclient.Object
+		// expectation: this is how the copy of the related object should look
+		// like after the sync has completed
+		expectedSyncedRelatedObject ctrlruntimeclient.Object
+	}{
+		{
+			name:            "use a resource from another APIExport as a related resource",
+			workspacePrefix: "sync-related-foreign-apiexport",
+			mainResource: crds.Crontab{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "initech.example.com/v1",
+					Kind:       "CronTab",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-crontab",
+					Namespace: "default",
+				},
+				Spec: crds.CrontabSpec{
+					CronSpec: "* * *",
+					Image:    "ubuntu:latest",
+				},
+			},
+			relatedConfig: syncagentv1alpha1.RelatedResourceSpec{
+				Identifier: "the-backup",
+				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
+				Resource:   "backups",
+				Group:      "eksempel.no",
+				Version:    "v1",
+				Projection: &syncagentv1alpha1.RelatedResourceProjection{
+					Group: initroidAPIExportName,
+				},
+				Object: syncagentv1alpha1.RelatedResourceObject{
+					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
+						Template: &syncagentv1alpha1.TemplateExpression{
+							// same fixed value on both sides
+							Template: "my-backup",
+						},
+					},
+				},
+			},
+			sourceRelatedObject: &crds.Backup{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "eksempel.no/v1",
+					Kind:       "Backup",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-backup",
+					Namespace: "synced-default",
+				},
+				Spec: crds.BackupSpec{},
+			},
+			expectedSyncedRelatedObject: &crds.Backup{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: initroidAPIExportName + "/v1",
+					Kind:       "Backup",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-backup",
+					Namespace: "default",
+				},
+				Spec: crds.BackupSpec{},
+			},
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			// setup a test environment in kcp
+			initechOrgWorkspace := testcase.workspacePrefix + "-initech"
+			initroidOrgWorkspace := testcase.workspacePrefix + "-initroid"
+
+			initechOrgKubconfig := utils.CreateOrganization(t, ctx, initechOrgWorkspace, initechAPIExportName)
+			initroidOrgKubconfig := utils.CreateOrganization(t, ctx, initroidOrgWorkspace, initroidAPIExportName)
+
+			// In this testcase, since we are referring to another APIExport, we need to get its
+			// identity hash first and update the relatedConfig.
+			kcpClusterClient := utils.GetKcpAdminClusterClient(t)
+			initroidClient := kcpClusterClient.Cluster(logicalcluster.NewPath("root").Join(initroidOrgWorkspace))
+
+			initroidAPIExport := &kcpapisv1alpha1.APIExport{}
+			err := initroidClient.Get(ctx, types.NamespacedName{Name: initroidAPIExportName}, initroidAPIExport)
+			if err != nil {
+				t.Fatalf("Failed to find Initroid APIExport: %v", err)
+			}
+
+			// In this testcase, initech wants to consume initroid APIs, so we must bind to their APIExport, too.
+			initechOrg := logicalcluster.NewPath("root").Join(initechOrgWorkspace)
+
+			for _, team := range []string{"team-1", "team-2"} {
+				utils.BindToAPIExport(t, ctx, kcpClusterClient.Cluster(initechOrg.Join(team)), initroidAPIExport)
+			}
+
+			// start a service cluster
+			envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
+				"test/crds/crontab.yaml",
+				"test/crds/backup.yaml",
+			})
+
+			t.Logf("Detected identity hash %q", initroidAPIExport.Status.IdentityHash)
+			testcase.relatedConfig.IdentityHash = initroidAPIExport.Status.IdentityHash
+
+			// publish Crontabs and Backups
+			t.Logf("Publishing CRDs…")
+			prCrontabs := &syncagentv1alpha1.PublishedResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "publish-crontabs",
+					Labels: map[string]string{
+						"agent": "initech",
+					},
+				},
+				Spec: syncagentv1alpha1.PublishedResourceSpec{
+					Resource: syncagentv1alpha1.SourceResourceDescriptor{
+						APIGroup: "example.com",
+						Version:  "v1",
+						Kind:     "CronTab",
+					},
+					// These rules make finding the local object easier, but should not be used in production.
+					Naming: &syncagentv1alpha1.ResourceNaming{
+						Name:      "{{ .Object.metadata.name }}",
+						Namespace: "synced-{{ .Object.metadata.namespace }}",
+					},
+					Projection: &syncagentv1alpha1.ResourceProjection{
+						Group: initechAPIExportName,
+					},
+					Related: []syncagentv1alpha1.RelatedResourceSpec{testcase.relatedConfig},
+				},
+			}
+
+			if err := envtestClient.Create(ctx, prCrontabs); err != nil {
+				t.Fatalf("Failed to create PublishedResource: %v", err)
+			}
+
+			// backups are published to be used as related resources only
+			prBackups := &syncagentv1alpha1.PublishedResource{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "publish-backups",
+					Labels: map[string]string{
+						"agent": "initroid",
+					},
+				},
+				Spec: syncagentv1alpha1.PublishedResourceSpec{
+					Resource: syncagentv1alpha1.SourceResourceDescriptor{
+						APIGroup: "eksempel.no",
+						Version:  "v1",
+						Kind:     "Backup",
+					},
+					Projection: &syncagentv1alpha1.ResourceProjection{
+						Group: initroidAPIExportName,
+					},
+					Synchronization: &syncagentv1alpha1.SynchronizationSpec{
+						Enabled: false,
+					},
+				},
+			}
+
+			if err := envtestClient.Create(ctx, prBackups); err != nil {
+				t.Fatalf("Failed to create PublishedResource: %v", err)
+			}
+
+			// start the agents in the background to update the APIExports
+			utils.RunAgent(ctx, t, "initech", initechOrgKubconfig, envtestKubeconfig, initechAPIExportName, "agent=initech")
+			utils.RunAgent(ctx, t, "initroid", initroidOrgKubconfig, envtestKubeconfig, initroidAPIExportName, "agent=initroid")
+
+			// wait until the APIs are available
+			for orgWs, gvr := range map[string]schema.GroupVersionResource{
+				initechOrgWorkspace:  {Group: initechAPIExportName, Version: "v1", Resource: "crontabs"},
+				initroidOrgWorkspace: {Group: initroidAPIExportName, Version: "v1", Resource: "backups"},
+			} {
+				teamClusterPath := logicalcluster.NewPath("root").Join(orgWs).Join("team-1")
+				teamClient := kcpClusterClient.Cluster(teamClusterPath)
+
+				utils.WaitForBoundAPI(t, ctx, teamClient, gvr)
+			}
+
+			// Since we are claiming resources from other APIExports, the default accepted claims
+			// the test utils provisioned are not enough anymore and we need to accept the new, actual
+			// list of claims. This has to happen after the agent had time to configure the expected
+			// claims on the APIExport.
+			initechClient := kcpClusterClient.Cluster(logicalcluster.NewPath("root").Join(initechOrgWorkspace))
+
+			initechAPIExport := &kcpapisv1alpha1.APIExport{}
+			err = initechClient.Get(ctx, types.NamespacedName{Name: initechAPIExportName}, initechAPIExport)
+			if err != nil {
+				t.Fatalf("Failed to find Initech APIExport: %v", err)
+			}
+
+			for _, team := range []string{"team-1", "team-2"} {
+				utils.AcceptAllPermissionClaims(t, ctx, kcpClusterClient.Cluster(initechOrg.Join(team)), initechAPIExport)
+			}
+
+			// create a Crontab object in a team workspace
+			t.Log("Creating CronTab in kcp…")
+
+			initechTeamClusterPath := logicalcluster.NewPath("root").Join(initechOrgWorkspace).Join("team-1")
+			initechTeamClient := kcpClusterClient.Cluster(initechTeamClusterPath)
+
+			crontab := utils.ToUnstructured(t, &testcase.mainResource)
+			if err := initechTeamClient.Create(ctx, crontab); err != nil {
+				t.Fatalf("Failed to create CronTab in kcp: %v", err)
+			}
+
+			// fake operator: create a related object as a result of processing the main object
+			t.Logf("Creating original related object on the %s side…", testcase.relatedConfig.Origin)
+
+			originClient := envtestClient
+			destClient := initechTeamClient
+
+			if testcase.relatedConfig.Origin == syncagentv1alpha1.RelatedResourceOriginKcp {
+				originClient, destClient = destClient, originClient
+			}
+
+			ensureNamespace(t, ctx, originClient, testcase.sourceRelatedObject.GetNamespace())
+
+			relatedObject := utils.ToUnstructured(t, &testcase.sourceRelatedObject)
+			if err := originClient.Create(ctx, relatedObject); err != nil {
+				t.Fatalf("Failed to create related object: %v", err)
+			}
+
+			// wait for the agents to do their magic
+			t.Log("Wait for related object to be synced…")
+			projectedGVR := projection.RelatedResourceProjectedGVR(&testcase.relatedConfig)
+			projectedGVK, err := destClient.RESTMapper().KindFor(projectedGVR)
+			if err != nil {
+				t.Fatalf("Failed to resolve projected GVR %v: %v", projectedGVR, err)
+			}
+
+			copiedRelatedObject := &unstructured.Unstructured{}
+			copiedRelatedObject.SetAPIVersion(projectedGVK.GroupVersion().String())
+			copiedRelatedObject.SetKind(projectedGVK.Kind)
+
+			err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
+				copyKey := ctrlruntimeclient.ObjectKeyFromObject(testcase.expectedSyncedRelatedObject)
+				return destClient.Get(ctx, copyKey, copiedRelatedObject) == nil, nil
+			})
+			if err != nil {
+				t.Fatalf("Failed to wait for related object to be synced: %v", err)
+			}
+
+			if err := compareUnstructured(copiedRelatedObject, toUnstructured(t, testcase.expectedSyncedRelatedObject)); err != nil {
+				t.Fatalf("Synced copy does not match expected object:\n%v", err)
+			}
+		})
+	}
+}
+
+func toUnstructured(t *testing.T, obj ctrlruntimeclient.Object) *unstructured.Unstructured {
+	data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		t.Fatalf("Failed to encode object as unstructured: %v", err)
+	}
+
+	unstructuredObj := &unstructured.Unstructured{Object: data}
+	unstructuredObj.SetGroupVersionKind(obj.GetObjectKind().GroupVersionKind())
+
+	return unstructuredObj
+}
+
+func compareSecrets(t *testing.T, actual, expected corev1.Secret) error {
+	return compareUnstructured(toUnstructured(t, &actual), toUnstructured(t, &expected))
+}
+
+func compareUnstructured(actual, expected *unstructured.Unstructured) error {
+	// ensure the secret in kcp does not have any sync-related metadata
+	labels := actual.GetLabels()
+	maps.DeleteFunc(labels, func(k, v string) bool {
+		return strings.HasPrefix(k, "claimed.internal.apis.kcp.io/")
+	})
+	if len(labels) == 0 {
+		labels = nil
+	}
+	actual.SetLabels(labels)
+
+	annotations := actual.GetAnnotations()
+	delete(annotations, "kcp.io/cluster")
+	if len(annotations) == 0 {
+		annotations = nil
+	}
+	actual.SetAnnotations(annotations)
+
+	// doing a.SetCreation(b.GetCreation()) doesn't work due to nil values in metav1.Time...
+	actual.SetCreationTimestamp(metav1.Time{})
+	expected.SetCreationTimestamp(metav1.Time{})
+
+	actual.SetGeneration(expected.GetGeneration())
+	actual.SetResourceVersion(expected.GetResourceVersion())
+	actual.SetManagedFields(expected.GetManagedFields())
+	actual.SetUID(expected.GetUID())
 
 	if changes := diff.ObjectDiff(expected, actual); changes != "" {
 		return errors.New(changes)

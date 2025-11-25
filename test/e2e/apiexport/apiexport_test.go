@@ -94,7 +94,7 @@ func TestPermissionsClaims(t *testing.T) {
 	}
 
 	// let the agent do its thing
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait for the APIExport to be updated
 	t.Logf("Waiting for APIExport to be updated…")
@@ -135,6 +135,8 @@ func TestPermissionsClaims(t *testing.T) {
 			Identifier: "super-secret",
 			Origin:     "kcp",
 			Kind:       "Secret",
+			Group:      "",
+			Version:    "v1",
 			Object: syncagentv1alpha1.RelatedResourceObject{
 				RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 					Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
@@ -152,6 +154,8 @@ func TestPermissionsClaims(t *testing.T) {
 			Identifier: "other-super-secret",
 			Origin:     "service",
 			Kind:       "Secret",
+			Group:      "",
+			Version:    "v1",
 			Object: syncagentv1alpha1.RelatedResourceObject{
 				RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 					Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
@@ -172,6 +176,8 @@ func TestPermissionsClaims(t *testing.T) {
 			Identifier: "config",
 			Origin:     "kcp",
 			Kind:       "ConfigMap",
+			Group:      "",
+			Version:    "v1",
 			Object: syncagentv1alpha1.RelatedResourceObject{
 				RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 					Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
@@ -306,6 +312,8 @@ func TestExistingPermissionsClaimsAreKept(t *testing.T) {
 					Identifier: "super-secret",
 					Origin:     "kcp",
 					Kind:       "Secret",
+					Group:      "",
+					Version:    "v1",
 					Object: syncagentv1alpha1.RelatedResourceObject{
 						RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 							Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
@@ -328,7 +336,7 @@ func TestExistingPermissionsClaimsAreKept(t *testing.T) {
 	}
 
 	// let the agent do its thing
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait for the APIExport to be updated
 	expectedClaims := []kcpapisv1alpha1.PermissionClaim{
@@ -431,6 +439,8 @@ func TestSchemasAreMerged(t *testing.T) {
 					Identifier: "super-secret",
 					Origin:     "kcp",
 					Kind:       "Secret",
+					Group:      "",
+					Version:    "v1",
 					Object: syncagentv1alpha1.RelatedResourceObject{
 						RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 							Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
@@ -453,7 +463,7 @@ func TestSchemasAreMerged(t *testing.T) {
 	}
 
 	// let the agent do its thing
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait for the APIExport to be updated
 	t.Logf("Waiting for APIExport to be updated…")
@@ -521,6 +531,8 @@ func TestSchemaIsKeptWhenDeletingPublishedResource(t *testing.T) {
 					Identifier: "super-secret",
 					Origin:     "kcp",
 					Kind:       "Secret",
+					Group:      "",
+					Version:    "v1",
 					Object: syncagentv1alpha1.RelatedResourceObject{
 						RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 							Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
@@ -543,7 +555,7 @@ func TestSchemaIsKeptWhenDeletingPublishedResource(t *testing.T) {
 	}
 
 	// let the agent do its thing
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait for the APIExport to be contain the new ARS
 	t.Logf("Waiting for APIExport to be updated…")
@@ -680,7 +692,7 @@ func TestNewSchemasAreCreatedAsNeeded(t *testing.T) {
 	}
 
 	// let the agent do its thing
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait for the APIExport to be updated
 	t.Logf("Waiting for APIExport to be updated…")

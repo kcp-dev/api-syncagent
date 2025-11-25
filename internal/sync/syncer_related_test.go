@@ -216,6 +216,8 @@ func TestResolveRelatedResourceObjects(t *testing.T) {
 				Identifier: "test",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
+				Group:      "",
+				Version:    "v1",
 				Object:     testcase.objectSpec,
 			}
 

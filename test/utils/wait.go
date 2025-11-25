@@ -48,7 +48,7 @@ func WaitForObject(t *testing.T, ctx context.Context, client ctrlruntimeclient.C
 func WaitForBoundAPI(t *testing.T, ctx context.Context, client ctrlruntimeclient.Client, gvr schema.GroupVersionResource) {
 	t.Helper()
 
-	t.Log("Waiting for API to be bound in kcp…")
+	t.Logf("Waiting for API %s/%s to be bound in kcp…", gvr.Group, gvr.Resource)
 	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
 		apiBindings := &kcpapisv1alpha1.APIBindingList{}
 		err := client.List(ctx, apiBindings)
