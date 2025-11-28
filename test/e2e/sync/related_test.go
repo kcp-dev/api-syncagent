@@ -94,8 +94,6 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
-				Group:      "",
-				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Template: &syncagentv1alpha1.TemplateExpression{
@@ -147,8 +145,6 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginKcp,
 				Kind:       "Secret",
-				Group:      "",
-				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Template: &syncagentv1alpha1.TemplateExpression{
@@ -200,8 +196,6 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
-				Group:      "",
-				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Template: &syncagentv1alpha1.TemplateExpression{
@@ -257,8 +251,6 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginKcp,
 				Kind:       "Secret",
-				Group:      "",
-				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Template: &syncagentv1alpha1.TemplateExpression{
@@ -314,8 +306,6 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
-				Group:      "",
-				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Template: &syncagentv1alpha1.TemplateExpression{
@@ -371,8 +361,6 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
-				Group:      "",
-				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Selector: &syncagentv1alpha1.RelatedResourceObjectSelector{
@@ -439,8 +427,6 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
-				Group:      "",
-				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Selector: &syncagentv1alpha1.RelatedResourceObjectSelector{
@@ -507,8 +493,6 @@ func TestSyncRelatedObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
-				Group:      "",
-				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Selector: &syncagentv1alpha1.RelatedResourceObjectSelector{
@@ -732,8 +716,6 @@ func TestSyncRelatedMultiObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
-				Group:      "",
-				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
@@ -842,8 +824,6 @@ func TestSyncRelatedMultiObjects(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Kind:       "Secret",
-				Group:      "",
-				Version:    "v1",
 				Object: syncagentv1alpha1.RelatedResourceObject{
 					RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 						Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
@@ -1065,8 +1045,6 @@ func TestSyncNonStandardRelatedResources(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Resource:   "configmaps",
-				Group:      "",
-				Version:    "v1",
 				Projection: &syncagentv1alpha1.RelatedResourceProjection{
 					Resource: "secrets",
 				},
@@ -1544,6 +1522,9 @@ func TestSyncNonStandardRelatedResourcesMultipleAPIExports(t *testing.T) {
 			if err := originClient.Create(ctx, relatedObject); err != nil {
 				t.Fatalf("Failed to create related object: %v", err)
 			}
+
+			t.Log("sove...")
+			time.Sleep(30 * time.Second)
 
 			// wait for the agents to do their magic
 			t.Log("Wait for related object to be synced…")
