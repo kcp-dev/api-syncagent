@@ -26,6 +26,8 @@ import (
 
 	"github.com/kcp-dev/api-syncagent/internal/controllerutil"
 	predicateutil "github.com/kcp-dev/api-syncagent/internal/controllerutil/predicate"
+	"github.com/kcp-dev/api-syncagent/internal/discovery"
+	"github.com/kcp-dev/api-syncagent/internal/kcp"
 	"github.com/kcp-dev/api-syncagent/internal/projection"
 	"github.com/kcp-dev/api-syncagent/internal/resources/reconciling"
 	"github.com/kcp-dev/api-syncagent/internal/validation"
@@ -53,14 +55,15 @@ const (
 )
 
 type Reconciler struct {
-	localClient   ctrlruntimeclient.Client
-	kcpClient     ctrlruntimeclient.Client
-	log           *zap.SugaredLogger
-	recorder      record.EventRecorder
-	lcName        logicalcluster.Name
-	apiExportName string
-	agentName     string
-	prFilter      labels.Selector
+	localClient     ctrlruntimeclient.Client
+	kcpClient       ctrlruntimeclient.Client
+	discoveryClient *discovery.Client
+	log             *zap.SugaredLogger
+	recorder        record.EventRecorder
+	lcName          logicalcluster.Name
+	apiExportName   string
+	agentName       string
+	prFilter        labels.Selector
 }
 
 // Add creates a new controller and adds it to the given manager.
@@ -73,15 +76,21 @@ func Add(
 	agentName string,
 	prFilter labels.Selector,
 ) error {
+	discoveryClient, err := discovery.NewClient(mgr.GetConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create discovery client: %w", err)
+	}
+
 	reconciler := &Reconciler{
-		localClient:   mgr.GetClient(),
-		kcpClient:     kcpCluster.GetClient(),
-		lcName:        lcName,
-		log:           log.Named(ControllerName),
-		recorder:      kcpCluster.GetEventRecorderFor(ControllerName),
-		apiExportName: apiExportName,
-		agentName:     agentName,
-		prFilter:      prFilter,
+		localClient:     mgr.GetClient(),
+		kcpClient:       kcpCluster.GetClient(),
+		discoveryClient: discoveryClient,
+		lcName:          lcName,
+		log:             log.Named(ControllerName),
+		recorder:        kcpCluster.GetEventRecorderFor(ControllerName),
+		apiExportName:   apiExportName,
+		agentName:       agentName,
+		prFilter:        prFilter,
 	}
 
 	hasARS := predicate.NewPredicateFuncs(func(object ctrlruntimeclient.Object) bool {
@@ -93,7 +102,7 @@ func Add(
 		return publishedResource.Status.ResourceSchemaName != ""
 	})
 
-	_, err := builder.ControllerManagedBy(mgr).
+	_, err = builder.ControllerManagedBy(mgr).
 		Named(ControllerName).
 		WithOptions(controller.Options{
 			// we reconcile a single object in kcp, no need for parallel workers
@@ -151,7 +160,12 @@ func (r *Reconciler) reconcile(ctx context.Context, apiExport *kcpdevv1alpha1.AP
 	// for each PR, we note down the created ARS and also the GVKs of related resources
 	newARSList := sets.New[string]()
 	for _, pubResource := range filteredPubResources {
-		newARSList.Insert(pubResource.Status.ResourceSchemaName)
+		schemaName, err := r.getSchemaName(ctx, &pubResource)
+		if err != nil {
+			return fmt.Errorf("failed to determine schema name for PublishedResource %s: %w", pubResource.Name, err)
+		}
+
+		newARSList.Insert(schemaName)
 	}
 
 	// To determine if the GVR of a related resource needs to be listed as a permission claim,
@@ -258,4 +272,23 @@ func (r *Reconciler) reconcile(ctx context.Context, apiExport *kcpdevv1alpha1.AP
 	// }
 
 	return nil
+}
+
+func (r *Reconciler) getSchemaName(ctx context.Context, pubRes *syncagentv1alpha1.PublishedResource) (string, error) {
+	if pubRes.Status.ResourceSchemaName != "" {
+		return pubRes.Status.ResourceSchemaName, nil
+	}
+
+	// Technically we *could* wait and let the apiresourceschema controller do its
+	// job and provide the status field above. But this would mean we potentially
+	// temporarily misidentify related resources, adding unnecessary and invalid
+	// permission claims in the APIExport. To avoid these it's worth it to basically
+	// do the same projection logic as the other controller here, just to calculate
+	// what the name of the schema would/will be.
+	projectedCRD, err := projection.ProjectPublishedResource(ctx, r.discoveryClient, pubRes)
+	if err != nil {
+		return "", fmt.Errorf("failed to apply projection rules: %w", err)
+	}
+
+	return kcp.GetAPIResourceSchemaName(projectedCRD), nil
 }

@@ -191,7 +191,7 @@ func parseSchemaName(name string) (schema.GroupVersionResource, error) {
 	// <version>.<resource>.<group>
 	parts := strings.SplitN(name, ".", 3)
 	if len(parts) != 3 {
-		return schema.GroupVersionResource{}, fmt.Errorf("invalid schema name %q, must consist of version.resource.group.", name)
+		return schema.GroupVersionResource{}, fmt.Errorf("invalid schema name %q, must consist of version.resource.group", name)
 	}
 
 	return schema.GroupVersionResource{
