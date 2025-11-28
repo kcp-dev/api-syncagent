@@ -157,27 +157,36 @@ func (r *Reconciler) reconcile(ctx context.Context, apiExport *kcpdevv1alpha1.AP
 		return err != nil
 	})
 
-	// for each PR, we note down the created ARS and also the GVKs of related resources
-	newARSList := sets.New[string]()
+	// Create two lists of schema names: ready schemas are those already processed by the
+	// apiresourceschema controller, the other list includes all possible schema names.
+	// For calculating the required permission claims we need _all_ schemas, but we actually
+	// only want to store ready schemas in the APIExport in order to not confuse other
+	// downstream components.
+	readySchemaNames := sets.New[string]()
+	allSchemaNames := sets.New[string]()
 	for _, pubResource := range filteredPubResources {
 		schemaName, err := r.getSchemaName(ctx, &pubResource)
 		if err != nil {
 			return fmt.Errorf("failed to determine schema name for PublishedResource %s: %w", pubResource.Name, err)
 		}
 
-		newARSList.Insert(schemaName)
+		allSchemaNames.Insert(schemaName)
+
+		if pubResource.Status.ResourceSchemaName != "" {
+			readySchemaNames.Insert(schemaName)
+		}
 	}
 
 	// To determine if the GVR of a related resource needs to be listed as a permission claim,
 	// we first need to figure out all the GVRs our APIExport contains. This is not just the
 	// list of ARS we just built, but also potentially other ARS's that exist in the APIExport
 	// and that we would not touch.
-	allARSList := mergeResourceSchemas(apiExport.Spec.LatestResourceSchemas, newARSList)
+	mergedSchemaNames := mergeResourceSchemas(apiExport.Spec.LatestResourceSchemas, allSchemaNames)
 
 	// turn the flat list of schema names ("version.resource.group") into a lookup table consisting
 	// of group/resource only
 	ourOwnResources := sets.New[schema.GroupResource]()
-	for _, schemaName := range allARSList {
+	for _, schemaName := range mergedSchemaNames {
 		gvr, err := parseSchemaName(schemaName)
 		if err != nil {
 			return fmt.Errorf("failed to assemble own resources: %w", err)
@@ -236,7 +245,7 @@ func (r *Reconciler) reconcile(ctx context.Context, apiExport *kcpdevv1alpha1.AP
 
 	// reconcile an APIExport in kcp
 	factories := []reconciling.NamedAPIExportReconcilerFactory{
-		r.createAPIExportReconciler(newARSList, claimedResources, r.agentName, r.apiExportName, r.recorder),
+		r.createAPIExportReconciler(readySchemaNames, claimedResources, r.agentName, r.apiExportName, r.recorder),
 	}
 
 	if err := reconciling.ReconcileAPIExports(ctx, factories, "", r.kcpClient); err != nil {
