@@ -36,7 +36,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -425,11 +424,16 @@ func resolveRelatedResourceObjectsInNamespace(ctx context.Context, relatedOrigin
 		return mapSlices(originNames, destNames), nil
 
 	case spec.Selector != nil:
-		apiVersion := schema.GroupVersion{Group: relRes.Group, Version: relRes.Version}.String()
+		originGVR := projection.RelatedResourceGVR(&relRes)
+
+		originGVK, err := relatedOrigin.client.RESTMapper().KindFor(originGVR)
+		if err != nil {
+			return nil, fmt.Errorf("failed to lookup %v: %w", originGVR, err)
+		}
 
 		originObjects := &unstructured.UnstructuredList{}
-		originObjects.SetAPIVersion(apiVersion)
-		originObjects.SetKind(relRes.Kind)
+		originObjects.SetAPIVersion(originGVK.GroupVersion().String())
+		originObjects.SetKind(originGVK.Kind)
 
 		labelSelector, err := templateLabelSelector(relatedOrigin, relatedDest, relRes.Origin, &spec.Selector.LabelSelector)
 		if err != nil {
