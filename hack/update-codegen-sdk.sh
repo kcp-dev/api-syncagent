@@ -36,7 +36,7 @@ set -x
   "object:headerFile=$BOILERPLATE_HEADER" \
   paths=./internal/sync/apis/...
 
-$GOBIN/controller-gen \
+"$CONTROLLER_GEN" \
   "object:headerFile=$BOILERPLATE_HEADER" \
   paths=./test/crds/...
 
