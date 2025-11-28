@@ -443,8 +443,11 @@ func (r *Reconciler) ensureSyncControllers(ctx context.Context, log *zap.Sugared
 	}
 
 	// start missing controllers
-	for idx := range publishedResources {
-		pubRes := publishedResources[idx]
+	for _, pubRes := range publishedResources {
+		if !isSyncEnabled(&pubRes) {
+			continue
+		}
+
 		key := getPublishedResourceKey(&pubRes)
 
 		// controller already exists
