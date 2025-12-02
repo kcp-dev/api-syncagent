@@ -22,9 +22,7 @@ source hack/lib.sh
 
 # get kube envtest binaries
 echodate "Setting up Kube binaries…"
-ENVTEST="$(UGET_PRINT_PATH=relative make --no-print-directory install-envtest)"
-export KUBEBUILDER_ASSETS="$($ENVTEST use 1.31.0 --bin-dir $UGET_DIRECTORY -p path)"
-KUBEBUILDER_ASSETS="$(realpath "$KUBEBUILDER_ASSETS")"
+source <(make --no-print-directory envtest-env)
 
 export ARTIFACTS=.e2e
 
