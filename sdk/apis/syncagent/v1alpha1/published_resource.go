@@ -195,6 +195,15 @@ const (
 	RelatedResourceOriginKcp     RelatedResourceOrigin = "kcp"
 )
 
+// RelatedResourceSpec describes a single related resource, which might point to
+// any number of actual Kubernetes objects.
+//
+// (in the following rule, group is optional becaue core/v1 is represented by group="")
+// +kubebuilder:validation:XValidation:rule="has(self.kind) != (has(self.version) || has(self.resource))",message="must specify either kind (deprecated) or group, version, resource"
+// +kubebuilder:validation:XValidation:rule="has(self.resource) == has(self.version)",message="resource and version must be configured together or not at all"
+// +kubebuilder:validation:XValidation:rule="!has(self.group) || (has(self.resource) && has(self.version))",message="configuring a group also requires a version and resource"
+// group is included here because when an identityHash is used, core/v1 cannot possible be targetted
+// +kubebuilder:validation:XValidation:rule="!has(self.identityHash) || (has(self.group) && has(self.version) && has(self.resource))",message="identity hashes can only be used with GVRs"
 type RelatedResourceSpec struct {
 	// Identifier is a unique name for this related resource. The name must be unique within one
 	// PublishedResource and is the key by which consumers (end users) can identify and consume the
@@ -220,6 +229,8 @@ type RelatedResourceSpec struct {
 	//
 	// Deprecated: Use "Resource" instead. This field is limited to "ConfigMap" and "Secret" and will
 	// be removed in the future. Kind and Resource cannot be specified at the same time.
+	//
+	// +kubebuilder:validation:Enum=ConfigMap;Secret
 	Kind string `json:"kind,omitempty"`
 
 	// IdentityHash is the identity hash of a kcp APIExport, in case the given Kind is

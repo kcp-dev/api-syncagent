@@ -19,7 +19,6 @@ package apiexport
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/kcp-dev/logicalcluster/v3"
 	"go.uber.org/zap"
@@ -30,7 +29,6 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/kcp"
 	"github.com/kcp-dev/api-syncagent/internal/projection"
 	"github.com/kcp-dev/api-syncagent/internal/resources/reconciling"
-	"github.com/kcp-dev/api-syncagent/internal/validation"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
 	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
@@ -131,15 +129,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 }
 
 func (r *Reconciler) reconcile(ctx context.Context, apiExport *kcpdevv1alpha1.APIExport) error {
-	// find all PublishedResources
-	pubResources := &syncagentv1alpha1.PublishedResourceList{}
-	if err := r.localClient.List(ctx, pubResources, &ctrlruntimeclient.ListOptions{
-		LabelSelector: r.prFilter,
-	}); err != nil {
-		return fmt.Errorf("failed to list PublishedResources: %w", err)
-	}
-
-	// filter out those PRs that are invalid; we keep those that are not yet converted into ARS,
+	// find all PublishedResources; we keep those that are not yet converted into ARS,
 	// just to reduce the amount of re-reconciles when the agent processes a number of PRs in a row
 	// and would constantly update the APIExport; instead we rely on kcp to handle the eventual
 	// consistency.
@@ -147,15 +137,12 @@ func (r *Reconciler) reconcile(ctx context.Context, apiExport *kcpdevv1alpha1.AP
 	// bilding the proper permission claims if one of the related resources is using a resource
 	// type managed via PublishedResource. Otherwise the controller might not see the PR for the
 	// related resource and temporarily incorrectly assume it needs to add a permission claim.
-	filteredPubResources := slices.DeleteFunc(pubResources.Items, func(pr syncagentv1alpha1.PublishedResource) bool {
-		// TODO: Turn this into a webhook or CEL expressions.
-		err := validation.ValidatePublishedResource(&pr)
-		if err != nil {
-			r.log.With("pr", pr.Name, "error", err).Warn("Ignoring invalid PublishedResource.")
-		}
-
-		return err != nil
-	})
+	pubResources := &syncagentv1alpha1.PublishedResourceList{}
+	if err := r.localClient.List(ctx, pubResources, &ctrlruntimeclient.ListOptions{
+		LabelSelector: r.prFilter,
+	}); err != nil {
+		return fmt.Errorf("failed to list PublishedResources: %w", err)
+	}
 
 	// Create two lists of schema names: ready schemas are those already processed by the
 	// apiresourceschema controller, the other list includes all possible schema names.
@@ -164,7 +151,7 @@ func (r *Reconciler) reconcile(ctx context.Context, apiExport *kcpdevv1alpha1.AP
 	// downstream components.
 	readySchemaNames := sets.New[string]()
 	allSchemaNames := sets.New[string]()
-	for _, pubResource := range filteredPubResources {
+	for _, pubResource := range pubResources.Items {
 		schemaName, err := r.getSchemaName(ctx, &pubResource)
 		if err != nil {
 			return fmt.Errorf("failed to determine schema name for PublishedResource %s: %w", pubResource.Name, err)
@@ -198,7 +185,7 @@ func (r *Reconciler) reconcile(ctx context.Context, apiExport *kcpdevv1alpha1.AP
 	// Now we can finally assemble the list of required permission claims.
 	claimedResources := sets.New[permissionClaim]()
 
-	for _, pubResource := range filteredPubResources {
+	for _, pubResource := range pubResources.Items {
 		// to evaluate the namespace filter, the agent needs to fetch the namespace
 		if filter := pubResource.Spec.Filter; filter != nil && filter.Namespace != nil {
 			claimedResources.Insert(permissionClaim{

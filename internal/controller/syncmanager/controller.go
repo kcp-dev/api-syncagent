@@ -28,7 +28,6 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/controllerutil"
 	"github.com/kcp-dev/api-syncagent/internal/controllerutil/predicate"
 	"github.com/kcp-dev/api-syncagent/internal/discovery"
-	"github.com/kcp-dev/api-syncagent/internal/validation"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
 	kcpapisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
@@ -416,12 +415,6 @@ func isSyncEnabled(pr *syncagentv1alpha1.PublishedResource) bool {
 func (r *Reconciler) ensureSyncControllers(ctx context.Context, log *zap.SugaredLogger, publishedResources []syncagentv1alpha1.PublishedResource) error {
 	requiredWorkers := sets.New[string]()
 	for _, pr := range publishedResources {
-		// TODO: Turn this into a webhook or CEL expressions.
-		if err := validation.ValidatePublishedResource(&pr); err != nil {
-			r.log.With("pr", pr.Name, "error", err).Warn("Ignoring invalid PublishedResource.")
-			continue
-		}
-
 		if isSyncEnabled(&pr) {
 			requiredWorkers.Insert(getPublishedResourceKey(&pr))
 		}
