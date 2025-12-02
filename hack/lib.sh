@@ -98,7 +98,7 @@ write_junit() {
     errors=1
     failure='<failure type="Failure">Step failed</failure>'
   fi
-  TEST_CLASS="${TEST_CLASS:-Kubermatic}"
+  TEST_CLASS="${TEST_CLASS:-api-syncagent}"
   cat << EOF > ${ARTIFACTS}/junit.$(echo $TEST_NAME | sed 's/ /_/g' | tr '[:upper:]' '[:lower:]').xml
 <?xml version="1.0" ?>
 <testsuites>

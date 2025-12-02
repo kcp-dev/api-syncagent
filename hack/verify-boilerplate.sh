@@ -28,6 +28,7 @@ set -x
 "$BOILERPLATE" \
   -boilerplates hack/boilerplate \
   -exclude .github \
+  -exclude hack/uget.sh \
   -exclude internal/certificates/triple \
   -exclude sdk/applyconfiguration \
   -exclude sdk/clientset \
