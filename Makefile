@@ -73,9 +73,14 @@ build-tests:
 
 .PHONY: clean
 clean:
+	rm -rf $(BUILD_DEST)
+	@echo "Cleaned $(BUILD_DEST)."
+
+.PHONY: clean-tools
+clean-tools:
 	if [ -d $(UGET_DIRECTORY)/k8s ]; then chmod -R +w $(UGET_DIRECTORY)/k8s; fi
-	rm -rf $(BUILD_DEST) $(UGET_DIRECTORY)
-	@echo "Cleaned $(BUILD_DEST) and $(UGET_DIRECTORY)"
+	rm -rf $(UGET_DIRECTORY)
+	@echo "Cleaned $(UGET_DIRECTORY)."
 
 .PHONY: lint
 lint: install-golangci-lint
