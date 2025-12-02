@@ -125,3 +125,22 @@ presubmits:
             requests:
               memory: 4Gi
               cpu: 2
+
+  - name: pull-api-syncagent-test-e2e-kcp-0.29
+    always_run: true
+    decorate: true
+    clone_uri: "https://github.com/kcp-dev/api-syncagent"
+    labels:
+      preset-goproxy: "true"
+    spec:
+      containers:
+        - image: ghcr.io/kcp-dev/infra/build:1.24.9-1
+          command:
+            - hack/ci/run-e2e-tests.sh
+          env:
+            - name: KCP_VERSION
+              value: "0.29.0"
+          resources:
+            requests:
+              memory: 4Gi
+              cpu: 2
