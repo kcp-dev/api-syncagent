@@ -177,6 +177,13 @@ install-kcp-codegen:
 install-reconciler-gen:
 	@GO_MODULE=true hack/uget.sh k8c.io/reconciler/cmd/reconciler-gen reconciler-gen $(RECONCILER_GEN_VERSION)
 
+# This target can be used to conveniently update the checksums for all checksummed tools.
+# Combine with GOARCH to update for other archs, like "GOARCH=arm64 make update-tools".
+
+.PHONY: update-tools
+update-tools: UGET_UPDATE=true
+update-tools: clean install-boilerplate install-gimps install-golangci-lint install-kubectl install-yq
+
 ############################################################################
 ### docs
 
