@@ -73,6 +73,7 @@ build-tests:
 
 .PHONY: clean
 clean:
+	if [ -d $(UGET_DIRECTORY)/k8s ]; then chmod -R +w $(UGET_DIRECTORY)/k8s; fi
 	rm -rf $(BUILD_DEST) $(UGET_DIRECTORY)
 	@echo "Cleaned $(BUILD_DEST) and $(UGET_DIRECTORY)"
 
