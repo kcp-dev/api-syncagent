@@ -19,13 +19,13 @@ set -euo pipefail
 cd $(dirname $0)/..
 source hack/lib.sh
 
-make --no-print-directory _tools/boilerplate
+BOILERPLATE="$(UGET_PRINT_PATH=relative make --no-print-directory install-boilerplate)"
 
 echo "Checking file boilerplates…"
 
 set -x
 
-_tools/boilerplate \
+"$BOILERPLATE" \
   -boilerplates hack/boilerplate \
   -exclude .github \
   -exclude internal/certificates/triple \
@@ -35,7 +35,7 @@ _tools/boilerplate \
   -exclude sdk/listers \
   -exclude test/crds
 
-_tools/boilerplate \
+"$BOILERPLATE" \
   -boilerplates hack/boilerplate/generated \
   sdk/applyconfiguration \
   sdk/clientset \

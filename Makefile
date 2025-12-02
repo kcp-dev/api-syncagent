@@ -35,6 +35,10 @@ GOTOOLFLAGS ?= $(GOBUILDFLAGS) -ldflags '$(LDFLAGS) $(LDFLAGS_EXTRA)' $(GOTOOLFL
 GOARCH ?= $(shell go env GOARCH)
 GOOS ?= $(shell go env GOOS)
 
+export UGET_DIRECTORY = _tools
+export UGET_CHECKSUMS = hack/tools.checksums
+export UGET_VERSIONED_BINARIES = true
+
 .PHONY: all
 all: build test
 
@@ -50,88 +54,16 @@ $(CMD): %: $(BUILD_DEST)/%
 $(BUILD_DEST)/%: cmd/%
 	go build $(GOTOOLFLAGS) -o $@ ./cmd/$*
 
-GOLANGCI_LINT = _tools/golangci-lint
-GOLANGCI_LINT_VERSION = 2.1.6
-
-.PHONY: $(GOLANGCI_LINT)
-$(GOLANGCI_LINT):
-	@hack/download-tool.sh \
-	  https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}/golangci-lint-${GOLANGCI_LINT_VERSION}-${GOOS}-${GOARCH}.tar.gz \
-	  golangci-lint \
-	  ${GOLANGCI_LINT_VERSION}
-
-GIMPS = _tools/gimps
-GIMPS_VERSION = 0.6.3
-
-.PHONY: $(GIMPS)
-$(GIMPS):
-	@hack/download-tool.sh \
-	  https://codeberg.org/xrstf/gimps/releases/download/v${GIMPS_VERSION}/gimps_${GIMPS_VERSION}_${GOOS}_${GOARCH}.tar.gz \
-	  gimps \
-	  ${GIMPS_VERSION}
-
-# wwhrd is installed as a Go module rather than from the provided
-# binaries because there is no arm64 binary available from the author.
-# See https://github.com/frapposelli/wwhrd/issues/141
-
-WWHRD = _tools/wwhrd
-WWHRD_VERSION = 06b99400ca6db678386ba5dc39bbbdcdadb664ff
-
-.PHONY: $(WWHRD)
-$(WWHRD):
-	@GO_MODULE=true hack/download-tool.sh \
-	  github.com/frapposelli/wwhrd \
-	  wwhrd \
-	  ${WWHRD_VERSION}
-
-BOILERPLATE = _tools/boilerplate
-BOILERPLATE_VERSION = 0.3.0
-
-.PHONY: $(BOILERPLATE)
-$(BOILERPLATE):
-	@hack/download-tool.sh \
-	  https://github.com/kubermatic-labs/boilerplate/releases/download/v${BOILERPLATE_VERSION}/boilerplate_${BOILERPLATE_VERSION}_${GOOS}_${GOARCH}.tar.gz \
-	  boilerplate \
-	  ${BOILERPLATE_VERSION}
-
-YQ = _tools/yq
-YQ_VERSION = 4.44.6
-
-.PHONY: $(YQ)
-$(YQ):
-	@UNCOMPRESSED=true hack/download-tool.sh \
-	  https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_${GOOS}_${GOARCH} \
-	  yq \
-	  ${YQ_VERSION} \
-	  yq_*
-
-KCP = _tools/kcp
-export KCP_VERSION ?= 0.28.1
-
-.PHONY: $(KCP)
-$(KCP):
-	@hack/download-tool.sh \
-	  https://github.com/kcp-dev/kcp/releases/download/v${KCP_VERSION}/kcp_${KCP_VERSION}_${GOOS}_${GOARCH}.tar.gz \
-	  kcp \
-	  ${KCP_VERSION}
-
-ENVTEST = _tools/setup-envtest
-ENVTEST_VERSION = release-0.19
-
-.PHONY: $(ENVTEST)
-$(ENVTEST):
-	@GO_MODULE=true hack/download-tool.sh sigs.k8s.io/controller-runtime/tools/setup-envtest setup-envtest $(ENVTEST_VERSION)
-
 .PHONY: test
 test:
 	./hack/run-tests.sh
 
 .PHONY: test-e2e
-test-e2e: $(ENVTEST) $(KCP)
+test-e2e:
 	./hack/run-e2e-tests.sh
 
 .PHONY: codegen
-codegen: $(YQ)
+codegen:
 	hack/update-codegen-crds.sh
 	hack/update-codegen-sdk.sh
 
@@ -141,11 +73,11 @@ build-tests:
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILD_DEST)
-	@echo "Cleaned $(BUILD_DEST)"
+	rm -rf $(BUILD_DEST) $(UGET_DIRECTORY)
+	@echo "Cleaned $(BUILD_DEST) and $(UGET_DIRECTORY)"
 
 .PHONY: lint
-lint: $(GOLANGCI_LINT)
+lint: install-golangci-lint
 	$(GOLANGCI_LINT) run \
 		--verbose \
 		--timeout 20m \
@@ -153,7 +85,7 @@ lint: $(GOLANGCI_LINT)
 		./...
 
 .PHONY: imports
-imports: $(GIMPS)
+imports: install-gimps
 	$(GIMPS) .
 
 .PHONY: verify
@@ -161,6 +93,91 @@ verify:
 	./hack/verify-boilerplate.sh
 	./hack/verify-licenses.sh
 
+############################################################################
+### tools
+
+BOILERPLATE_VERSION ?= 0.3.0
+ENVTEST_VERSION ?= release-0.19
+GIMPS_VERSION ?= 0.6.3
+GOIMPORTS_VERSION ?= c70783e636f2213cac683f6865d88c5edace3157
+GOLANGCI_LINT_VERSION ?= 2.1.6
+KUBECTL_VERSION ?= v1.34.2
+WWHRD_VERSION ?= 06b99400ca6db678386ba5dc39bbbdcdadb664ff
+YQ_VERSION ?= 4.44.6
+
+# exported because the e2e tests make use of it
+export KCP_VERSION ?= 0.28.1
+
+APPLYCONFIGURATION_GEN_VERSION ?= v0.33.4
+CLIENT_GEN_VERSION ?= v0.33.4
+CONTROLLER_GEN_VERSION ?= v0.18.0
+KCP_CODEGEN_VERSION ?= v2.4.0
+RECONCILER_GEN_VERSION ?= v0.5.0
+
+.PHONY: install-boilerplate
+install-boilerplate:
+	@hack/uget.sh https://github.com/kubermatic-labs/boilerplate/releases/download/v{VERSION}/boilerplate_{VERSION}_{GOOS}_{GOARCH}.tar.gz boilerplate $(BOILERPLATE_VERSION)
+
+.PHONY: install-envtest
+install-envtest:
+	@GO_MODULE=true hack/uget.sh sigs.k8s.io/controller-runtime/tools/setup-envtest setup-envtest $(ENVTEST_VERSION)
+
+GIMPS = $(UGET_DIRECTORY)/gimps-$(GIMPS_VERSION)
+
+.PHONY: install-gimps
+install-gimps:
+	@hack/uget.sh https://codeberg.org/xrstf/gimps/releases/download/v{VERSION}/gimps_{VERSION}_{GOOS}_{GOARCH}.tar.gz gimps $(GIMPS_VERSION)
+
+.PHONY: install-goimports
+install-goimports:
+	@GO_MODULE=true hack/uget.sh github.com/openshift-eng/openshift-goimports goimports $(GOIMPORTS_VERSION)
+
+GOLANGCI_LINT = $(UGET_DIRECTORY)/golangci-lint-$(GOLANGCI_LINT_VERSION)
+
+.PHONY: install-golangci-lint
+install-golangci-lint:
+	@hack/uget.sh https://github.com/golangci/golangci-lint/releases/download/v{VERSION}/golangci-lint-{VERSION}-{GOOS}-{GOARCH}.tar.gz golangci-lint $(GOLANGCI_LINT_VERSION)
+
+.PHONY: install-kubectl
+install-kubectl:
+	@UNCOMPRESSED=true hack/uget.sh https://dl.k8s.io/release/{VERSION}/bin/{GOOS}/{GOARCH}/kubectl kubectl $(KUBECTL_VERSION) kubectl
+
+# wwhrd is installed as a Go module rather than from the provided
+# binaries because there is no arm64 binary available from the author.
+# See https://github.com/frapposelli/wwhrd/issues/141
+.PHONY: install-wwhrd
+install-wwhrd:
+	@GO_MODULE=true hack/uget.sh github.com/frapposelli/wwhrd wwhrd $(WWHRD_VERSION)
+
+.PHONY: install-yq
+install-yq:
+	@UNCOMPRESSED=true hack/uget.sh https://github.com/mikefarah/yq/releases/download/v{VERSION}/yq_{GOOS}_{GOARCH} yq $(YQ_VERSION) yq_*
+
+.PHONY: install-kcp
+install-kcp:
+	@hack/uget.sh https://github.com/kcp-dev/kcp/releases/download/v{VERSION}/kcp_{VERSION}_{GOOS}_{GOARCH}.tar.gz kcp $(KCP_VERSION)
+
+.PHONY: install-applyconfiguration-gen
+install-applyconfiguration-gen:
+	@GO_MODULE=true hack/uget.sh k8s.io/code-generator/cmd/applyconfiguration-gen applyconfiguration-gen $(APPLYCONFIGURATION_GEN_VERSION)
+
+.PHONY: install-client-gen
+install-client-gen:
+	@GO_MODULE=true hack/uget.sh k8s.io/code-generator/cmd/client-gen client-gen $(CLIENT_GEN_VERSION)
+
+.PHONY: install-controller-gen
+install-controller-gen:
+	@GO_MODULE=true hack/uget.sh sigs.k8s.io/controller-tools/cmd/controller-gen controller-gen $(CONTROLLER_GEN_VERSION)
+
+.PHONY: install-kcp-codegen
+install-kcp-codegen:
+	@GO_MODULE=true hack/uget.sh github.com/kcp-dev/code-generator/v2 kcp-code-generator $(KCP_CODEGEN_VERSION) code-generator
+
+.PHONY: install-reconciler-gen
+install-reconciler-gen:
+	@GO_MODULE=true hack/uget.sh k8c.io/reconciler/cmd/reconciler-gen reconciler-gen $(RECONCILER_GEN_VERSION)
+
+############################################################################
 ### docs
 
 VENVDIR=$(abspath docs/venv)

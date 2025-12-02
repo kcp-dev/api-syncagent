@@ -22,7 +22,8 @@ source hack/lib.sh
 
 # get kube envtest binaries
 echodate "Setting up Kube binaries…"
-export KUBEBUILDER_ASSETS="$(_tools/setup-envtest use 1.31.0 --bin-dir _tools -p path)"
+ENVTEST="$(UGET_PRINT_PATH=relative make --no-print-directory install-envtest)"
+export KUBEBUILDER_ASSETS="$($ENVTEST use 1.31.0 --bin-dir $UGET_DIRECTORY -p path)"
 KUBEBUILDER_ASSETS="$(realpath "$KUBEBUILDER_ASSETS")"
 
 export ARTIFACTS=.e2e
@@ -36,8 +37,10 @@ KCP_TOKENFILE=hack/ci/testdata/e2e-kcp.tokens
 KCP_PID=0
 
 echodate "Starting kcp…"
+KCP="$(UGET_PRINT_PATH=relative make --no-print-directory install-kcp)"
+
 rm -rf "$KCP_ROOT_DIRECTORY" "$KCP_LOGFILE"
-_tools/kcp start \
+"$KCP" start \
   -v4 \
   --token-auth-file "$KCP_TOKENFILE" \
   --root-directory "$KCP_ROOT_DIRECTORY" 1>"$KCP_LOGFILE" 2>&1 &
@@ -62,7 +65,8 @@ export KCP_AGENT_TOKEN="$(grep e2e "$KCP_TOKENFILE" | cut -f1 -d,)"
 export KCP_KUBECONFIG="$KCP_ROOT_DIRECTORY/admin.kubeconfig"
 
 # the tenancy API becomes available pretty late during startup, so it's a good readiness check
-if ! retry_linear 3 20 kubectl --kubeconfig "$KCP_KUBECONFIG" get workspaces; then
+KUBECTL="$(UGET_PRINT_PATH=relative make --no-print-directory install-kubectl)"
+if ! retry_linear 3 20 "$KUBECTL" --kubeconfig "$KCP_KUBECONFIG" get workspaces; then
   echodate "kcp never became ready."
   exit 1
 fi
