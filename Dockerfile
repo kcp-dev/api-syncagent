@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM --platform=${BUILDPLATFORM} docker.io/golang:1.24.9 AS builder
+FROM --platform=${BUILDPLATFORM} docker.io/golang:1.24.11 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
