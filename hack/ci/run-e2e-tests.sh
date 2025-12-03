@@ -32,9 +32,7 @@ make build
 
 # get kube envtest binaries
 echodate "Setting up Kube binaries…"
-ENVTEST="$(UGET_PRINT_PATH=relative make --no-print-directory install-envtest)"
-export KUBEBUILDER_ASSETS="$("$ENVTEST" use 1.31.0 --bin-dir _tools -p path)"
-KUBEBUILDER_ASSETS="$(realpath "$KUBEBUILDER_ASSETS")"
+source <(make --no-print-directory envtest-env)
 
 # start a shared kcp process
 KCP="$(UGET_PRINT_PATH=relative make --no-print-directory install-kcp)"

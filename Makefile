@@ -78,7 +78,6 @@ clean:
 
 .PHONY: clean-tools
 clean-tools:
-	if [ -d $(UGET_DIRECTORY)/k8s ]; then chmod -R +w $(UGET_DIRECTORY)/k8s; fi
 	rm -rf $(UGET_DIRECTORY)
 	@echo "Cleaned $(UGET_DIRECTORY)."
 
@@ -103,7 +102,8 @@ verify:
 ### tools
 
 BOILERPLATE_VERSION ?= 0.3.0
-ENVTEST_VERSION ?= release-0.19
+ENVTEST_ETCD_VERSION ?= 3.5.15
+ENVTEST_KUBE_VERSION ?= v1.34.2
 GIMPS_VERSION ?= 0.6.3
 GOIMPORTS_VERSION ?= c70783e636f2213cac683f6865d88c5edace3157
 GOLANGCI_LINT_VERSION ?= 2.1.6
@@ -125,8 +125,22 @@ install-boilerplate:
 	@hack/uget.sh https://github.com/kubermatic-labs/boilerplate/releases/download/v{VERSION}/boilerplate_{VERSION}_{GOOS}_{GOARCH}.tar.gz boilerplate $(BOILERPLATE_VERSION)
 
 .PHONY: install-envtest
-install-envtest:
-	@GO_MODULE=true hack/uget.sh sigs.k8s.io/controller-runtime/tools/setup-envtest setup-envtest $(ENVTEST_VERSION)
+install-envtest: install-kube-apiserver install-etcd install-kubectl
+
+.PHONY: install-kube-apiserver
+install-kube-apiserver:
+	@UNCOMPRESSED=true hack/uget.sh https://dl.k8s.io/release/{VERSION}/bin/{GOOS}/{GOARCH}/kube-apiserver kube-apiserver $(ENVTEST_KUBE_VERSION) kube-apiserver
+
+.PHONY: install-etcd
+install-etcd:
+	@hack/uget.sh https://github.com/etcd-io/etcd/releases/download/v{VERSION}/etcd-v{VERSION}-{GOOS}-{GOARCH}.tar.gz etcd $(ENVTEST_ETCD_VERSION)
+
+.PHONY: envtest-env
+envtest-env: export UGET_PRINT_PATH=absolute
+envtest-env:
+	@echo "export TEST_ASSET_KUBE_APISERVER=$$(make --no-print-directory install-kube-apiserver)"
+	@echo "export TEST_ASSET_ETCD=$$(make --no-print-directory install-etcd)"
+	@echo "export TEST_ASSET_KUBECTL=$$(make --no-print-directory install-kubectl)"
 
 GIMPS = $(UGET_DIRECTORY)/gimps-$(GIMPS_VERSION)
 
@@ -189,7 +203,7 @@ install-reconciler-gen:
 
 .PHONY: update-tools
 update-tools: UGET_UPDATE=true
-update-tools: clean-tools install-boilerplate install-gimps install-golangci-lint install-kubectl install-yq
+update-tools: clean-tools install-boilerplate install-gimps install-golangci-lint install-kubectl install-yq install-kcp install-kube-apiserver install-etcd
 
 ############################################################################
 ### docs
