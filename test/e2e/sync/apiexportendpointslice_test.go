@@ -30,7 +30,7 @@ import (
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 	"github.com/kcp-dev/api-syncagent/test/utils"
 
-	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	kcpdevv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
