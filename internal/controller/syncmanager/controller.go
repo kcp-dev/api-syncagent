@@ -277,6 +277,12 @@ func (r *Reconciler) ensureManager(log *zap.SugaredLogger, vwURL string) error {
 
 		provider, err := apiexportprovider.New(vwConfig, apiexportprovider.Options{
 			Scheme: scheme,
+			// The provider is still on kcp 0.28, hence it has an entirely differnt
+			// kcp SDK module; to make sure the scheme we provide actually contains
+			// the real, new 0.29-style kcp SDK, we have to override this object.
+			// TODO: Once the multicluster-provider we use is also on 0.29+, this
+			// shouldn't be needed anymore.
+			ObjectToWatch: &kcpapisv1alpha1.APIBinding{},
 		})
 		if err != nil {
 			return fmt.Errorf("failed to init apiexport provider: %w", err)
