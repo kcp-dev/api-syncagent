@@ -31,9 +31,9 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/discovery"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
-	kcpapisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
-	kcpcorev1alpha1 "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
 	apiexportprovider "github.com/kcp-dev/multicluster-provider/apiexport"
+	kcpapisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
+	kcpcorev1alpha1 "github.com/kcp-dev/sdk/apis/core/v1alpha1"
 	mccontroller "sigs.k8s.io/multicluster-runtime/pkg/controller"
 	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
 

@@ -26,9 +26,9 @@ import (
 
 	"github.com/kcp-dev/api-syncagent/internal/kcp"
 
-	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
-	kcpdevcore "github.com/kcp-dev/kcp/sdk/apis/core"
-	kcpdevcorev1alpha1 "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
+	kcpdevv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
+	kcpdevcore "github.com/kcp-dev/sdk/apis/core"
+	kcpdevcorev1alpha1 "github.com/kcp-dev/sdk/apis/core/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
