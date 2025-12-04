@@ -1045,6 +1045,7 @@ func TestSyncNonStandardRelatedResources(t *testing.T) {
 				Identifier: "credentials",
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Resource:   "configmaps",
+				Version:    "v1",
 				Projection: &syncagentv1alpha1.RelatedResourceProjection{
 					Resource: "secrets",
 				},

@@ -134,7 +134,7 @@ func TestPermissionsClaims(t *testing.T) {
 		{
 			Identifier: "super-secret",
 			Origin:     "kcp",
-			Kind:       "Secret",
+			Resource:   "secrets",
 			Group:      "",
 			Version:    "v1",
 			Object: syncagentv1alpha1.RelatedResourceObject{
@@ -153,7 +153,7 @@ func TestPermissionsClaims(t *testing.T) {
 		{
 			Identifier: "other-super-secret",
 			Origin:     "service",
-			Kind:       "Secret",
+			Resource:   "secrets",
 			Group:      "",
 			Version:    "v1",
 			Object: syncagentv1alpha1.RelatedResourceObject{
@@ -175,7 +175,7 @@ func TestPermissionsClaims(t *testing.T) {
 		{
 			Identifier: "config",
 			Origin:     "kcp",
-			Kind:       "ConfigMap",
+			Resource:   "configmaps",
 			Group:      "",
 			Version:    "v1",
 			Object: syncagentv1alpha1.RelatedResourceObject{
@@ -311,7 +311,7 @@ func TestExistingPermissionsClaimsAreKept(t *testing.T) {
 				{
 					Identifier: "super-secret",
 					Origin:     "kcp",
-					Kind:       "Secret",
+					Resource:   "secrets",
 					Group:      "",
 					Version:    "v1",
 					Object: syncagentv1alpha1.RelatedResourceObject{
@@ -438,7 +438,7 @@ func TestSchemasAreMerged(t *testing.T) {
 				{
 					Identifier: "super-secret",
 					Origin:     "kcp",
-					Kind:       "Secret",
+					Resource:   "secrets",
 					Group:      "",
 					Version:    "v1",
 					Object: syncagentv1alpha1.RelatedResourceObject{
@@ -530,7 +530,7 @@ func TestSchemaIsKeptWhenDeletingPublishedResource(t *testing.T) {
 				{
 					Identifier: "super-secret",
 					Origin:     "kcp",
-					Kind:       "Secret",
+					Resource:   "secrets",
 					Group:      "",
 					Version:    "v1",
 					Object: syncagentv1alpha1.RelatedResourceObject{
@@ -669,7 +669,8 @@ func TestNewSchemasAreCreatedAsNeeded(t *testing.T) {
 				{
 					Identifier: "super-secret",
 					Origin:     "kcp",
-					Kind:       "Secret",
+					Resource:   "secrets",
+					Version:    "v1",
 					Object: syncagentv1alpha1.RelatedResourceObject{
 						RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 							Reference: &syncagentv1alpha1.RelatedResourceObjectReference{
