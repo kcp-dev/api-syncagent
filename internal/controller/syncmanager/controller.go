@@ -275,7 +275,7 @@ func (r *Reconciler) ensureManager(log *zap.SugaredLogger, vwURL string) error {
 	if r.vwProvider == nil {
 		log.Debug("Setting up APIExport provider…")
 
-		provider, err := apiexportprovider.New(vwConfig, apiexportprovider.Options{
+		provider, err := apiexportprovider.New(vwConfig, "BOBO", apiexportprovider.Options{
 			Scheme: scheme,
 			// The provider is still on kcp 0.28, hence it has an entirely differnt
 			// kcp SDK module; to make sure the scheme we provide actually contains
@@ -334,7 +334,7 @@ func (r *Reconciler) ensureManager(log *zap.SugaredLogger, vwURL string) error {
 		go func() {
 			// Use the global app context so this provider is independent of the reconcile
 			// context, which might get cancelled right after Reconcile() is done.
-			if err := r.vwProvider.Run(r.vwManagerCtx, r.vwManager); err != nil {
+			if err := r.vwProvider.Start(r.vwManagerCtx, r.vwManager); err != nil {
 				log.Fatalw("Failed to start apiexport provider", zap.Error(err))
 			}
 		}()

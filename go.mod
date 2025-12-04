@@ -4,21 +4,13 @@ go 1.24.0
 
 replace github.com/kcp-dev/api-syncagent/sdk => ./sdk
 
-replace (
-	k8s.io/api => k8s.io/api v0.33.5
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.33.5
-	k8s.io/apimachinery => k8s.io/apimachinery v0.33.5
-	k8s.io/apiserver => k8s.io/apiserver v0.33.5
-	k8s.io/client-go => k8s.io/client-go v0.33.5
-	k8s.io/component-base => k8s.io/component-base v0.33.5
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff
-	k8s.io/utils => k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
+replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff
 
-	// Latest multicluster-runtime/provider modules provide a lot of bugfixes,
-	// but are already based on Kube 1.33. It's worth it to have those fixes,
-	// even though it forces us to override the controller-runtime release.
-	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.21.0
-)
+replace sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.6.0
+
+replace github.com/google/gnostic-models => github.com/google/gnostic-models v0.6.9
+
+replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.21.0
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
@@ -29,7 +21,7 @@ require (
 	github.com/kcp-dev/api-syncagent/sdk v0.0.0-00010101000000-000000000000
 	github.com/kcp-dev/kcp v0.29.0
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
-	github.com/kcp-dev/multicluster-provider v0.3.0
+	github.com/kcp-dev/multicluster-provider v0.3.1
 	github.com/kcp-dev/sdk v0.29.0
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/spf13/cobra v1.10.1
@@ -41,9 +33,9 @@ require (
 	k8s.io/api v0.34.1
 	k8s.io/apiextensions-apiserver v0.34.1
 	k8s.io/apimachinery v0.34.1
-	k8s.io/apiserver v0.33.5
+	k8s.io/apiserver v0.34.1
 	k8s.io/client-go v0.34.1
-	k8s.io/component-base v0.33.5
+	k8s.io/component-base v0.34.1
 	k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	sigs.k8s.io/controller-runtime v0.22.4
@@ -52,7 +44,7 @@ require (
 )
 
 require (
-	cel.dev/expr v0.19.1 // indirect
+	cel.dev/expr v0.24.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
@@ -88,7 +80,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.3 // indirect
-	github.com/google/cel-go v0.23.2 // indirect
+	github.com/google/cel-go v0.26.0 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
@@ -99,6 +91,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kcp-dev/apimachinery/v2 v2.29.0 // indirect
+	github.com/kcp-dev/client-go v0.29.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mailru/easyjson v0.9.1 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
@@ -118,9 +111,9 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	go.etcd.io/etcd/api/v3 v3.5.21 // indirect
-	go.etcd.io/etcd/client/pkg/v3 v3.5.21 // indirect
-	go.etcd.io/etcd/client/v3 v3.5.21 // indirect
+	go.etcd.io/etcd/api/v3 v3.6.4 // indirect
+	go.etcd.io/etcd/client/pkg/v3 v3.6.4 // indirect
+	go.etcd.io/etcd/client/v3 v3.6.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
@@ -146,7 +139,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250324211829-b45e905df463 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463 // indirect
-	google.golang.org/grpc v1.71.1 // indirect
+	google.golang.org/grpc v1.72.1 // indirect
 	google.golang.org/protobuf v1.36.7 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
@@ -159,4 +152,39 @@ require (
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
+)
+
+replace (
+	k8s.io/api => github.com/kcp-dev/kubernetes/staging/src/k8s.io/api v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/apiextensions-apiserver => github.com/kcp-dev/kubernetes/staging/src/k8s.io/apiextensions-apiserver v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/apimachinery => github.com/kcp-dev/kubernetes/staging/src/k8s.io/apimachinery v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/apiserver => github.com/kcp-dev/kubernetes/staging/src/k8s.io/apiserver v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/cli-runtime => github.com/kcp-dev/kubernetes/staging/src/k8s.io/cli-runtime v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/client-go => github.com/kcp-dev/kubernetes/staging/src/k8s.io/client-go v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/cloud-provider => github.com/kcp-dev/kubernetes/staging/src/k8s.io/cloud-provider v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/cluster-bootstrap => github.com/kcp-dev/kubernetes/staging/src/k8s.io/cluster-bootstrap v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/code-generator => github.com/kcp-dev/kubernetes/staging/src/k8s.io/code-generator v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/component-base => github.com/kcp-dev/kubernetes/staging/src/k8s.io/component-base v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/component-helpers => github.com/kcp-dev/kubernetes/staging/src/k8s.io/component-helpers v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/controller-manager => github.com/kcp-dev/kubernetes/staging/src/k8s.io/controller-manager v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/cri-api => github.com/kcp-dev/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/cri-client => github.com/kcp-dev/kubernetes/staging/src/k8s.io/cri-client v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/csi-translation-lib => github.com/kcp-dev/kubernetes/staging/src/k8s.io/csi-translation-lib v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/dynamic-resource-allocation => github.com/kcp-dev/kubernetes/staging/src/k8s.io/dynamic-resource-allocation v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/endpointslice => github.com/kcp-dev/kubernetes/staging/src/k8s.io/endpointslice v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/externaljwt => github.com/kcp-dev/kubernetes/staging/src/k8s.io/externaljwt v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/kms => github.com/kcp-dev/kubernetes/staging/src/k8s.io/kms v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/kube-aggregator => github.com/kcp-dev/kubernetes/staging/src/k8s.io/kube-aggregator v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/kube-controller-manager => github.com/kcp-dev/kubernetes/staging/src/k8s.io/kube-controller-manager v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/kube-proxy => github.com/kcp-dev/kubernetes/staging/src/k8s.io/kube-proxy v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/kube-scheduler => github.com/kcp-dev/kubernetes/staging/src/k8s.io/kube-scheduler v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/kubectl => github.com/kcp-dev/kubernetes/staging/src/k8s.io/kubectl v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/kubelet => github.com/kcp-dev/kubernetes/staging/src/k8s.io/kubelet v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/kubernetes => github.com/kcp-dev/kubernetes v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/metrics => github.com/kcp-dev/kubernetes/staging/src/k8s.io/metrics v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/mount-utils => github.com/kcp-dev/kubernetes/staging/src/k8s.io/mount-utils v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/pod-security-admission => github.com/kcp-dev/kubernetes/staging/src/k8s.io/pod-security-admission v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/sample-apiserver => github.com/kcp-dev/kubernetes/staging/src/k8s.io/sample-apiserver v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/sample-cli-plugin => github.com/kcp-dev/kubernetes/staging/src/k8s.io/sample-cli-plugin v0.0.0-20251113163256-f038ec6bf609
+	k8s.io/sample-controller => github.com/kcp-dev/kubernetes/staging/src/k8s.io/sample-controller v0.0.0-20251113163256-f038ec6bf609
 )
