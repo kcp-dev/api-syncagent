@@ -96,7 +96,13 @@ type PublishedResourceSpec struct {
 	// directions during the synchronization.
 	Mutation *ResourceMutationSpec `json:"mutation,omitempty"`
 
+	// Related configures additional resources that semantically belong to the synced
+	// resource, like a Secret containing generated credentials. Related objects are
+	// synced along the main resource.
 	Related []RelatedResourceSpec `json:"related,omitempty"`
+
+	// Synchronization allows to configure how the syncagent processes this resource.
+	Synchronization *SynchronizationSpec `json:"synchronization,omitempty"`
 }
 
 // ResourceNaming describes how the names for local objects should be formed.
@@ -189,6 +195,15 @@ const (
 	RelatedResourceOriginKcp     RelatedResourceOrigin = "kcp"
 )
 
+// RelatedResourceSpec describes a single related resource, which might point to
+// any number of actual Kubernetes objects.
+//
+// (in the following rule, group is optional becaue core/v1 is represented by group="")
+// +kubebuilder:validation:XValidation:rule="has(self.kind) != (has(self.version) || has(self.resource))",message="must specify either kind (deprecated) or group, version, resource"
+// +kubebuilder:validation:XValidation:rule="has(self.resource) == has(self.version)",message="resource and version must be configured together or not at all"
+// +kubebuilder:validation:XValidation:rule="!has(self.group) || (has(self.resource) && has(self.version))",message="configuring a group also requires a version and resource"
+// group is included here because when an identityHash is used, core/v1 cannot possible be targetted
+// +kubebuilder:validation:XValidation:rule="!has(self.identityHash) || (has(self.group) && has(self.version) && has(self.resource))",message="identity hashes can only be used with GVRs"
 type RelatedResourceSpec struct {
 	// Identifier is a unique name for this related resource. The name must be unique within one
 	// PublishedResource and is the key by which consumers (end users) can identify and consume the
@@ -199,8 +214,34 @@ type RelatedResourceSpec struct {
 	// +kubebuilder:validation:Enum=service;kcp
 	Origin RelatedResourceOrigin `json:"origin"`
 
-	// ConfigMap or Secret
-	Kind string `json:"kind"`
+	// Group is the API group of the related resource. This should be left blank for resources
+	// in the core API group.
+	Group string `json:"group,omitempty"`
+
+	// Version is the API version of the related resource. This can be left blank to automatically
+	// use the preferred version.
+	Version string `json:"version,omitempty"`
+
+	// Resource is the name of the related resource (for example "secrets").
+	Resource string `json:"resource,omitempty"`
+
+	// Kind is the object kind of the related resource (for example "Secret").
+	//
+	// Deprecated: Use "Resource" instead. This field is limited to "ConfigMap" and "Secret" and will
+	// be removed in the future. Kind and Resource cannot be specified at the same time.
+	//
+	// +kubebuilder:validation:Enum=ConfigMap;Secret
+	Kind string `json:"kind,omitempty"`
+
+	// IdentityHash is the identity hash of a kcp APIExport, in case the given Kind is
+	// provided by an APIExport and not Kube-native.
+	IdentityHash string `json:"identityHash,omitempty"`
+
+	// Projection is used to change the GVK of a related resource on the opposite side of
+	// its origin.
+	// All fields in the projection are optional. If a field is set, it will overwrite
+	// that field in the GVK.
+	Projection *RelatedResourceProjection `json:"projection,omitempty"`
 
 	// Object describes how the related resource can be found on the origin side
 	// and where it is to supposed to be created on the destination side.
@@ -209,6 +250,18 @@ type RelatedResourceSpec struct {
 	// Mutation configures optional transformation rules for the related resource.
 	// Status mutations are only performed when the related resource originates in kcp.
 	Mutation *ResourceMutationSpec `json:"mutation,omitempty"`
+}
+
+// RelatedResourceProjection describes how the source GVK of a related resource (i.e.
+// the GVK on the related resource's origin side) should be modified when an object
+// is copied from the origin to the destination.
+type RelatedResourceProjection struct {
+	// The API group, for example "myservice.example.com". Leave empty to not modify the API group.
+	Group string `json:"group,omitempty"`
+	// The API version, for example "v1beta1". Leave empty to not modify the version.
+	Version string `json:"version,omitempty"`
+	// The resource name, for example "databases". Leave empty to not modify the resource.
+	Resource string `json:"resource,omitempty"`
 }
 
 // RelatedResourceSource configures how the related resource can be found on the origin side
@@ -356,6 +409,19 @@ type ResourceFilter struct {
 	Namespace *metav1.LabelSelector `json:"namespace,omitempty"`
 	// When given, the resource filter will be applied to a resource itself.
 	Resource *metav1.LabelSelector `json:"resource,omitempty"`
+}
+
+// SynchronizationSpec allows to configure how the syncagent processes a
+// PublishedResource.
+type SynchronizationSpec struct {
+	// Enabled can be used to toggle the synchronization as a whole. When set to
+	// false, the syncagent will only copy the CRD and include it in the APIExport,
+	// but not will attempt to synchronize objects of this resource from the kcp
+	// workspaces to the provider.
+	// Synchronization must be disabled for resources that are used as related
+	// resources for other PublishedResources. Otherwise the syncagent would
+	// potentially loop and never finish processing an object.
+	Enabled bool `json:"enabled"`
 }
 
 // PublishedResourceStatus stores status information about a published resource.

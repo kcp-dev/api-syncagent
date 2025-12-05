@@ -75,8 +75,9 @@ func RunEndpointSliceAgent(
 	kcpKubeconfig string,
 	localKubeconfig string,
 	apiExportEndpointSlice string,
+	labelSelector string,
 ) context.CancelFunc {
-	return runAgent(ctx, t, name, kcpKubeconfig, localKubeconfig, "--apiexportendpointslice-ref", apiExportEndpointSlice)
+	return runAgent(ctx, t, name, kcpKubeconfig, localKubeconfig, "--apiexportendpointslice-ref", apiExportEndpointSlice, labelSelector)
 }
 
 func RunAgent(
@@ -86,8 +87,9 @@ func RunAgent(
 	kcpKubeconfig string,
 	localKubeconfig string,
 	apiExport string,
+	labelSelector string,
 ) context.CancelFunc {
-	return runAgent(ctx, t, name, kcpKubeconfig, localKubeconfig, "--apiexport-ref", apiExport)
+	return runAgent(ctx, t, name, kcpKubeconfig, localKubeconfig, "--apiexport-ref", apiExport, labelSelector)
 }
 
 func runAgent(
@@ -98,6 +100,7 @@ func runAgent(
 	localKubeconfig string,
 	refFlag string,
 	refValue string,
+	labelSelector string,
 ) context.CancelFunc {
 	t.Helper()
 
@@ -114,6 +117,10 @@ func runAgent(
 		"--log-debug=true",
 		"--health-address", "0",
 		"--metrics-address", "0",
+	}
+
+	if labelSelector != "" {
+		args = append(args, "--published-resource-selector", labelSelector)
 	}
 
 	logFile := filepath.Join(ArtifactsDirectory(t), uniqueLogfile(t, ""))

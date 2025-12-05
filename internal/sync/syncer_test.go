@@ -31,19 +31,36 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/test/diff"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/tools/record"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	fakectrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+func newFakeClientBuilder() *fakectrlruntimeclient.ClientBuilder {
+	scheme := runtime.NewScheme()
+
+	utilruntime.Must(metav1.AddMetaToScheme(scheme))
+	utilruntime.Must(corev1.AddToScheme(scheme))
+
+	mapper := meta.NewDefaultRESTMapper(nil)
+	for gvk := range scheme.AllKnownTypes() {
+		mapper.Add(gvk, meta.RESTScopeNamespace)
+	}
+
+	return fakectrlruntimeclient.NewClientBuilder().WithScheme(scheme).WithRESTMapper(mapper)
+}
+
 func buildFakeClient(objs ...*unstructured.Unstructured) ctrlruntimeclient.Client {
-	builder := fakectrlruntimeclient.NewClientBuilder()
+	builder := newFakeClientBuilder()
 	for i, obj := range objs {
 		if obj != nil {
 			builder.WithObjects(objs[i])
@@ -54,7 +71,7 @@ func buildFakeClient(objs ...*unstructured.Unstructured) ctrlruntimeclient.Clien
 }
 
 func buildFakeClientWithStatus(objs ...*unstructured.Unstructured) ctrlruntimeclient.Client {
-	builder := fakectrlruntimeclient.NewClientBuilder()
+	builder := newFakeClientBuilder()
 	for i, obj := range objs {
 		if obj != nil {
 			builder.WithObjects(objs[i])

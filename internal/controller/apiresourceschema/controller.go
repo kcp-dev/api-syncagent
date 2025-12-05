@@ -144,22 +144,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 }
 
 func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubResource *syncagentv1alpha1.PublishedResource) (*reconcile.Result, error) {
-	// find the resource that the PublishedResource is referring to
-	localGK := projection.PublishedResourceSourceGK(pubResource)
-
+	// get the projected CRD (i.e. strip unwanted versions, rename values etc.)
 	client, err := discovery.NewClient(r.restConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create discovery client: %w", err)
 	}
 
-	// fetch the original, full CRD from the cluster
-	crd, err := client.RetrieveCRD(ctx, localGK)
-	if err != nil {
-		return nil, fmt.Errorf("failed to discover resource defined in PublishedResource: %w", err)
-	}
-
-	// project the CRD (i.e. strip unwanted versions, rename values etc.)
-	projectedCRD, err := projection.ProjectCRD(crd, pubResource)
+	projectedCRD, err := projection.ProjectPublishedResource(ctx, client, pubResource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply projection rules: %w", err)
 	}

@@ -408,10 +408,16 @@ func getPublishedResourceKey(pr *syncagentv1alpha1.PublishedResource) string {
 	return fmt.Sprintf("%s-%s", pr.UID, pr.ResourceVersion)
 }
 
+func isSyncEnabled(pr *syncagentv1alpha1.PublishedResource) bool {
+	return pr.Spec.Synchronization == nil || pr.Spec.Synchronization.Enabled
+}
+
 func (r *Reconciler) ensureSyncControllers(ctx context.Context, log *zap.SugaredLogger, publishedResources []syncagentv1alpha1.PublishedResource) error {
 	requiredWorkers := sets.New[string]()
 	for _, pr := range publishedResources {
-		requiredWorkers.Insert(getPublishedResourceKey(&pr))
+		if isSyncEnabled(&pr) {
+			requiredWorkers.Insert(getPublishedResourceKey(&pr))
+		}
 	}
 
 	// stop controllers that are no longer needed
@@ -430,8 +436,11 @@ func (r *Reconciler) ensureSyncControllers(ctx context.Context, log *zap.Sugared
 	}
 
 	// start missing controllers
-	for idx := range publishedResources {
-		pubRes := publishedResources[idx]
+	for _, pubRes := range publishedResources {
+		if !isSyncEnabled(&pubRes) {
+			continue
+		}
+
 		key := getPublishedResourceKey(&pubRes)
 
 		// controller already exists

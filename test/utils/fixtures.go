@@ -266,7 +266,10 @@ func BindToAPIExport(t *testing.T, ctx context.Context, client ctrlruntimeclient
 					},
 					State: kcpapisv1alpha1.ClaimAccepted,
 				},
-				// for related resources, the agent can also sync ConfigMaps and Secrets
+				// for related resources, the agent can also sync ConfigMaps and Secrets;
+				// for all testcases that use foreign resources (i.e. those not part of
+				// the core Kubernetes group or the same APIExport), the tests will adjust
+				// these permission claims later.
 				{
 					PermissionClaim: kcpapisv1alpha1.PermissionClaim{
 						GroupResource: kcpapisv1alpha1.GroupResource{
@@ -319,6 +322,39 @@ func BindToAPIExport(t *testing.T, ctx context.Context, client ctrlruntimeclient
 	}
 
 	return apiBinding
+}
+
+func AcceptAllPermissionClaims(t *testing.T, ctx context.Context, client ctrlruntimeclient.Client, apiExport *kcpapisv1alpha1.APIExport) {
+	allBindings := &kcpapisv1alpha1.APIBindingList{}
+	if err := client.List(ctx, allBindings); err != nil {
+		t.Fatalf("Failed to list APIBindings: %v", err)
+	}
+
+	var apiBinding *kcpapisv1alpha1.APIBinding
+	for _, binding := range allBindings.Items {
+		// for simplicity, we only match against the name
+		if exp := binding.Spec.Reference.Export; exp != nil && exp.Name == apiExport.Name {
+			apiBinding = &binding
+			break
+		}
+	}
+
+	if apiBinding == nil {
+		t.Fatalf("No APIBinding found that binds %s.", apiExport.Name)
+	}
+
+	accepted := []kcpapisv1alpha1.AcceptablePermissionClaim{}
+	for _, claim := range apiExport.Spec.PermissionClaims {
+		accepted = append(accepted, kcpapisv1alpha1.AcceptablePermissionClaim{
+			PermissionClaim: claim,
+			State:           kcpapisv1alpha1.ClaimAccepted,
+		})
+	}
+
+	apiBinding.Spec.PermissionClaims = accepted
+	if err := client.Update(ctx, apiBinding); err != nil {
+		t.Fatalf("Failed to update APIBinding: %v", err)
+	}
 }
 
 func ApplyCRD(t *testing.T, ctx context.Context, client ctrlruntimeclient.Client, filename string) {

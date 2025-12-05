@@ -14,25 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package crds
+package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type Backup struct {
+// +kubebuilder:object:root=true
+
+type Crontab struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec BackupSpec `json:"spec"`
+	Spec CrontabSpec `json:"spec"`
 }
 
-type BackupSpec struct {
-	Source      string       `json:"source"`
-	Destination string       `json:"destination"`
-	Items       []BackupItem `json:"items,omitempty"`
-}
-
-type BackupItem struct {
-	Name string `json:"name"`
+type CrontabSpec struct {
+	CronSpec string `json:"cronSpec"`
+	Image    string `json:"image"`
+	Replicas int    `json:"replicas"`
 }

@@ -88,7 +88,7 @@ func TestSyncSimpleObject(t *testing.T) {
 	}
 
 	// start the agent in the background to update the APIExport with the CronTabs API
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait until the API is available
 	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
@@ -181,7 +181,7 @@ func TestSyncSimpleObjectOldNaming(t *testing.T) {
 	}
 
 	// start the agent in the background to update the APIExport with the CronTabs API
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait until the API is available
 	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
@@ -268,7 +268,7 @@ func TestSyncWithDefaultNamingRules(t *testing.T) {
 	}
 
 	// start the agent in the background to update the APIExport with the CronTabs API
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait until the API is available
 	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
@@ -371,7 +371,7 @@ func TestLocalChangesAreKept(t *testing.T) {
 	}
 
 	// start the agent in the background to update the APIExport with the CronTabs API
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait until the API is available
 	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
@@ -568,7 +568,7 @@ func TestResourceFilter(t *testing.T) {
 	}
 
 	// start the agent in the background to update the APIExport with the CronTabs API
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait until the API is available
 	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
@@ -685,7 +685,7 @@ func TestSyncingOverlyLongNames(t *testing.T) {
 	}
 
 	// start the agent in the background to update the APIExport with the CronTabs API
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait until the API is available
 	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
@@ -787,7 +787,7 @@ func TestSyncWithWorkspacePath(t *testing.T) {
 	}
 
 	// start the agent in the background to update the APIExport with the CronTabs API
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait until the API is available
 	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
@@ -912,7 +912,7 @@ func TestSyncMultiResources(t *testing.T) {
 	}
 
 	// start the agent in the background to update the APIExport with the CronTabs API
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait until the API is available
 	kcpClusterClient := utils.GetKcpAdminClusterClient(t)

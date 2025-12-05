@@ -28,6 +28,7 @@ type PublishedResourceSpecApplyConfiguration struct {
 	Projection           *ResourceProjectionApplyConfiguration       `json:"projection,omitempty"`
 	Mutation             *ResourceMutationSpecApplyConfiguration     `json:"mutation,omitempty"`
 	Related              []RelatedResourceSpecApplyConfiguration     `json:"related,omitempty"`
+	Synchronization      *SynchronizationSpecApplyConfiguration      `json:"synchronization,omitempty"`
 }
 
 // PublishedResourceSpecApplyConfiguration constructs a declarative configuration of the PublishedResourceSpec type for use with
@@ -94,5 +95,13 @@ func (b *PublishedResourceSpecApplyConfiguration) WithRelated(values ...*Related
 		}
 		b.Related = append(b.Related, *values[i])
 	}
+	return b
+}
+
+// WithSynchronization sets the Synchronization field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Synchronization field is set to the value of the last call.
+func (b *PublishedResourceSpecApplyConfiguration) WithSynchronization(value *SynchronizationSpecApplyConfiguration) *PublishedResourceSpecApplyConfiguration {
+	b.Synchronization = value
 	return b
 }
