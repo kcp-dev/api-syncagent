@@ -28,8 +28,8 @@ For each related resource, the Sync Agent needs to be told how to find the objec
 and where to create it on the destination side. There are multiple options that you can choose from.
 
 By default all related objects live in the same namespace as the primary object (their owner/parent).
-If the primary object is cluster scoped, admins must configure additional rules to specify what
-namespace the ConfigMap/Secret shall be read from and created in.
+If the primary object is cluster scoped, a namespace must be configured to specify which namespaces
+the resource shall be read from and written to.
 
 Related resources are always optional. Even if references (see below) are used and their path
 expression points to a non-existing field in the primary object (e.g. `spec.secretName` is configured,
