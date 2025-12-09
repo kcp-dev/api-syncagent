@@ -1524,9 +1524,6 @@ func TestSyncNonStandardRelatedResourcesMultipleAPIExports(t *testing.T) {
 				t.Fatalf("Failed to create related object: %v", err)
 			}
 
-			t.Log("sove...")
-			time.Sleep(30 * time.Second)
-
 			// wait for the agents to do their magic
 			t.Log("Wait for related object to be synced…")
 			projectedGVR := projection.RelatedResourceProjectedGVR(&testcase.relatedConfig)

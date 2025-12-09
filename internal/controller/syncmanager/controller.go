@@ -244,8 +244,9 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, vwUR
 	// Filter out those that have not been processed into APIResourceSchemas yet; starting
 	// sync controllers too early, before the schemes are available, will make the watches
 	// not work properly.
+	// Also remove those PRs that have sync disabled.
 	pubResources := slices.DeleteFunc(pubResList.Items, func(pr syncagentv1alpha1.PublishedResource) bool {
-		return pr.Status.ResourceSchemaName == ""
+		return pr.Status.ResourceSchemaName == "" || !isSyncEnabled(&pr)
 	})
 
 	// make sure that for every PublishedResource, a matching sync controller exists
@@ -423,9 +424,7 @@ func isSyncEnabled(pr *syncagentv1alpha1.PublishedResource) bool {
 func (r *Reconciler) ensureSyncControllers(ctx context.Context, log *zap.SugaredLogger, publishedResources []syncagentv1alpha1.PublishedResource) error {
 	requiredWorkers := sets.New[string]()
 	for _, pr := range publishedResources {
-		if isSyncEnabled(&pr) {
-			requiredWorkers.Insert(getPublishedResourceKey(&pr))
-		}
+		requiredWorkers.Insert(getPublishedResourceKey(&pr))
 	}
 
 	// stop controllers that are no longer needed
@@ -445,10 +444,6 @@ func (r *Reconciler) ensureSyncControllers(ctx context.Context, log *zap.Sugared
 
 	// start missing controllers
 	for _, pubRes := range publishedResources {
-		if !isSyncEnabled(&pubRes) {
-			continue
-		}
-
 		key := getPublishedResourceKey(&pubRes)
 
 		// controller already exists
