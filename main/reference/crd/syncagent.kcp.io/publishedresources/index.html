@@ -534,6 +534,8 @@ access to the APIs inside kcp.
       
         
       
+        
+      
     
     
       
@@ -575,6 +577,27 @@ access to the APIs inside kcp.
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../publish-resources/related-resources/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Related Resources
+  </span>
+  
+
+      </a>
+    </li>
+  
+
               
             
               
@@ -2126,6 +2149,13 @@ versions.</p>
 
 </div>
 
+<div class="property-description">
+<p>Related configures additional resources that semantically belong to the synced
+resource, like a Secret containing generated credentials. Related objects are
+synced along the main resource.</p>
+
+</div>
+
 </div>
 </div>
 
@@ -2136,6 +2166,34 @@ versions.</p>
 <div class="property-body">
 <div class="property-meta">
 <span class="property-type">object</span>
+
+</div>
+
+<div class="property-description">
+<p>RelatedResourceSpec describes a single related resource, which might point to
+any number of actual Kubernetes objects.</p>
+
+<p>(in the following rule, group is optional becaue core/v1 is represented by group=&ldquo;&rdquo;)
+group is included here because when an identityHash is used, core/v1 cannot possible be targetted</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-3">
+<div class="property-header">
+<h3 class="property-path" id="v1alpha1-.spec.related[*].group">.spec.related[*].group</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Group is the API group of the related resource. This should be left blank for resources
+in the core API group.</p>
 
 </div>
 
@@ -2165,16 +2223,38 @@ The identifier must be an alphanumeric string.</p>
 
 <div class="property depth-3">
 <div class="property-header">
+<h3 class="property-path" id="v1alpha1-.spec.related[*].identityHash">.spec.related[*].identityHash</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>IdentityHash is the identity hash of a kcp APIExport, in case the given Kind is
+provided by an APIExport and not Kube-native.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-3">
+<div class="property-header">
 <h3 class="property-path" id="v1alpha1-.spec.related[*].kind">.spec.related[*].kind</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
 <span class="property-type">string</span>
-<span class="property-required">Required</span>
+
 </div>
 
 <div class="property-description">
-<p>ConfigMap or Secret</p>
+<p>Kind is the object kind of the related resource (for example &ldquo;Secret&rdquo;).</p>
+
+<p>Deprecated: Use &ldquo;Resource&rdquo; instead. This field is limited to &ldquo;ConfigMap&rdquo; and &ldquo;Secret&rdquo; and will
+be removed in the future. Kind and Resource cannot be specified at the same time.</p>
 
 </div>
 
@@ -3307,6 +3387,118 @@ construct the resulting string.</p>
 </div>
 </div>
 
+<div class="property depth-3">
+<div class="property-header">
+<h3 class="property-path" id="v1alpha1-.spec.related[*].projection">.spec.related[*].projection</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">object</span>
+
+</div>
+
+<div class="property-description">
+<p>Projection is used to change the GVK of a related resource on the opposite side of
+its origin.
+All fields in the projection are optional. If a field is set, it will overwrite
+that field in the GVK.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-4">
+<div class="property-header">
+<h3 class="property-path" id="v1alpha1-.spec.related[*].projection.group">.spec.related[*].projection.group</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>The API group, for example &ldquo;myservice.example.com&rdquo;. Leave empty to not modify the API group.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-4">
+<div class="property-header">
+<h3 class="property-path" id="v1alpha1-.spec.related[*].projection.resource">.spec.related[*].projection.resource</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>The resource name, for example &ldquo;databases&rdquo;. Leave empty to not modify the resource.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-4">
+<div class="property-header">
+<h3 class="property-path" id="v1alpha1-.spec.related[*].projection.version">.spec.related[*].projection.version</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>The API version, for example &ldquo;v1beta1&rdquo;. Leave empty to not modify the version.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-3">
+<div class="property-header">
+<h3 class="property-path" id="v1alpha1-.spec.related[*].resource">.spec.related[*].resource</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Resource is the name of the related resource (for example &ldquo;secrets&rdquo;).</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-3">
+<div class="property-header">
+<h3 class="property-path" id="v1alpha1-.spec.related[*].version">.spec.related[*].version</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Version is the API version of the related resource. This can be left blank to automatically
+use the preferred version.</p>
+
+</div>
+
+</div>
+</div>
+
 <div class="property depth-1">
 <div class="property-header">
 <h3 class="property-path" id="v1alpha1-.spec.resource">.spec.resource</h3>
@@ -3410,6 +3602,48 @@ to publish all available versions.</p>
 <div class="property-body">
 <div class="property-meta">
 <span class="property-type">string</span>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-1">
+<div class="property-header">
+<h3 class="property-path" id="v1alpha1-.spec.synchronization">.spec.synchronization</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">object</span>
+
+</div>
+
+<div class="property-description">
+<p>Synchronization allows to configure how the syncagent processes this resource.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-2">
+<div class="property-header">
+<h3 class="property-path" id="v1alpha1-.spec.synchronization.enabled">.spec.synchronization.enabled</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">boolean</span>
+<span class="property-required">Required</span>
+</div>
+
+<div class="property-description">
+<p>Enabled can be used to toggle the synchronization as a whole. When set to
+false, the syncagent will only copy the CRD and include it in the APIExport,
+but not will attempt to synchronize objects of this resource from the kcp
+workspaces to the provider.
+Synchronization must be disabled for resources that are used as related
+resources for other PublishedResources. Otherwise the syncagent would
+potentially loop and never finish processing an object.</p>
 
 </div>
 

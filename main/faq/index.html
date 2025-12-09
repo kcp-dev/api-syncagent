@@ -527,6 +527,8 @@
       
         
       
+        
+      
     
     
       
@@ -568,6 +570,27 @@
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../publish-resources/related-resources/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Related Resources
+  </span>
+  
+
+      </a>
+    </li>
+  
+
               
             
               
@@ -1139,10 +1162,17 @@ but is no longer configured in the agent, the agent will simply ignore the schem
 This allows for async cleanup processes to happen before an admin ultimately removes the old
 schema from the <code>APIExport</code>.</p>
 <h2 id="does-the-sync-agent-handle-permission-claims">Does the Sync Agent handle permission claims?</h2>
-<p>Only those required for its own operation. If you configure a namespaced resource to sync, it will
-automatically add a claim for <code>namespaces</code> in kcp, plus it will add either <code>configmaps</code> or <code>secrets</code>
-if related resources are configured in a <code>PublishedResource</code>. But you cannot specify additional
-permissions claims.</p>
+<p>Only those required for its own operation. The syncagent will add the following permission claims
+to the APIExport it manages:</p>
+<ul>
+<li><code>events</code> (always)</li>
+<li><code>namespaces</code> (always)</li>
+<li><code>core.kcp.io/logicalclusters</code> (if <code>enableWorkspacePaths</code> is set in a <code>PublishedResource</code>)</li>
+<li>any resource used as related resources (most often this means <code>configmaps</code> or <code>secrets</code>, but could
+  be any resource)</li>
+</ul>
+<p>The syncagent will always overwrite the entire list of permission claims, i.e. you cannot have custom
+claims in an APIExport managed by the api-syncagent.</p>
 <h2 id="i-am-seeing-errors-in-the-agent-logs-whats-going-on">I am seeing errors in the agent logs, what's going on?</h2>
 <p>Errors like</p>
 <blockquote>
