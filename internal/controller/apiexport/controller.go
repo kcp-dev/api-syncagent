@@ -19,13 +19,15 @@ package apiexport
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/kcp-dev/logicalcluster/v3"
 	"go.uber.org/zap"
 
 	"github.com/kcp-dev/api-syncagent/internal/controllerutil"
 	predicateutil "github.com/kcp-dev/api-syncagent/internal/controllerutil/predicate"
+	"github.com/kcp-dev/api-syncagent/internal/discovery"
+	"github.com/kcp-dev/api-syncagent/internal/kcp"
+	"github.com/kcp-dev/api-syncagent/internal/projection"
 	"github.com/kcp-dev/api-syncagent/internal/resources/reconciling"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
@@ -33,6 +35,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -50,14 +53,15 @@ const (
 )
 
 type Reconciler struct {
-	localClient   ctrlruntimeclient.Client
-	kcpClient     ctrlruntimeclient.Client
-	log           *zap.SugaredLogger
-	recorder      record.EventRecorder
-	lcName        logicalcluster.Name
-	apiExportName string
-	agentName     string
-	prFilter      labels.Selector
+	localClient     ctrlruntimeclient.Client
+	kcpClient       ctrlruntimeclient.Client
+	discoveryClient *discovery.Client
+	log             *zap.SugaredLogger
+	recorder        record.EventRecorder
+	lcName          logicalcluster.Name
+	apiExportName   string
+	agentName       string
+	prFilter        labels.Selector
 }
 
 // Add creates a new controller and adds it to the given manager.
@@ -70,15 +74,21 @@ func Add(
 	agentName string,
 	prFilter labels.Selector,
 ) error {
+	discoveryClient, err := discovery.NewClient(mgr.GetConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create discovery client: %w", err)
+	}
+
 	reconciler := &Reconciler{
-		localClient:   mgr.GetClient(),
-		kcpClient:     kcpCluster.GetClient(),
-		lcName:        lcName,
-		log:           log.Named(ControllerName),
-		recorder:      kcpCluster.GetEventRecorderFor(ControllerName),
-		apiExportName: apiExportName,
-		agentName:     agentName,
-		prFilter:      prFilter,
+		localClient:     mgr.GetClient(),
+		kcpClient:       kcpCluster.GetClient(),
+		discoveryClient: discoveryClient,
+		lcName:          lcName,
+		log:             log.Named(ControllerName),
+		recorder:        kcpCluster.GetEventRecorderFor(ControllerName),
+		apiExportName:   apiExportName,
+		agentName:       agentName,
+		prFilter:        prFilter,
 	}
 
 	hasARS := predicate.NewPredicateFuncs(func(object ctrlruntimeclient.Object) bool {
@@ -90,7 +100,7 @@ func Add(
 		return publishedResource.Status.ResourceSchemaName != ""
 	})
 
-	_, err := builder.ControllerManagedBy(mgr).
+	_, err = builder.ControllerManagedBy(mgr).
 		Named(ControllerName).
 		WithOptions(controller.Options{
 			// we reconcile a single object in kcp, no need for parallel workers
@@ -109,11 +119,24 @@ func Add(
 
 func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	r.log.Debug("Processing")
-	return reconcile.Result{}, r.reconcile(ctx)
+
+	apiExport := &kcpdevv1alpha1.APIExport{}
+	if err := r.kcpClient.Get(ctx, types.NamespacedName{Name: r.apiExportName}, apiExport); err != nil {
+		return reconcile.Result{}, ctrlruntimeclient.IgnoreNotFound(err)
+	}
+
+	return reconcile.Result{}, r.reconcile(ctx, apiExport)
 }
 
-func (r *Reconciler) reconcile(ctx context.Context) error {
-	// find all PublishedResources
+func (r *Reconciler) reconcile(ctx context.Context, apiExport *kcpdevv1alpha1.APIExport) error {
+	// find all PublishedResources; we keep those that are not yet converted into ARS,
+	// just to reduce the amount of re-reconciles when the agent processes a number of PRs in a row
+	// and would constantly update the APIExport; instead we rely on kcp to handle the eventual
+	// consistency.
+	// This allows us to already determine all resources we "own", which helps us in
+	// bilding the proper permission claims if one of the related resources is using a resource
+	// type managed via PublishedResource. Otherwise the controller might not see the PR for the
+	// related resource and temporarily incorrectly assume it needs to add a permission claim.
 	pubResources := &syncagentv1alpha1.PublishedResourceList{}
 	if err := r.localClient.List(ctx, pubResources, &ctrlruntimeclient.ListOptions{
 		LabelSelector: r.prFilter,
@@ -121,75 +144,95 @@ func (r *Reconciler) reconcile(ctx context.Context) error {
 		return fmt.Errorf("failed to list PublishedResources: %w", err)
 	}
 
-	// filter out those PRs that have not yet been processed into an ARS
-	filteredPubResources := slices.DeleteFunc(pubResources.Items, func(pr syncagentv1alpha1.PublishedResource) bool {
-		return pr.Status.ResourceSchemaName == ""
-	})
+	// Create two lists of schema names: ready schemas are those already processed by the
+	// apiresourceschema controller, the other list includes all possible schema names.
+	// For calculating the required permission claims we need _all_ schemas, but we actually
+	// only want to store ready schemas in the APIExport in order to not confuse other
+	// downstream components.
+	readySchemaNames := sets.New[string]()
+	allSchemaNames := sets.New[string]()
+	for _, pubResource := range pubResources.Items {
+		schemaName, err := r.getSchemaName(ctx, &pubResource)
+		if err != nil {
+			return fmt.Errorf("failed to determine schema name for PublishedResource %s: %w", pubResource.Name, err)
+		}
 
-	// for each PR, we note down the created ARS and also the GVKs of related resources
-	arsList := sets.New[string]()
-	claimedResources := sets.New[kcpdevv1alpha1.GroupResource]()
+		allSchemaNames.Insert(schemaName)
 
-	// PublishedResources use kinds, but the PermissionClaims use resource names (plural),
-	// so we must translate accordingly
-	mapper := r.kcpClient.RESTMapper()
+		if pubResource.Status.ResourceSchemaName != "" {
+			readySchemaNames.Insert(schemaName)
+		}
+	}
 
-	for _, pubResource := range filteredPubResources {
-		arsList.Insert(pubResource.Status.ResourceSchemaName)
+	// To determine if the GVR of a related resource needs to be listed as a permission claim,
+	// we first need to figure out all the GVRs our APIExport contains. This is not just the
+	// list of ARS we just built, but also potentially other ARS's that exist in the APIExport
+	// and that we would not touch.
+	mergedSchemaNames := mergeResourceSchemas(apiExport.Spec.LatestResourceSchemas, allSchemaNames)
 
+	// turn the flat list of schema names ("version.resource.group") into a lookup table consisting
+	// of group/resource only
+	ourOwnResources := sets.New[schema.GroupResource]()
+	for _, schemaName := range mergedSchemaNames {
+		gvr, err := parseSchemaName(schemaName)
+		if err != nil {
+			return fmt.Errorf("failed to assemble own resources: %w", err)
+		}
+
+		ourOwnResources.Insert(gvr.GroupResource())
+	}
+
+	// Now we can finally assemble the list of required permission claims.
+	claimedResources := sets.New[permissionClaim]()
+
+	for _, pubResource := range pubResources.Items {
 		// to evaluate the namespace filter, the agent needs to fetch the namespace
 		if filter := pubResource.Spec.Filter; filter != nil && filter.Namespace != nil {
-			claimedResources.Insert(kcpdevv1alpha1.GroupResource{
+			claimedResources.Insert(permissionClaim{
 				Group:    "",
 				Resource: "namespaces",
 			})
 		}
 
 		if pubResource.Spec.EnableWorkspacePaths {
-			claimedResources.Insert(kcpdevv1alpha1.GroupResource{
+			claimedResources.Insert(permissionClaim{
 				Group:    "core.kcp.io",
 				Resource: "logicalclusters",
 			})
 		}
 
+		// Add a claim for every foreign (!) related resource, but make sure to
+		// project the GVR of related resources to their kcp-side equivalent first
+		// if they originate on the service cluster.
 		for _, rr := range pubResource.Spec.Related {
-			resource, err := mapper.ResourceFor(schema.GroupVersionResource{
-				Resource: rr.Kind,
-			})
-			if err != nil {
-				return fmt.Errorf("unknown related resource kind %q: %w", rr.Kind, err)
-			}
+			kcpGVR := projection.RelatedResourceKcpGVR(&rr)
 
-			claimedResources.Insert(kcpdevv1alpha1.GroupResource{
+			// We always want to see namespaces, for simplicity. Technically if we knew the scope
+			// of every related resource, we could determine if a namespace claim is truly necessary.
+			claimedResources.Insert(permissionClaim{
 				Group:    "",
-				Resource: resource.Resource,
+				Resource: "namespaces",
 			})
+
+			if !ourOwnResources.Has(kcpGVR.GroupResource()) {
+				claimedResources.Insert(permissionClaim{
+					Group:        kcpGVR.Group,
+					Resource:     kcpGVR.Resource,
+					IdentityHash: rr.IdentityHash,
+				})
+			}
 		}
 	}
 
-	// Related resources (Secrets, ConfigMaps) are namespaced and so the Sync Agent will
-	// always need to be able to see and manage namespaces.
-	if claimedResources.Len() > 0 {
-		claimedResources.Insert(kcpdevv1alpha1.GroupResource{
-			Group:    "",
-			Resource: "namespaces",
-		})
-	}
-
 	// We always want to create events.
-	claimedResources.Insert(kcpdevv1alpha1.GroupResource{
+	claimedResources.Insert(permissionClaim{
 		Group:    "",
 		Resource: "events",
 	})
 
-	if arsList.Len() == 0 {
-		r.log.Debug("No ready PublishedResources available.")
-		return nil
-	}
-
 	// reconcile an APIExport in kcp
 	factories := []reconciling.NamedAPIExportReconcilerFactory{
-		r.createAPIExportReconciler(arsList, claimedResources, r.agentName, r.apiExportName, r.recorder),
+		r.createAPIExportReconciler(readySchemaNames, claimedResources, r.agentName, r.apiExportName, r.recorder),
 	}
 
 	if err := reconciling.ReconcileAPIExports(ctx, factories, "", r.kcpClient); err != nil {
@@ -225,4 +268,23 @@ func (r *Reconciler) reconcile(ctx context.Context) error {
 	// }
 
 	return nil
+}
+
+func (r *Reconciler) getSchemaName(ctx context.Context, pubRes *syncagentv1alpha1.PublishedResource) (string, error) {
+	if pubRes.Status.ResourceSchemaName != "" {
+		return pubRes.Status.ResourceSchemaName, nil
+	}
+
+	// Technically we *could* wait and let the apiresourceschema controller do its
+	// job and provide the status field above. But this would mean we potentially
+	// temporarily misidentify related resources, adding unnecessary and invalid
+	// permission claims in the APIExport. To avoid these it's worth it to basically
+	// do the same projection logic as the other controller here, just to calculate
+	// what the name of the schema would/will be.
+	projectedCRD, err := projection.ProjectPublishedResource(ctx, r.discoveryClient, pubRes)
+	if err != nil {
+		return "", fmt.Errorf("failed to apply projection rules: %w", err)
+	}
+
+	return kcp.GetAPIResourceSchemaName(projectedCRD), nil
 }

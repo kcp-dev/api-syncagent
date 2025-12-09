@@ -32,10 +32,17 @@ schema from the `APIExport`.
 
 ## Does the Sync Agent handle permission claims?
 
-Only those required for its own operation. If you configure a namespaced resource to sync, it will
-automatically add a claim for `namespaces` in kcp, plus it will add either `configmaps` or `secrets`
-if related resources are configured in a `PublishedResource`. But you cannot specify additional
-permissions claims.
+Only those required for its own operation. The syncagent will add the following permission claims
+to the APIExport it manages:
+
+* `events` (always)
+* `namespaces` (always)
+* `core.kcp.io/logicalclusters` (if `enableWorkspacePaths` is set in a `PublishedResource`)
+* any resource used as related resources (most often this means `configmaps` or `secrets`, but could
+  be any resource)
+
+The syncagent will always overwrite the entire list of permission claims, i.e. you cannot have custom
+claims in an APIExport managed by the api-syncagent.
 
 ## I am seeing errors in the agent logs, what's going on?
 

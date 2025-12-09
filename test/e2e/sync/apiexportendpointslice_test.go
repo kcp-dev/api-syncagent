@@ -110,7 +110,7 @@ func TestAPIExportEndpointSliceSameCluster(t *testing.T) {
 	}
 
 	// start the agent in the background to update the APIExport with the CronTabs API;
-	utils.RunEndpointSliceAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, endpointSlice.Name)
+	utils.RunEndpointSliceAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, endpointSlice.Name, "")
 
 	// wait until the API is available
 	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
@@ -253,7 +253,7 @@ func TestAPIExportEndpointSliceDifferentCluster(t *testing.T) {
 	}
 
 	// start the agent in the background to update the APIExport with the CronTabs API
-	utils.RunEndpointSliceAgent(ctx, t, "bob", endpointKubeconfig, envtestKubeconfig, endpointSlice.Name)
+	utils.RunEndpointSliceAgent(ctx, t, "bob", endpointKubeconfig, envtestKubeconfig, endpointSlice.Name, "")
 
 	// wait until the API is available
 

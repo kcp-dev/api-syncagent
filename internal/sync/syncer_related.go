@@ -28,6 +28,7 @@ import (
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 
+	"github.com/kcp-dev/api-syncagent/internal/projection"
 	"github.com/kcp-dev/api-syncagent/internal/sync/templating"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
@@ -97,11 +98,18 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 		return strings.Compare(aKey, bKey)
 	})
 
-	// Synchronize objects the same way the parent object was synchronized.
+	// Synchronize related objects the same way the parent object was synchronized.
+	projectedGVR := projection.RelatedResourceProjectedGVR(&relRes)
+
+	projectedGVK, err := dest.client.RESTMapper().KindFor(projectedGVR)
+	if err != nil {
+		return false, fmt.Errorf("failed to lookup %v: %w", projectedGVR, err)
+	}
+
 	for idx, resolved := range resolvedObjects {
 		destObject := &unstructured.Unstructured{}
-		destObject.SetAPIVersion("v1") // we only support ConfigMaps and Secrets, both are in core/v1
-		destObject.SetKind(relRes.Kind)
+		destObject.SetAPIVersion(projectedGVK.GroupVersion().String())
+		destObject.SetKind(projectedGVK.Kind)
 
 		if err = dest.client.Get(ctx, resolved.destination, destObject); err != nil {
 			destObject = nil
@@ -128,17 +136,24 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 			// how to create a new destination object
 			destCreator: func(source *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 				dest := source.DeepCopy()
+				dest.SetAPIVersion(projectedGVK.GroupVersion().String())
+				dest.SetKind(projectedGVK.Kind)
 				dest.SetName(resolved.destination.Name)
 				dest.SetNamespace(resolved.destination.Namespace)
 
 				return dest, nil
 			},
-			// ConfigMaps and Secrets have no subresources
+			// Originally related resources were only ConfigMaps and Secrets, which do not have subresources;
+			// nowadays we support arbitrary APIs for related resources, but for simplicity do not [yet?]
+			// support syncing the subresources back. For this we would first need to figure out which
+			// subresources even exist.
 			subresources: nil,
-			// only sync the status back if the object originates in kcp,
-			// as the service side should never have to rely on new status infos coming
-			// from the kcp side
-			syncStatusBack: relRes.Origin == "kcp",
+			// Theoretically we would only want to sync the status back if the related resource
+			// originates in kcp, because it would be weird if the service provider relied on status
+			// information provided to them by the consumer.
+			// However since we do not know anything about subresources, we currently cannot enable this
+			// feature at all.
+			syncStatusBack: false,
 			// if the origin is on the remote side, we want to add a finalizer to make
 			// sure we can clean up properly
 			blockSourceDeletion: relRes.Origin == "kcp",
@@ -171,8 +186,8 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 			value, err := json.Marshal(relatedObjectAnnotation{
 				Namespace:  resolved.destination.Namespace,
 				Name:       resolved.destination.Name,
-				APIVersion: "v1", // we only support ConfigMaps and Secrets
-				Kind:       relRes.Kind,
+				APIVersion: resolved.original.GetAPIVersion(),
+				Kind:       resolved.original.GetKind(),
 			})
 			if err != nil {
 				return false, fmt.Errorf("failed to encode related object annotation: %w", err)
@@ -355,9 +370,16 @@ func resolveRelatedResourceObjectsInNamespaces(ctx context.Context, relatedOrigi
 		}
 
 		for originName, destName := range nameMap {
+			originGVR := projection.RelatedResourceGVR(&relRes)
+
+			originGVK, err := relatedOrigin.client.RESTMapper().KindFor(originGVR)
+			if err != nil {
+				return nil, fmt.Errorf("failed to lookup %v: %w", originGVR, err)
+			}
+
 			originObj := &unstructured.Unstructured{}
-			originObj.SetAPIVersion("v1") // we only support ConfigMaps and Secrets, both are in core/v1
-			originObj.SetKind(relRes.Kind)
+			originObj.SetAPIVersion(originGVK.GroupVersion().String())
+			originObj.SetKind(originGVK.Kind)
 
 			err = relatedOrigin.client.Get(ctx, types.NamespacedName{Name: originName, Namespace: originNamespace}, originObj)
 			if err != nil {
@@ -407,9 +429,16 @@ func resolveRelatedResourceObjectsInNamespace(ctx context.Context, relatedOrigin
 		return mapSlices(originNames, destNames), nil
 
 	case spec.Selector != nil:
+		originGVR := projection.RelatedResourceGVR(&relRes)
+
+		originGVK, err := relatedOrigin.client.RESTMapper().KindFor(originGVR)
+		if err != nil {
+			return nil, fmt.Errorf("failed to lookup %v: %w", originGVR, err)
+		}
+
 		originObjects := &unstructured.UnstructuredList{}
-		originObjects.SetAPIVersion("v1") // we only support ConfigMaps and Secrets, both are in core/v1
-		originObjects.SetKind(relRes.Kind)
+		originObjects.SetAPIVersion(originGVK.GroupVersion().String())
+		originObjects.SetKind(originGVK.Kind)
 
 		labelSelector, err := templateLabelSelector(relatedOrigin, relatedDest, relRes.Origin, &spec.Selector.LabelSelector)
 		if err != nil {

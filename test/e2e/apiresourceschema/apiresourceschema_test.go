@@ -76,7 +76,7 @@ func TestARSAreCreated(t *testing.T) {
 	}
 
 	// let the agent do its thing
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait for the APIExport to be updated
 	t.Logf("Waiting for APIExport to be updated…")
@@ -147,7 +147,7 @@ func TestARSAreNotUpdated(t *testing.T) {
 	}
 
 	// let the agent do its thing
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// check ARS
 	t.Logf("Waiting for APIResourceSchema to be created…")
@@ -254,7 +254,7 @@ func TestARSOnlyContainsSelectedCRDVersion(t *testing.T) {
 	}
 
 	// let the agent do its thing
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait for the APIExport to be updated
 	t.Logf("Waiting for APIExport to be updated…")
@@ -336,7 +336,7 @@ func TestMultiVersionCRD(t *testing.T) {
 	}
 
 	// let the agent do its thing
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait for the APIExport to be updated
 	t.Logf("Waiting for APIExport to be updated…")
@@ -433,7 +433,7 @@ func TestProjection(t *testing.T) {
 	}
 
 	// let the agent do its thing
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait for the APIExport to be updated
 	t.Logf("Waiting for APIExport to be updated…")
@@ -532,7 +532,7 @@ func TestNonCRDResource(t *testing.T) {
 	}
 
 	// let the agent do its thing
-	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName)
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 	// wait for the APIExport to be updated
 	t.Logf("Waiting for APIExport to be updated…")

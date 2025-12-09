@@ -17,11 +17,13 @@ limitations under the License.
 package projection
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
 	"strings"
 
+	"github.com/kcp-dev/api-syncagent/internal/discovery"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -111,6 +113,89 @@ func ProjectCRD(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagent
 	}
 
 	return result, nil
+}
+
+func ProjectPublishedResource(ctx context.Context, client *discovery.Client, pubRes *syncagentv1alpha1.PublishedResource) (*apiextensionsv1.CustomResourceDefinition, error) {
+	// find the resource that the PublishedResource is referring to
+	localGK := PublishedResourceSourceGK(pubRes)
+
+	// fetch the original, full CRD from the cluster
+	crd, err := client.RetrieveCRD(ctx, localGK)
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover resource defined in PublishedResource: %w", err)
+	}
+
+	// project the CRD (i.e. strip unwanted versions, rename values etc.)
+	projectedCRD, err := ProjectCRD(crd, pubRes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply projection rules: %w", err)
+	}
+
+	return projectedCRD, nil
+}
+
+func RelatedResourceGVR(rr *syncagentv1alpha1.RelatedResourceSpec) schema.GroupVersionResource {
+	resultGVR := schema.GroupVersionResource{
+		Group:    rr.Group,
+		Version:  rr.Version,
+		Resource: rr.Resource,
+	}
+
+	// handle legacy kinds
+	//nolint:staticcheck
+	switch rr.Kind {
+	case "ConfigMap":
+		resultGVR.Group = ""
+		resultGVR.Version = "v1"
+		resultGVR.Resource = "configmaps"
+	case "Secret":
+		resultGVR.Group = ""
+		resultGVR.Version = "v1"
+		resultGVR.Resource = "secrets"
+	}
+
+	return resultGVR
+}
+
+// RelatedResourceProjectedGVR returns the effective GVR on the destination side,
+// after the projection rules for the related resource have been applied.
+func RelatedResourceProjectedGVR(rr *syncagentv1alpha1.RelatedResourceSpec) schema.GroupVersionResource {
+	resultGVR := RelatedResourceGVR(rr)
+
+	projection := rr.Projection
+	if projection == nil {
+		return resultGVR
+	}
+
+	if projection.Group != "" {
+		resultGVR.Group = projection.Group
+	}
+
+	if projection.Version != "" {
+		resultGVR.Version = projection.Version
+	}
+
+	if projection.Resource != "" {
+		resultGVR.Resource = projection.Resource
+	}
+
+	return resultGVR
+}
+
+func RelatedResourceKcpGVR(rr *syncagentv1alpha1.RelatedResourceSpec) schema.GroupVersionResource {
+	if rr.Origin == syncagentv1alpha1.RelatedResourceOriginKcp {
+		return RelatedResourceGVR(rr)
+	}
+
+	return RelatedResourceProjectedGVR(rr)
+}
+
+func RelatedResourceServiceGVK(rr *syncagentv1alpha1.RelatedResourceSpec) schema.GroupVersionResource {
+	if rr.Origin == syncagentv1alpha1.RelatedResourceOriginService {
+		return RelatedResourceGVR(rr)
+	}
+
+	return RelatedResourceProjectedGVR(rr)
 }
 
 func stripUnwantedVersions(crd *apiextensionsv1.CustomResourceDefinition, pubRes *syncagentv1alpha1.PublishedResource) (*apiextensionsv1.CustomResourceDefinition, error) {

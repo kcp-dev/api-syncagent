@@ -36,6 +36,10 @@ set -x
   "object:headerFile=$BOILERPLATE_HEADER" \
   paths=./internal/sync/apis/...
 
+"$CONTROLLER_GEN" \
+  "object:headerFile=$BOILERPLATE_HEADER" \
+  paths=./test/crds/...
+
 cd sdk
 rm -rf -- applyconfiguration clientset informers listers
 

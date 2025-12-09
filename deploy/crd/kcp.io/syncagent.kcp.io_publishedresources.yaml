@@ -349,8 +349,23 @@ spec:
                       type: object
                   type: object
                 related:
+                  description: |-
+                    Related configures additional resources that semantically belong to the synced
+                    resource, like a Secret containing generated credentials. Related objects are
+                    synced along the main resource.
                   items:
+                    description: |-
+                      RelatedResourceSpec describes a single related resource, which might point to
+                      any number of actual Kubernetes objects.
+
+                      (in the following rule, group is optional becaue core/v1 is represented by group="")
+                      group is included here because when an identityHash is used, core/v1 cannot possible be targetted
                     properties:
+                      group:
+                        description: |-
+                          Group is the API group of the related resource. This should be left blank for resources
+                          in the core API group.
+                        type: string
                       identifier:
                         description: |-
                           Identifier is a unique name for this related resource. The name must be unique within one
@@ -358,8 +373,20 @@ spec:
                           related resource. Common names are "connection-details" or "credentials".
                           The identifier must be an alphanumeric string.
                         type: string
+                      identityHash:
+                        description: |-
+                          IdentityHash is the identity hash of a kcp APIExport, in case the given Kind is
+                          provided by an APIExport and not Kube-native.
+                        type: string
                       kind:
-                        description: ConfigMap or Secret
+                        description: |-
+                          Kind is the object kind of the related resource (for example "Secret").
+
+                          Deprecated: Use "Resource" instead. This field is limited to "ConfigMap" and "Secret" and will
+                          be removed in the future. Kind and Resource cannot be specified at the same time.
+                        enum:
+                          - ConfigMap
+                          - Secret
                         type: string
                       mutation:
                         description: |-
@@ -686,12 +713,45 @@ spec:
                           - service
                           - kcp
                         type: string
+                      projection:
+                        description: |-
+                          Projection is used to change the GVK of a related resource on the opposite side of
+                          its origin.
+                          All fields in the projection are optional. If a field is set, it will overwrite
+                          that field in the GVK.
+                        properties:
+                          group:
+                            description: The API group, for example "myservice.example.com". Leave empty to not modify the API group.
+                            type: string
+                          resource:
+                            description: The resource name, for example "databases". Leave empty to not modify the resource.
+                            type: string
+                          version:
+                            description: The API version, for example "v1beta1". Leave empty to not modify the version.
+                            type: string
+                        type: object
+                      resource:
+                        description: Resource is the name of the related resource (for example "secrets").
+                        type: string
+                      version:
+                        description: |-
+                          Version is the API version of the related resource. This can be left blank to automatically
+                          use the preferred version.
+                        type: string
                     required:
                       - identifier
-                      - kind
                       - object
                       - origin
                     type: object
+                    x-kubernetes-validations:
+                      - message: must specify either kind (deprecated) or group, version, resource
+                        rule: has(self.kind) != (has(self.version) || has(self.resource))
+                      - message: resource and version must be configured together or not at all
+                        rule: has(self.resource) == has(self.version)
+                      - message: configuring a group also requires a version and resource
+                        rule: '!has(self.group) || (has(self.resource) && has(self.version))'
+                      - message: identity hashes can only be used with GVRs
+                        rule: '!has(self.identityHash) || (has(self.group) && has(self.version) && has(self.resource))'
                   type: array
                 resource:
                   description: |-
@@ -722,6 +782,22 @@ spec:
                   required:
                     - apiGroup
                     - kind
+                  type: object
+                synchronization:
+                  description: Synchronization allows to configure how the syncagent processes this resource.
+                  properties:
+                    enabled:
+                      description: |-
+                        Enabled can be used to toggle the synchronization as a whole. When set to
+                        false, the syncagent will only copy the CRD and include it in the APIExport,
+                        but not will attempt to synchronize objects of this resource from the kcp
+                        workspaces to the provider.
+                        Synchronization must be disabled for resources that are used as related
+                        resources for other PublishedResources. Otherwise the syncagent would
+                        potentially loop and never finish processing an object.
+                      type: boolean
+                  required:
+                    - enabled
                   type: object
               required:
                 - resource
