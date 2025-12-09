@@ -236,6 +236,7 @@ spec:
       - regex: ...
         template: ...
         delete: ...
+        cel: ...
 ```
 
 #### Regex
@@ -272,6 +273,25 @@ delete:
 
 This mutation simply removes the value at the given path from the document. JSON path is the
 usual path, without a leading dot.
+
+#### CEL Expressions
+
+```yaml
+cel:
+  path: "metadata.resourceVersion"
+  expression: "value + 42"
+```
+
+This mutation applies a [CEL expression](https://cel.dev/) to a selected value (via `path`) in the
+source object. For this mutation the syncagent will first get the current value at the `path` from
+the Kubernetes object, then applies the CEl expression to it and updates the document with the
+resulting value.
+
+Inside the CEL expression, the following variables are available:
+
+* `value` is the value selected by the `path`
+* `self` is the object to modify
+* `other` is the copy of this object on the other side of the sync
 
 ### Related Resources
 

@@ -157,6 +157,16 @@ spec:
                     spec:
                       items:
                         properties:
+                          cel:
+                            properties:
+                              expression:
+                                type: string
+                              path:
+                                type: string
+                            required:
+                              - expression
+                              - path
+                            type: object
                           delete:
                             properties:
                               path:
@@ -193,6 +203,16 @@ spec:
                     status:
                       items:
                         properties:
+                          cel:
+                            properties:
+                              expression:
+                                type: string
+                              path:
+                                type: string
+                            required:
+                              - expression
+                              - path
+                            type: object
                           delete:
                             properties:
                               path:
@@ -396,6 +416,16 @@ spec:
                           spec:
                             items:
                               properties:
+                                cel:
+                                  properties:
+                                    expression:
+                                      type: string
+                                    path:
+                                      type: string
+                                  required:
+                                    - expression
+                                    - path
+                                  type: object
                                 delete:
                                   properties:
                                     path:
@@ -432,6 +462,16 @@ spec:
                           status:
                             items:
                               properties:
+                                cel:
+                                  properties:
+                                    expression:
+                                      type: string
+                                    path:
+                                      type: string
+                                  required:
+                                    - expression
+                                    - path
+                                  type: object
                                 delete:
                                   properties:
                                     path:

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 
 	"go.uber.org/zap"
@@ -233,15 +234,23 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, vwUR
 	}
 
 	// find all PublishedResources
-	pubResources := &syncagentv1alpha1.PublishedResourceList{}
-	if err := r.localManager.GetClient().List(ctx, pubResources, &ctrlruntimeclient.ListOptions{
+	pubResList := &syncagentv1alpha1.PublishedResourceList{}
+	if err := r.localManager.GetClient().List(ctx, pubResList, &ctrlruntimeclient.ListOptions{
 		LabelSelector: r.prFilter,
 	}); err != nil {
 		return fmt.Errorf("failed to list PublishedResources: %w", err)
 	}
 
+	// Filter out those that have not been processed into APIResourceSchemas yet; starting
+	// sync controllers too early, before the schemes are available, will make the watches
+	// not work properly.
+	// Also remove those PRs that have sync disabled.
+	pubResources := slices.DeleteFunc(pubResList.Items, func(pr syncagentv1alpha1.PublishedResource) bool {
+		return pr.Status.ResourceSchemaName == "" || !isSyncEnabled(&pr)
+	})
+
 	// make sure that for every PublishedResource, a matching sync controller exists
-	if err := r.ensureSyncControllers(ctx, log, pubResources.Items); err != nil {
+	if err := r.ensureSyncControllers(ctx, log, pubResources); err != nil {
 		return fmt.Errorf("failed to ensure sync controllers: %w", err)
 	}
 
@@ -415,9 +424,7 @@ func isSyncEnabled(pr *syncagentv1alpha1.PublishedResource) bool {
 func (r *Reconciler) ensureSyncControllers(ctx context.Context, log *zap.SugaredLogger, publishedResources []syncagentv1alpha1.PublishedResource) error {
 	requiredWorkers := sets.New[string]()
 	for _, pr := range publishedResources {
-		if isSyncEnabled(&pr) {
-			requiredWorkers.Insert(getPublishedResourceKey(&pr))
-		}
+		requiredWorkers.Insert(getPublishedResourceKey(&pr))
 	}
 
 	// stop controllers that are no longer needed
@@ -437,10 +444,6 @@ func (r *Reconciler) ensureSyncControllers(ctx context.Context, log *zap.Sugared
 
 	// start missing controllers
 	for _, pubRes := range publishedResources {
-		if !isSyncEnabled(&pubRes) {
-			continue
-		}
-
 		key := getPublishedResourceKey(&pubRes)
 
 		// controller already exists
