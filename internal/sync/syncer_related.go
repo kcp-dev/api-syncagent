@@ -143,12 +143,17 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 
 				return dest, nil
 			},
-			// reloated resources have no subresources
+			// Originally related resources were only ConfigMaps and Secrets, which do not have subresources;
+			// nowadays we support arbitrary APIs for related resources, but for simplicity do not [yet?]
+			// support syncing the subresources back. For this we would first need to figure out which
+			// subresources even exist.
 			subresources: nil,
-			// only sync the status back if the object originates in kcp,
-			// as the service side should never have to rely on new status infos coming
-			// from the kcp side
-			syncStatusBack: relRes.Origin == "kcp",
+			// Theoretically we would only want to sync the status back if the related resource
+			// originates in kcp, because it would be weird if the service provider relied on status
+			// information provided to them by the consumer.
+			// However since we do not know anything about subresources, we currently cannot enable this
+			// feature at all.
+			syncStatusBack: false,
 			// if the origin is on the remote side, we want to add a finalizer to make
 			// sure we can clean up properly
 			blockSourceDeletion: relRes.Origin == "kcp",

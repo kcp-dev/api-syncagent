@@ -42,7 +42,7 @@ to the APIExport it manages:
   be any resource)
 
 The syncagent will always overwrite the entire list of permission claims, i.e. you cannot have custom
-claims in an APIExport.
+claims in an APIExport managed by the api-syncagent.
 
 ## I am seeing errors in the agent logs, what's going on?
 
