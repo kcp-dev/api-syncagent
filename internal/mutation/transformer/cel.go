@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/checker/decls"
+	"github.com/google/cel-go/common/decls"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
@@ -35,10 +35,10 @@ type celTransformer struct {
 }
 
 func NewCEL(mut *syncagentv1alpha1.ResourceCELMutation) (*celTransformer, error) {
-	env, err := cel.NewEnv(cel.Declarations(
-		decls.NewVar("self", decls.Dyn),
-		decls.NewVar("other", decls.Dyn),
-		decls.NewVar("value", decls.Dyn),
+	env, err := cel.NewEnv(cel.VariableDecls(
+		decls.NewVariable("self", cel.DynType),
+		decls.NewVariable("other", cel.DynType),
+		decls.NewVariable("value", cel.DynType),
 	))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CEL env: %w", err)
