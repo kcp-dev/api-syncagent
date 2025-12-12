@@ -174,7 +174,7 @@ install-yq:
 	@UNCOMPRESSED=true hack/uget.sh https://github.com/mikefarah/yq/releases/download/v{VERSION}/yq_{GOOS}_{GOARCH} yq $(YQ_VERSION) yq_*
 
 .PHONY: install-kcp
-install-kcp: UGET_CHECKSUMS=false # do not checksum because the version regularly gets overwritten in CI jobs
+install-kcp: UGET_CHECKSUMS= # do not checksum because the version regularly gets overwritten in CI jobs
 install-kcp:
 	@hack/uget.sh https://github.com/kcp-dev/kcp/releases/download/v{VERSION}/kcp_{VERSION}_{GOOS}_{GOARCH}.tar.gz kcp $(KCP_VERSION)
 
