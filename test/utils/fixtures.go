@@ -128,6 +128,24 @@ func CreateAPIExport(t *testing.T, ctx context.Context, client ctrlruntimeclient
 		t.Fatalf("Failed to create APIExport: %v", err)
 	}
 
+	// In kcp 0.27, we have to manually create the AEES. To make the tests work consistently with
+	// 0.27 and later versions, we simply always create one.
+	endpointSlice := &kcpapisv1alpha1.APIExportEndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: kcpapisv1alpha1.APIExportEndpointSliceSpec{
+			APIExport: kcpapisv1alpha1.ExportBindingReference{
+				Name: name,
+			},
+		},
+	}
+
+	t.Logf("Creating APIExportEndpointSlice %q…", endpointSlice.Name)
+	if err := client.Create(ctx, endpointSlice); err != nil {
+		t.Fatalf("Failed to create APIExportEndpointSlice: %v", err)
+	}
+
 	// grant permissions to access/manage the APIExport
 	if rbacSubject != nil {
 		clusterRoleName := "api-syncagent"

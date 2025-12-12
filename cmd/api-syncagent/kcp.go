@@ -38,25 +38,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 )
 
-// The agent has two potentially different kcp clusters:
-//
-//   endpointCluster - this is where the source of the virtual workspace URLs
-//                     live, i.e. where the APIExport/EndpointSlice.
-//   managedCluster  - this is where the APIExport and APIResourceSchemas
-//                     exist that are meant to be reconciled.
-//
-// The managedCluster always exists, the endpointCluster only if the workspace
-// for the virtual workspace source is different from the managed cluster.
-
 // setupEndpointKcpCluster sets up a plain, non-kcp-aware ctrl-runtime Cluster object
 // that is solvely used to watch whichever object holds the virtual workspace URLs,
 // either the APIExport or the APIExportEndpointSlice.
-func setupEndpointKcpCluster(endpoint *syncEndpoint) (cluster.Cluster, error) {
-	// no need for a dedicated endpoint cluster
-	if endpoint.EndpointSlice == nil || endpoint.EndpointSlice.Cluster == endpoint.APIExport.Cluster {
-		return nil, nil
-	}
-
+func setupEndpointKcpCluster(endpointSlice qualifiedAPIExportEndpointSlice) (cluster.Cluster, error) {
 	scheme := runtime.NewScheme()
 
 	if err := kcpapisv1alpha1.AddToScheme(scheme); err != nil {
@@ -71,11 +56,11 @@ func setupEndpointKcpCluster(endpoint *syncEndpoint) (cluster.Cluster, error) {
 	// restrict the cache's selectors accordingly so we can still make use of caching.
 	byObject := map[ctrlruntimeclient.Object]cache.ByObject{
 		&kcpapisv1alpha1.APIExportEndpointSlice{}: {
-			Field: fields.SelectorFromSet(fields.Set{"metadata.name": endpoint.EndpointSlice.Name}),
+			Field: fields.SelectorFromSet(fields.Set{"metadata.name": endpointSlice.Name}),
 		},
 	}
 
-	return cluster.New(endpoint.EndpointSlice.Config, func(o *cluster.Options) {
+	return cluster.New(endpointSlice.Config, func(o *cluster.Options) {
 		o.Scheme = scheme
 		o.Cache = cache.Options{
 			Scheme:   scheme,
@@ -86,7 +71,7 @@ func setupEndpointKcpCluster(endpoint *syncEndpoint) (cluster.Cluster, error) {
 
 // setupManagedKcpCluster sets up a plain, non-kcp-aware ctrl-runtime Cluster object
 // that is solvely used to manage the APIExport and APIResourceSchemas.
-func setupManagedKcpCluster(endpoint *syncEndpoint) (cluster.Cluster, error) {
+func setupManagedKcpCluster(apiExport qualifiedAPIExport) (cluster.Cluster, error) {
 	scheme := runtime.NewScheme()
 
 	if err := kcpapisv1alpha1.AddToScheme(scheme); err != nil {
@@ -101,11 +86,11 @@ func setupManagedKcpCluster(endpoint *syncEndpoint) (cluster.Cluster, error) {
 	// restrict the cache's selectors accordingly so we can still make use of caching.
 	byObject := map[ctrlruntimeclient.Object]cache.ByObject{
 		&kcpapisv1alpha1.APIExport{}: {
-			Field: fields.SelectorFromSet(fields.Set{"metadata.name": endpoint.APIExport.Name}),
+			Field: fields.SelectorFromSet(fields.Set{"metadata.name": apiExport.Name}),
 		},
 	}
 
-	return cluster.New(endpoint.APIExport.Config, func(o *cluster.Options) {
+	return cluster.New(apiExport.Config, func(o *cluster.Options) {
 		o.Scheme = scheme
 		o.Cache = cache.Options{
 			Scheme:   scheme,
@@ -121,18 +106,18 @@ type qualifiedCluster struct {
 }
 
 type qualifiedAPIExport struct {
-	*kcpdevv1alpha1.APIExport
+	*kcpapisv1alpha1.APIExport
 	qualifiedCluster
 }
 
 type qualifiedAPIExportEndpointSlice struct {
-	*kcpdevv1alpha1.APIExportEndpointSlice
+	*kcpapisv1alpha1.APIExportEndpointSlice
 	qualifiedCluster
 }
 
 type syncEndpoint struct {
 	APIExport     qualifiedAPIExport
-	EndpointSlice *qualifiedAPIExportEndpointSlice
+	EndpointSlice qualifiedAPIExportEndpointSlice
 }
 
 // resolveSyncEndpoint takes the user provided (usually via CLI flags) APIExportEndpointSliceRef and
@@ -141,7 +126,7 @@ type syncEndpoint struct {
 // must point to the cluster where the APIExport lives, and vice versa for the endpoint slice;
 // however the endpoint slice references an APIExport in potentially another cluster, and for this
 // case the initialRestConfig will be rewritten accordingly).
-func resolveSyncEndpoint(ctx context.Context, initialRestConfig *rest.Config, endpointSliceRef string, apiExportRef string) (*syncEndpoint, error) {
+func resolveSyncEndpoint(ctx context.Context, initialRestConfig *rest.Config, endpointSliceRef string) (*syncEndpoint, error) {
 	// construct temporary, uncached client
 	scheme := runtime.NewScheme()
 	if err := kcpcorev1alpha1.AddToScheme(scheme); err != nil {
