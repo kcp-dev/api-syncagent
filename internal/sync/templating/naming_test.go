@@ -19,9 +19,9 @@ package templating
 import (
 	"testing"
 
-	"github.com/kcp-dev/logicalcluster/v3"
-
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
+
+	"github.com/kcp-dev/logicalcluster/v3"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"

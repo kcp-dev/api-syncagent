@@ -22,11 +22,12 @@ import (
 	"slices"
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
-	"github.com/kcp-dev/logicalcluster/v3"
 	"go.uber.org/zap"
 	"k8c.io/reconciler/pkg/equality"
 
 	"github.com/kcp-dev/api-syncagent/internal/mutation"
+
+	"github.com/kcp-dev/logicalcluster/v3"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

@@ -32,11 +32,11 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/controller/apiexport"
 	"github.com/kcp-dev/api-syncagent/internal/controller/apiresourceschema"
 	"github.com/kcp-dev/api-syncagent/internal/controller/syncmanager"
+	"github.com/kcp-dev/api-syncagent/internal/discovery"
+	"github.com/kcp-dev/api-syncagent/internal/kcp"
 	syncagentlog "github.com/kcp-dev/api-syncagent/internal/log"
 	"github.com/kcp-dev/api-syncagent/internal/version"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
-
-	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -85,13 +85,11 @@ func main() {
 
 func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 	v := version.NewAppVersion()
-	hello := log.With("version", v.GitVersion, "name", opts.AgentName)
-
-	if opts.APIExportEndpointSliceRef != "" {
-		hello = hello.With("apiexportendpointslice", opts.APIExportEndpointSliceRef)
-	} else {
-		hello = hello.With("apiexport", opts.APIExportRef)
-	}
+	hello := log.With(
+		"version", v.GitVersion,
+		"name", opts.AgentName,
+		"apiexportendpointslice", opts.APIExportEndpointSliceRef,
+	)
 
 	hello.Info("Moin, I'm the kcp Sync Agent")
 
@@ -112,22 +110,20 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 		return fmt.Errorf("kcp kubeconfig does not point to a specific workspace")
 	}
 
-	// We check if the APIExport/APIExportEndpointSlice exists and extract information we need to set up our kcpCluster.
-	endpoint, err := resolveSyncEndpoint(ctx, kcpRestConfig, opts.APIExportEndpointSliceRef, opts.APIExportRef)
+	// We check if the APIExportEndpointSlice exists and extract information we need to set up our kcpCluster.
+	endpoint, err := resolveSyncEndpoint(ctx, kcpRestConfig, opts.APIExportEndpointSliceRef)
 	if err != nil {
 		return fmt.Errorf("failed to resolve APIExport/EndpointSlice: %w", err)
 	}
 
 	log.Infow("Resolved APIExport", "name", endpoint.APIExport.Name, "workspace", endpoint.APIExport.Path, "logicalcluster", endpoint.APIExport.Cluster)
-
-	if s := endpoint.EndpointSlice; s != nil {
-		log.Infow("Using APIExportEndpointSlice", "name", endpoint.EndpointSlice.Name, "workspace", s.Path, "logicalcluster", s.Cluster)
-	}
+	log.Infow("Using APIExportEndpointSlice", "name", endpoint.EndpointSlice.Name, "workspace", endpoint.EndpointSlice.Path, "logicalcluster", endpoint.EndpointSlice.Cluster)
 
 	// init the "permanent" kcp cluster connections
 
-	// always need the managedKcpCluster
-	managedKcpCluster, err := setupManagedKcpCluster(endpoint)
+	// always need the managedKcpCluster, this is where we will manage the APIExport and
+	// its resource schemas.
+	managedKcpCluster, err := setupManagedKcpCluster(endpoint.APIExport)
 	if err != nil {
 		return fmt.Errorf("failed to initialize managed kcp cluster: %w", err)
 	}
@@ -138,16 +134,34 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 		return fmt.Errorf("failed to add managed kcp cluster runnable: %w", err)
 	}
 
-	// the endpoint cluster can be nil
-	endpointKcpCluster, err := setupEndpointKcpCluster(endpoint)
-	if err != nil {
-		return fmt.Errorf("failed to initialize endpoint kcp cluster: %w", err)
-	}
+	endpointSliceCluster := managedKcpCluster
 
-	if endpointKcpCluster != nil {
+	// If needed, start an additional cluster for the endpoint workspace, where
+	// the EndpointSlice lives.
+	if endpoint.EndpointSlice.Cluster != endpoint.APIExport.Cluster {
+		endpointKcpCluster, err := setupEndpointKcpCluster(endpoint.EndpointSlice)
+		if err != nil {
+			return fmt.Errorf("failed to initialize endpoint kcp cluster: %w", err)
+		}
+
 		if err := mgr.Add(endpointKcpCluster); err != nil {
 			return fmt.Errorf("failed to add endpoint kcp cluster runnable: %w", err)
 		}
+
+		endpointSliceCluster = endpointKcpCluster
+	}
+
+	// Setup the magical dynamic multicluster manager. It's a dynamic version of the
+	// regular mcmanager, capable of starting new controllers at any later time and
+	// allowing them to be also stopped at any time. The syncmanager needs it to
+	// start/stop sync controllers for each PublishedResource.
+	dmcm, err := kcp.NewDynamicMultiClusterManager(endpoint.EndpointSlice.Config, endpoint.EndpointSlice.Name)
+	if err != nil {
+		return fmt.Errorf("failed to start dynamic multi cluster manager: %w", err)
+	}
+
+	if err := mgr.Add(dmcm); err != nil {
+		return fmt.Errorf("failed to add endpoint kcp cluster runnable: %w", err)
 	}
 
 	startController := func(name string, creator func() error) error {
@@ -178,20 +192,11 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 	// This controller is called "sync" because it makes the most sense to the users, even though internally the relevant
 	// controller is the syncmanager (which in turn would start/stop the sync controllers).
 	if err := startController("sync", func() error {
-		cluster := endpointKcpCluster
-		if cluster == nil {
-			cluster = managedKcpCluster
-		}
+		// The syncmanager needs to be able to determine whether an API is already bound and available
+		// before it can start any sync controllers. That discovery logic is encapsulated in the ResourceProber.
+		prober := discovery.NewResourceProber(endpoint.EndpointSlice.Config, endpointSliceCluster.GetClient(), endpoint.EndpointSlice.Name)
 
-		var endpointSlice *kcpdevv1alpha1.APIExportEndpointSlice
-		if endpoint.EndpointSlice != nil {
-			endpointSlice = endpoint.EndpointSlice.APIExportEndpointSlice
-		}
-
-		// It doesn't matter which rest config we specify, as the URL will be overwritten with the
-		// virtual workspace URL anyway.
-
-		return syncmanager.Add(ctx, mgr, cluster, kcpRestConfig, log, endpoint.APIExport.APIExport, endpointSlice, opts.PublishedResourceSelector, opts.Namespace, opts.AgentName)
+		return syncmanager.Add(ctx, mgr, prober, dmcm, log, opts.PublishedResourceSelector, opts.Namespace, opts.AgentName)
 	}); err != nil {
 		return err
 	}

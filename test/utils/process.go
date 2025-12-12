@@ -68,7 +68,7 @@ func uniqueLogfile(t *testing.T, basename string) string {
 	return fmt.Sprintf("%s_%02d.log", testName, counter)
 }
 
-func RunEndpointSliceAgent(
+func RunAgent(
 	ctx context.Context,
 	t *testing.T,
 	name string,
@@ -77,38 +77,13 @@ func RunEndpointSliceAgent(
 	apiExportEndpointSlice string,
 	labelSelector string,
 ) context.CancelFunc {
-	return runAgent(ctx, t, name, kcpKubeconfig, localKubeconfig, "--apiexportendpointslice-ref", apiExportEndpointSlice, labelSelector)
-}
-
-func RunAgent(
-	ctx context.Context,
-	t *testing.T,
-	name string,
-	kcpKubeconfig string,
-	localKubeconfig string,
-	apiExport string,
-	labelSelector string,
-) context.CancelFunc {
-	return runAgent(ctx, t, name, kcpKubeconfig, localKubeconfig, "--apiexport-ref", apiExport, labelSelector)
-}
-
-func runAgent(
-	ctx context.Context,
-	t *testing.T,
-	name string,
-	kcpKubeconfig string,
-	localKubeconfig string,
-	refFlag string,
-	refValue string,
-	labelSelector string,
-) context.CancelFunc {
 	t.Helper()
 
 	t.Logf("Running agent %q…", name)
 
 	args := []string{
 		"--agent-name", name,
-		refFlag, refValue,
+		"--apiexportendpointslice-ref", apiExportEndpointSlice,
 		"--enable-leader-election=false",
 		"--kubeconfig", localKubeconfig,
 		"--kcp-kubeconfig", kcpKubeconfig,

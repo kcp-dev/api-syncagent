@@ -20,13 +20,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kcp-dev/logicalcluster/v3"
 	"go.uber.org/zap"
 
 	"github.com/kcp-dev/api-syncagent/internal/mutation"
 	"github.com/kcp-dev/api-syncagent/internal/projection"
 	"github.com/kcp-dev/api-syncagent/internal/sync/templating"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
+
+	"github.com/kcp-dev/logicalcluster/v3"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
