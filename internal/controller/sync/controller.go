@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/go-logr/zapr"
-	"github.com/kcp-dev/logicalcluster/v3"
 	"go.uber.org/zap"
 
 	"github.com/kcp-dev/api-syncagent/internal/discovery"
@@ -31,13 +30,9 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/sync"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
+	"github.com/kcp-dev/logicalcluster/v3"
 	kcpcore "github.com/kcp-dev/sdk/apis/core"
-	kcpdevcorev1alpha1 "github.com/kcp-dev/sdk/apis/core/v1alpha1"
-	mccontroller "sigs.k8s.io/multicluster-runtime/pkg/controller"
-	mchandler "sigs.k8s.io/multicluster-runtime/pkg/handler"
-	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
-	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
-	mcsource "sigs.k8s.io/multicluster-runtime/pkg/source"
+	kcpcorev1alpha1 "github.com/kcp-dev/sdk/apis/core/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -52,6 +47,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	mccontroller "sigs.k8s.io/multicluster-runtime/pkg/controller"
+	mchandler "sigs.k8s.io/multicluster-runtime/pkg/handler"
+	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
+	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
+	mcsource "sigs.k8s.io/multicluster-runtime/pkg/source"
 )
 
 const (
@@ -215,8 +215,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request)
 	// if desired, fetch the workspace path as well (some downstream service providers might make use of it,
 	// but since it requires an additional permission claim, it's optional)
 	if r.pubRes.Spec.EnableWorkspacePaths {
-		lc := &kcpdevcorev1alpha1.LogicalCluster{}
-		if err := vwClient.Get(ctx, types.NamespacedName{Name: kcpdevcorev1alpha1.LogicalClusterName}, lc); err != nil {
+		lc := &kcpcorev1alpha1.LogicalCluster{}
+		if err := vwClient.Get(ctx, types.NamespacedName{Name: kcpcorev1alpha1.LogicalClusterName}, lc); err != nil {
 			recorder.Event(remoteObj, corev1.EventTypeWarning, "ReconcilingError", "Failed to retrieve workspace path, cannot process object.")
 			return reconcile.Result{}, fmt.Errorf("failed to retrieve remote logicalcluster: %w", err)
 		}

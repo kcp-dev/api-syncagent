@@ -25,11 +25,11 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/kcp-dev/logicalcluster/v3"
 
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 	"github.com/kcp-dev/api-syncagent/test/utils"
 
+	"github.com/kcp-dev/logicalcluster/v3"
 	kcpdevv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
 
 	rbacv1 "k8s.io/api/rbac/v1"
