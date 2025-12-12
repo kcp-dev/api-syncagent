@@ -134,12 +134,12 @@ func Create(
 	// The manager parameter is mostly unused and will be removed in future CR versions.
 	c, err := mccontroller.NewUnmanaged(ControllerName, remoteManager, ctrlOptions)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to instantiate new controller: %w", err)
 	}
 
 	// watch the target resource in the virtual workspace
 	if err := c.MultiClusterWatch(mcsource.TypedKind(remoteDummy, mchandler.TypedEnqueueRequestForObject[*unstructured.Unstructured]())); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to setup remote-side watch: %w", err)
 	}
 
 	// watch the source resource in the local cluster, but enqueue the origin remote object
@@ -158,7 +158,7 @@ func Create(
 	})
 
 	if err := c.Watch(source.TypedKind(localManager.GetCache(), localDummy, enqueueRemoteObjForLocalObj, nameFilter)); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to setup local-side watch: %w", err)
 	}
 
 	log.Info("Done setting up unmanaged controller.")

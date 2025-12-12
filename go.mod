@@ -16,6 +16,7 @@ require (
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/cel-go v0.26.0
 	github.com/google/go-cmp v0.7.0
+	github.com/google/uuid v1.6.0
 	github.com/kcp-dev/api-syncagent/sdk v0.0.0-00010101000000-000000000000
 	github.com/kcp-dev/kcp v0.29.1-0.20251210093424-08fb9eb48494
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
@@ -79,7 +80,6 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect

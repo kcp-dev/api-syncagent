@@ -32,11 +32,11 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/controller/apiexport"
 	"github.com/kcp-dev/api-syncagent/internal/controller/apiresourceschema"
 	"github.com/kcp-dev/api-syncagent/internal/controller/syncmanager"
+	"github.com/kcp-dev/api-syncagent/internal/discovery"
+	"github.com/kcp-dev/api-syncagent/internal/kcp"
 	syncagentlog "github.com/kcp-dev/api-syncagent/internal/log"
 	"github.com/kcp-dev/api-syncagent/internal/version"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
-
-	kcpapisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -147,6 +147,21 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 		if err := mgr.Add(endpointKcpCluster); err != nil {
 			return fmt.Errorf("failed to add endpoint kcp cluster runnable: %w", err)
 		}
+
+		endpointSliceCluster = endpointKcpCluster
+	}
+
+	// Setup the magical dynamic multicluster manager. It's a dynamic version of the
+	// regular mcmanager, capable of starting new controllers at any later time and
+	// allowing them to be also stopped at any time. The syncmanager needs it to
+	// start/stop sync controllers for each PublishedResource.
+	dmcm, err := kcp.NewDynamicMultiClusterManager(endpoint.EndpointSlice.Config, endpoint.EndpointSlice.Name)
+	if err != nil {
+		return fmt.Errorf("failed to start dynamic multi cluster manager: %w", err)
+	}
+
+	if err := mgr.Add(dmcm); err != nil {
+		return fmt.Errorf("failed to add endpoint kcp cluster runnable: %w", err)
 	}
 
 	startController := func(name string, creator func() error) error {
@@ -177,20 +192,11 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 	// This controller is called "sync" because it makes the most sense to the users, even though internally the relevant
 	// controller is the syncmanager (which in turn would start/stop the sync controllers).
 	if err := startController("sync", func() error {
-		cluster := endpointKcpCluster
-		if cluster == nil {
-			cluster = managedKcpCluster
-		}
+		// The syncmanager needs to be able to determine whether an API is already bound and available
+		// before it can start any sync controllers. That discovery logic is encapsulated in the ResourceProber.
+		prober := discovery.NewResourceProber(endpoint.EndpointSlice.Config, endpointSliceCluster.GetClient(), endpoint.EndpointSlice.Name)
 
-		var endpointSlice *kcpdevv1alpha1.APIExportEndpointSlice
-		if endpoint.EndpointSlice != nil {
-			endpointSlice = endpoint.EndpointSlice.APIExportEndpointSlice
-		}
-
-		// It doesn't matter which rest config we specify, as the URL will be overwritten with the
-		// virtual workspace URL anyway.
-
-		return syncmanager.Add(ctx, mgr, cluster, kcpRestConfig, log, endpoint.APIExport.APIExport, endpointSlice, opts.PublishedResourceSelector, opts.Namespace, opts.AgentName)
+		return syncmanager.Add(ctx, mgr, prober, dmcm, log, opts.PublishedResourceSelector, opts.Namespace, opts.AgentName)
 	}); err != nil {
 		return err
 	}
