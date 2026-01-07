@@ -34,6 +34,7 @@ import (
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -129,7 +130,7 @@ func CreateAPIExport(t *testing.T, ctx context.Context, client ctrlruntimeclient
 	}
 
 	// In kcp 0.27, we have to manually create the AEES. To make the tests work consistently with
-	// 0.27 and later versions, we simply always create one.
+	// 0.27 and later versions, we simply always create one if it's missing.
 	endpointSlice := &kcpapisv1alpha1.APIExportEndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -142,7 +143,7 @@ func CreateAPIExport(t *testing.T, ctx context.Context, client ctrlruntimeclient
 	}
 
 	t.Logf("Creating APIExportEndpointSlice %q…", endpointSlice.Name)
-	if err := client.Create(ctx, endpointSlice); err != nil {
+	if err := client.Create(ctx, endpointSlice); err != nil && !apierrors.IsAlreadyExists(err) {
 		t.Fatalf("Failed to create APIExportEndpointSlice: %v", err)
 	}
 
