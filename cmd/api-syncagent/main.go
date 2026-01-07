@@ -22,7 +22,6 @@ import (
 	"fmt"
 	golog "log"
 	"slices"
-	"strings"
 
 	"github.com/go-logr/zapr"
 	"github.com/spf13/pflag"
@@ -34,6 +33,7 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/controller/syncmanager"
 	"github.com/kcp-dev/api-syncagent/internal/discovery"
 	"github.com/kcp-dev/api-syncagent/internal/kcp"
+	"github.com/kcp-dev/api-syncagent/internal/kubeconfig"
 	syncagentlog "github.com/kcp-dev/api-syncagent/internal/log"
 	"github.com/kcp-dev/api-syncagent/internal/version"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
@@ -106,8 +106,8 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 	}
 
 	// sanity check
-	if !strings.Contains(kcpRestConfig.Host, "/clusters/") {
-		return fmt.Errorf("kcp kubeconfig does not point to a specific workspace")
+	if err := kubeconfig.Validate(kcpRestConfig); err != nil {
+		return fmt.Errorf("failed to check kcp kubeconfig: %w", err)
 	}
 
 	// We check if the APIExportEndpointSlice exists and extract information we need to set up our kcpCluster.
