@@ -74,6 +74,9 @@ linters:
         # Controller Runtime
         - pkg: sigs.k8s.io/controller-runtime/pkg/client
           alias: ctrlruntimeclient
+        # kcp APIs
+        - pkg: github.com/kcp-dev/sdk/apis/(\w+)/(v[\w\d]+)
+          alias: kcp$1$2
       no-unaliased: true
   exclusions:
     generated: lax

@@ -22,22 +22,22 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/crypto"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
-	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	kcpapisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func CreateAPIResourceSchema(crd *apiextensionsv1.CustomResourceDefinition, name string, agentName string) (*kcpdevv1alpha1.APIResourceSchema, error) {
+func CreateAPIResourceSchema(crd *apiextensionsv1.CustomResourceDefinition, name string, agentName string) (*kcpapisv1alpha1.APIResourceSchema, error) {
 	// prefix is irrelevant as the name is overridden later
-	converted, err := kcpdevv1alpha1.CRDToAPIResourceSchema(crd, "irrelevant")
+	converted, err := kcpapisv1alpha1.CRDToAPIResourceSchema(crd, "irrelevant")
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert CRD: %w", err)
 	}
 
-	ars := &kcpdevv1alpha1.APIResourceSchema{}
+	ars := &kcpapisv1alpha1.APIResourceSchema{}
 	ars.TypeMeta = metav1.TypeMeta{
-		APIVersion: kcpdevv1alpha1.SchemeGroupVersion.String(),
+		APIVersion: kcpapisv1alpha1.SchemeGroupVersion.String(),
 		Kind:       "APIResourceSchema",
 	}
 
@@ -55,9 +55,9 @@ func CreateAPIResourceSchema(crd *apiextensionsv1.CustomResourceDefinition, name
 	ars.Spec.Versions = converted.Spec.Versions
 
 	if len(converted.Spec.Versions) > 1 {
-		ars.Spec.Conversion = &kcpdevv1alpha1.CustomResourceConversion{
+		ars.Spec.Conversion = &kcpapisv1alpha1.CustomResourceConversion{
 			// as of kcp 0.27, there is no constant for this
-			Strategy: kcpdevv1alpha1.ConversionStrategyType("None"),
+			Strategy: kcpapisv1alpha1.ConversionStrategyType("None"),
 		}
 	}
 

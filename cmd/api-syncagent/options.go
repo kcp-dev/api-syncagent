@@ -54,15 +54,6 @@ type Options struct {
 	// If not given, defaults to "<service ref>-syncagent".
 	AgentName string
 
-	// APIExportRef references the APIExport within a kcp workspace that this
-	// Sync Agent should work with by name. The APIExport has to already exist, but it must not have
-	// any pre-existing resource schemas configured, the agent will fill them in based on
-	// PublishedResources.
-	//
-	// Deprecated: Use APIExportEndpointSliceRef instead. If an APIExport is referenced, the agent
-	// will attempt to find and use an endpoint slice of the same name.
-	APIExportRef string
-
 	// APIExportEndpointSliceRef references the APIExportEndpointSlice within a kcp workspace that this
 	// Sync Agent should work with by name. The agent will automatically manage the resource schemas
 	// in the APIExport referenced by this endpoint slice.
@@ -96,7 +87,6 @@ func (o *Options) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.KcpKubeconfig, "kcp-kubeconfig", o.KcpKubeconfig, "kubeconfig file of kcp")
 	flags.StringVar(&o.Namespace, "namespace", o.Namespace, "Kubernetes namespace the Sync Agent is running in")
 	flags.StringVar(&o.AgentName, "agent-name", o.AgentName, "name of this Sync Agent, must not be changed after the first run, can be left blank to auto-generate a name")
-	flags.StringVar(&o.APIExportRef, "apiexport-ref", o.APIExportRef, "name of the APIExport in kcp that this Sync Agent is powering (deprecated, use --apiexportendpointslice-ref instead)")
 	flags.StringVar(&o.APIExportEndpointSliceRef, "apiexportendpointslice-ref", o.APIExportEndpointSliceRef, "name of the APIExportEndpointSlice in kcp that this Sync Agent is powering")
 	flags.StringVar(&o.PublishedResourceSelectorString, "published-resource-selector", o.PublishedResourceSelectorString, "restrict this Sync Agent to only process PublishedResources matching this label selector (optional)")
 	flags.BoolVar(&o.EnableLeaderElection, "enable-leader-election", o.EnableLeaderElection, "whether to perform leader election")
@@ -124,12 +114,8 @@ func (o *Options) Validate() error {
 		}
 	}
 
-	if len(o.APIExportRef) == 0 && len(o.APIExportEndpointSliceRef) == 0 {
-		errs = append(errs, errors.New("either --apiexportendpointslice-ref or --apiexport-ref is required"))
-	}
-
-	if len(o.APIExportRef) != 0 && len(o.APIExportEndpointSliceRef) != 0 {
-		errs = append(errs, errors.New("--apiexportendpointslice-ref and --apiexport-ref are mutually exclusive"))
+	if len(o.APIExportEndpointSliceRef) == 0 {
+		errs = append(errs, errors.New("--apiexportendpointslice-ref is required"))
 	}
 
 	if len(o.KcpKubeconfig) == 0 {
@@ -156,7 +142,7 @@ func (o *Options) Complete() error {
 	errs := []error{}
 
 	if len(o.AgentName) == 0 {
-		o.AgentName = o.APIExportRef + "-syncagent"
+		o.AgentName = o.APIExportEndpointSliceRef + "-syncagent"
 	}
 
 	if s := o.PublishedResourceSelectorString; len(s) > 0 {

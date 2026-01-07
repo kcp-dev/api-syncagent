@@ -26,15 +26,15 @@ import (
 	"time"
 
 	"github.com/kcp-dev/logicalcluster/v3"
-
-	kcpapisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
-	kcpcorev1alpha1 "github.com/kcp-dev/kcp/sdk/apis/core/v1alpha1"
-	kcptenancyv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/tenancy/v1alpha1"
-	conditionsv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/third_party/conditions/apis/conditions/v1alpha1"
-	"github.com/kcp-dev/kcp/sdk/apis/third_party/conditions/util/conditions"
+	kcpapisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
+	kcpcorev1alpha1 "github.com/kcp-dev/sdk/apis/core/v1alpha1"
+	kcptenancyv1alpha1 "github.com/kcp-dev/sdk/apis/tenancy/v1alpha1"
+	conditionsv1alpha1 "github.com/kcp-dev/sdk/apis/third_party/conditions/apis/conditions/v1alpha1"
+	"github.com/kcp-dev/sdk/apis/third_party/conditions/util/conditions"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -127,6 +127,24 @@ func CreateAPIExport(t *testing.T, ctx context.Context, client ctrlruntimeclient
 	t.Logf("Creating APIExport %q…", name)
 	if err := client.Create(ctx, apiExport); err != nil {
 		t.Fatalf("Failed to create APIExport: %v", err)
+	}
+
+	// In kcp 0.27, we have to manually create the AEES. To make the tests work consistently with
+	// 0.27 and later versions, we simply always create one if it's missing.
+	endpointSlice := &kcpapisv1alpha1.APIExportEndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: kcpapisv1alpha1.APIExportEndpointSliceSpec{
+			APIExport: kcpapisv1alpha1.ExportBindingReference{
+				Name: name,
+			},
+		},
+	}
+
+	t.Logf("Creating APIExportEndpointSlice %q…", endpointSlice.Name)
+	if err := client.Create(ctx, endpointSlice); err != nil && !apierrors.IsAlreadyExists(err) {
+		t.Fatalf("Failed to create APIExportEndpointSlice: %v", err)
 	}
 
 	// grant permissions to access/manage the APIExport

@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	kcpdevv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
 )
 
 // APIExportReconciler defines an interface to create/update APIExports.

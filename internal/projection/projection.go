@@ -134,6 +134,19 @@ func ProjectPublishedResource(ctx context.Context, client *discovery.Client, pub
 	return projectedCRD, nil
 }
 
+func ProjectPublishedResourceGVK(ctx context.Context, client *discovery.Client, pubRes *syncagentv1alpha1.PublishedResource) (schema.GroupVersionKind, error) {
+	// find the resource that the PublishedResource is referring to
+	localGK := PublishedResourceSourceGK(pubRes)
+
+	// fetch the original, full CRD from the cluster
+	crd, err := client.RetrieveCRD(ctx, localGK)
+	if err != nil {
+		return schema.GroupVersionKind{}, fmt.Errorf("failed to discover resource defined in PublishedResource: %w", err)
+	}
+
+	return PublishedResourceProjectedGVK(crd, pubRes)
+}
+
 func RelatedResourceGVR(rr *syncagentv1alpha1.RelatedResourceSpec) schema.GroupVersionResource {
 	resultGVR := schema.GroupVersionResource{
 		Group:    rr.Group,

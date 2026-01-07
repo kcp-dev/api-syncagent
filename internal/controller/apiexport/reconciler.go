@@ -24,7 +24,7 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/resources/reconciling"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
-	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	kcpapisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,7 +61,7 @@ func (r *Reconciler) createAPIExportReconciler(
 	recorder record.EventRecorder,
 ) reconciling.NamedAPIExportReconcilerFactory {
 	return func() (string, reconciling.APIExportReconciler) {
-		return apiExportName, func(existing *kcpdevv1alpha1.APIExport) (*kcpdevv1alpha1.APIExport, error) {
+		return apiExportName, func(existing *kcpapisv1alpha1.APIExport) (*kcpapisv1alpha1.APIExport, error) {
 			if existing.Annotations == nil {
 				existing.Annotations = map[string]string{}
 			}
@@ -102,8 +102,8 @@ func (r *Reconciler) createAPIExportReconciler(
 
 			// add our missing claims
 			for _, claimed := range claimsToAdd {
-				existing.Spec.PermissionClaims = append(existing.Spec.PermissionClaims, kcpdevv1alpha1.PermissionClaim{
-					GroupResource: kcpdevv1alpha1.GroupResource{
+				existing.Spec.PermissionClaims = append(existing.Spec.PermissionClaims, kcpapisv1alpha1.PermissionClaim{
+					GroupResource: kcpapisv1alpha1.GroupResource{
 						Group:    claimed.Group,
 						Resource: claimed.Resource,
 					},
@@ -121,7 +121,7 @@ func (r *Reconciler) createAPIExportReconciler(
 			}
 
 			// prevent reconcile loops by ensuring a stable order
-			slices.SortFunc(existing.Spec.PermissionClaims, func(a, b kcpdevv1alpha1.PermissionClaim) int {
+			slices.SortFunc(existing.Spec.PermissionClaims, func(a, b kcpapisv1alpha1.PermissionClaim) int {
 				if a.Group != b.Group {
 					return strings.Compare(a.Group, b.Group)
 				}
