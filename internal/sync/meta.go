@@ -19,10 +19,11 @@ package sync
 import (
 	"context"
 
-	"github.com/kcp-dev/logicalcluster/v3"
 	"go.uber.org/zap"
 
 	"github.com/kcp-dev/api-syncagent/internal/crypto"
+
+	"github.com/kcp-dev/logicalcluster/v3"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

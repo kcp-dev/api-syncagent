@@ -19,10 +19,10 @@ package templating
 import (
 	"testing"
 
-	"github.com/kcp-dev/logicalcluster/v3"
-
 	crds "github.com/kcp-dev/api-syncagent/test/crds/example/v1"
 	"github.com/kcp-dev/api-syncagent/test/utils"
+
+	"github.com/kcp-dev/logicalcluster/v3"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

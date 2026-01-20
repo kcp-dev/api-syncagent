@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/kcp-dev/logicalcluster/v3"
 	"go.uber.org/zap"
 
 	"github.com/kcp-dev/api-syncagent/internal/controllerutil/predicate"
@@ -30,7 +29,8 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/projection"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
-	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	"github.com/kcp-dev/logicalcluster/v3"
+	kcpapisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -159,7 +159,7 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubR
 	arsName := kcp.GetAPIResourceSchemaName(projectedCRD)
 
 	// ensure ARS exists (don't try to reconcile it, it's basically entirely immutable)
-	ars := &kcpdevv1alpha1.APIResourceSchema{}
+	ars := &kcpapisv1alpha1.APIResourceSchema{}
 	err = r.kcpClient.Get(ctx, types.NamespacedName{Name: arsName}, ars, &ctrlruntimeclient.GetOptions{})
 
 	if apierrors.IsNotFound(err) {

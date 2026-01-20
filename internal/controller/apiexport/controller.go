@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kcp-dev/logicalcluster/v3"
 	"go.uber.org/zap"
 
 	"github.com/kcp-dev/api-syncagent/internal/controllerutil"
@@ -31,7 +30,8 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/resources/reconciling"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
-	kcpdevv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	"github.com/kcp-dev/logicalcluster/v3"
+	kcpapisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -109,7 +109,7 @@ func Add(
 		// Watch for changes to APIExport on the kcp side to start/restart the actual syncing controllers;
 		// the cache is already restricted by a fieldSelector in the main.go to respect the RBC restrictions,
 		// so there is no need here to add an additional filter.
-		WatchesRawSource(source.Kind(kcpCluster.GetCache(), &kcpdevv1alpha1.APIExport{}, controllerutil.EnqueueConst[*kcpdevv1alpha1.APIExport]("dummy"))).
+		WatchesRawSource(source.Kind(kcpCluster.GetCache(), &kcpapisv1alpha1.APIExport{}, controllerutil.EnqueueConst[*kcpapisv1alpha1.APIExport]("dummy"))).
 		// Watch for changes to PublishedResources on the local service cluster
 		Watches(&syncagentv1alpha1.PublishedResource{}, controllerutil.EnqueueConst[ctrlruntimeclient.Object]("dummy"), builder.WithPredicates(predicateutil.ByLabels(prFilter), hasARS)).
 		Build(reconciler)
@@ -120,7 +120,7 @@ func Add(
 func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	r.log.Debug("Processing")
 
-	apiExport := &kcpdevv1alpha1.APIExport{}
+	apiExport := &kcpapisv1alpha1.APIExport{}
 	if err := r.kcpClient.Get(ctx, types.NamespacedName{Name: r.apiExportName}, apiExport); err != nil {
 		return reconcile.Result{}, ctrlruntimeclient.IgnoreNotFound(err)
 	}
@@ -128,7 +128,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	return reconcile.Result{}, r.reconcile(ctx, apiExport)
 }
 
-func (r *Reconciler) reconcile(ctx context.Context, apiExport *kcpdevv1alpha1.APIExport) error {
+func (r *Reconciler) reconcile(ctx context.Context, apiExport *kcpapisv1alpha1.APIExport) error {
 	// find all PublishedResources; we keep those that are not yet converted into ARS,
 	// just to reduce the amount of re-reconciles when the agent processes a number of PRs in a row
 	// and would constantly update the APIExport; instead we rely on kcp to handle the eventual

@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	kcpapisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
+	kcpapisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"

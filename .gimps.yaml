@@ -21,12 +21,14 @@ sets:
       - 'k8s.io/**'
       - 'sigs.k8s.io/controller-runtime/**'
       - 'sigs.k8s.io/controller-tools/**'
+      - 'sigs.k8s.io/multicluster-runtime/**'
       - 'sigs.k8s.io/yaml/**'
       - 'github.com/kcp-dev/client-go/**'
       - 'github.com/kcp-dev/kubernetes/**'
   - name: kcp
     patterns:
       - 'github.com/kcp-dev/kcp/**'
-      - 'github.com/kcp-dev/multicluster-provider/**'
+      - 'github.com/kcp-dev/sdk/**'
+      - 'github.com/kcp-dev/logicalcluster/**'
       - 'github.com/kcp-dev/code-generator/**'
-      - 'sigs.k8s.io/multicluster-runtime/**'
+      - 'github.com/kcp-dev/multicluster-provider/**'

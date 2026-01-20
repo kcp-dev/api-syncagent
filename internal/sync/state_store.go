@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kcp-dev/logicalcluster/v3"
-
 	"github.com/kcp-dev/api-syncagent/internal/crypto"
+
+	"github.com/kcp-dev/logicalcluster/v3"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
