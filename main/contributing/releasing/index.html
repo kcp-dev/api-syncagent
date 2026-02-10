@@ -1113,14 +1113,14 @@
 </ol>
 <h2 id="minor-release">Minor Release</h2>
 <p>Minor releases (0.x) are tagged directly on the <code>main</code> branch and the <code>v0.X.0</code>
-tag represents where the corresponding <code>release/v0.X</code> branch branches off.</p>
+tag represents where the corresponding <code>release-0.X</code> branch branches off.</p>
 <ol>
 <li>Checkout the desired <code>main</code> branch commit.</li>
 <li>Tag the main module: <code>git tag -m "version 0.X" v0.X.0</code></li>
 <li>Tag the SDK module: <code>git tag -m "SDK version 0.X" sdk/v0.X.0</code></li>
 <li>Push the tags: <code>git push upstream v0.X.0 sdk/v0.X.0</code></li>
-<li>Create the release branch: <code>git checkout -B release-v0.X</code></li>
-<li>Push the release branch: <code>git push -u upstream release-v0.X</code></li>
+<li>Create the release branch: <code>git checkout -B release-0.X</code></li>
+<li>Push the release branch: <code>git push -u upstream release-0.X</code></li>
 </ol>
 <p>Once the tag and branch have been pushed, the documentation has to be manually
 updated to include the new minor release.</p>
@@ -1133,7 +1133,7 @@ https://docs.kcp.io/api-syncagent/.</p>
 <h2 id="patch-releases">Patch Releases</h2>
 <p>Patch releases (v0.x.y) are tagged with in a release branch.</p>
 <ol>
-<li>Checkout the desired <code>release/v0.X</code> branch commit.</li>
+<li>Checkout the desired <code>release-0.X</code> branch commit.</li>
 <li>Tag the main module: <code>git tag -m "version 0.X.Y" v0.X.Y</code></li>
 <li>Tag the SDK module: <code>git tag -m "SDK version 0.X.Y" sdk/v0.X.Y</code></li>
 <li>Push the tags: <code>git push upstream v0.X.Y sdk/v0.X.Y</code></li>
