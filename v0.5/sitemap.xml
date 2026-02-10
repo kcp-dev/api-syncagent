@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+    <url>
+        <loc>https://docs.kcp.io/api-syncagent/v0.5/</loc>
+        <lastmod>2026-02-10</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/v0.5/"/>
+    </url>
+    <url>
+        <loc>https://docs.kcp.io/api-syncagent/v0.5/consuming-services/</loc>
+        <lastmod>2026-02-10</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/v0.5/consuming-services/"/>
+    </url>
+    <url>
+        <loc>https://docs.kcp.io/api-syncagent/v0.5/faq/</loc>
+        <lastmod>2026-02-10</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/v0.5/faq/"/>
+    </url>
+    <url>
+        <loc>https://docs.kcp.io/api-syncagent/v0.5/getting-started/</loc>
+        <lastmod>2026-02-10</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/v0.5/getting-started/"/>
+    </url>
+    <url>
+        <loc>https://docs.kcp.io/api-syncagent/v0.5/kube-bind/</loc>
+        <lastmod>2026-02-10</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/v0.5/kube-bind/"/>
+    </url>
+    <url>
+        <loc>https://docs.kcp.io/api-syncagent/v0.5/contributing/releasing/</loc>
+        <lastmod>2026-02-10</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/v0.5/contributing/releasing/"/>
+    </url>
+    <url>
+        <loc>https://docs.kcp.io/api-syncagent/v0.5/publish-resources/</loc>
+        <lastmod>2026-02-10</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/v0.5/publish-resources/"/>
+    </url>
+    <url>
+        <loc>https://docs.kcp.io/api-syncagent/v0.5/publish-resources/api-lifecycle/</loc>
+        <lastmod>2026-02-10</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/v0.5/publish-resources/api-lifecycle/"/>
+    </url>
+    <url>
+        <loc>https://docs.kcp.io/api-syncagent/v0.5/publish-resources/related-resources/</loc>
+        <lastmod>2026-02-10</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/v0.5/publish-resources/related-resources/"/>
+    </url>
+    <url>
+        <loc>https://docs.kcp.io/api-syncagent/v0.5/publish-resources/technical-details/</loc>
+        <lastmod>2026-02-10</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/v0.5/publish-resources/technical-details/"/>
+    </url>
+    <url>
+        <loc>https://docs.kcp.io/api-syncagent/v0.5/publish-resources/templating/</loc>
+        <lastmod>2026-02-10</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/v0.5/publish-resources/templating/"/>
+    </url>
+    <url>
+        <loc>https://docs.kcp.io/api-syncagent/v0.5/reference/</loc>
+        <lastmod>2026-02-10</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/v0.5/reference/"/>
+    </url>
+    <url>
+        <loc>https://docs.kcp.io/api-syncagent/v0.5/reference/crd/syncagent.kcp.io/publishedresources/</loc>
+        <lastmod>2026-02-10</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://docs.kcp.io/api-syncagent/v0.5/reference/crd/syncagent.kcp.io/publishedresources/"/>
+    </url>
+</urlset>
