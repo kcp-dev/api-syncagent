@@ -195,7 +195,7 @@ func (s *ResourceSyncer) Process(ctx context.Context, remoteObj *unstructured.Un
 		// (i.e. on the service cluster), so that the original and copy are linked
 		// together and can be found.
 		metadataOnDestination: true,
-		eventObjSide: syncSideSource,
+		eventObjSide:          syncSideSource,
 	}
 
 	// When the primary object is being deleted, clean up related resources FIRST,
