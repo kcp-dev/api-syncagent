@@ -195,7 +195,19 @@ func (s *ResourceSyncer) Process(ctx context.Context, remoteObj *unstructured.Un
 		// (i.e. on the service cluster), so that the original and copy are linked
 		// together and can be found.
 		metadataOnDestination: true,
-		eventObjSide:          syncSideSource,
+		eventObjSide: syncSideSource,
+	}
+
+	// When the primary object is being deleted, clean up related resources FIRST,
+	// while the local object still exists (needed for reference resolution).
+	if remoteObj.GetDeletionTimestamp() != nil && destSide.object != nil {
+		relRequeue, relErr := s.processRelatedResources(ctx, log, stateStore, sourceSide, destSide, true)
+		if relErr != nil {
+			return false, fmt.Errorf("failed to clean up related resources during primary deletion: %w", relErr)
+		}
+		if relRequeue {
+			return true, nil
+		}
 	}
 
 	requeue, err = syncer.Sync(ctx, log, sourceSide, destSide)
@@ -215,7 +227,14 @@ func (s *ResourceSyncer) Process(ctx context.Context, remoteObj *unstructured.Un
 	// it modifies the state of the world, otherwise the objects in
 	// source/dest.object might be ouf date.
 
-	return s.processRelatedResources(ctx, log, stateStore, sourceSide, destSide)
+	// Guard: related resource resolution requires both sync sides to exist.
+	// destSide.object can be nil if the primary was in deletion and the local
+	// copy was already removed. In that case there is nothing left to sync.
+	if destSide.object == nil {
+		return false, nil
+	}
+
+	return s.processRelatedResources(ctx, log, stateStore, sourceSide, destSide, false)
 }
 
 func (s *ResourceSyncer) findLocalObject(ctx context.Context, objectKey objectKey) (*unstructured.Unstructured, error) {
