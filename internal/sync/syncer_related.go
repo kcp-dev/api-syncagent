@@ -40,9 +40,9 @@ import (
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (s *ResourceSyncer) processRelatedResources(ctx context.Context, log *zap.SugaredLogger, stateStore ObjectStateStore, remote, local syncSide) (requeue bool, err error) {
+func (s *ResourceSyncer) processRelatedResources(ctx context.Context, log *zap.SugaredLogger, stateStore ObjectStateStore, remote, local syncSide, primaryDeleting bool) (requeue bool, err error) {
 	for _, relatedResource := range s.pubRes.Spec.Related {
-		requeue, err := s.processRelatedResource(ctx, log.With("identifier", relatedResource.Identifier), stateStore, remote, local, relatedResource)
+		requeue, err := s.processRelatedResource(ctx, log.With("identifier", relatedResource.Identifier), stateStore, remote, local, relatedResource, primaryDeleting)
 		if err != nil {
 			return false, fmt.Errorf("failed to process related resource %s: %w", relatedResource.Identifier, err)
 		}
@@ -62,7 +62,7 @@ type relatedObjectAnnotation struct {
 	Kind       string `json:"kind"`
 }
 
-func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.SugaredLogger, stateStore ObjectStateStore, remote, local syncSide, relRes syncagentv1alpha1.RelatedResourceSpec) (requeue bool, err error) {
+func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.SugaredLogger, stateStore ObjectStateStore, remote, local syncSide, relRes syncagentv1alpha1.RelatedResourceSpec, primaryDeleting bool) (requeue bool, err error) {
 	// decide what direction to sync (local->remote vs. remote->local)
 	var (
 		origin       syncSide
@@ -163,6 +163,9 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 			metadataOnDestination: false,
 			// events are always created on the kcp side
 			eventObjSide: eventObjSide,
+			// force deletion of related resources when the primary object is being deleted
+			// (only for origin:kcp resources that have blockSourceDeletion)
+			forceDelete: primaryDeleting && relRes.Origin == syncagentv1alpha1.RelatedResourceOriginKcp,
 		}
 
 		req, err := syncer.Sync(ctx, log, sourceSide, destSide)

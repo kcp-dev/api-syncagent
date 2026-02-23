@@ -1551,6 +1551,192 @@ func TestSyncNonStandardRelatedResourcesMultipleAPIExports(t *testing.T) {
 	}
 }
 
+// TestDeletePrimaryWithRelatedKcpResource verifies that when a primary object
+// is deleted, related resources with origin:kcp are properly cleaned up:
+// the local copy is deleted and the finalizer on the kcp-side source object
+// is removed. This is a regression test for
+// https://github.com/kcp-dev/api-syncagent/issues/116.
+func TestDeletePrimaryWithRelatedKcpResource(t *testing.T) {
+	const apiExportName = "kcp.example.com"
+
+	ctrlruntime.SetLogger(logr.Discard())
+
+	ctx := t.Context()
+
+	// setup a test environment in kcp
+	orgKubconfig := utils.CreateOrganization(t, ctx, "delete-primary-related-kcp", apiExportName)
+
+	// start a service cluster
+	envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
+		"test/crds/crontab.yaml",
+	})
+
+	// publish Crontabs with a related Secret (origin: kcp)
+	t.Log("Publishing CRDs…")
+	prCrontabs := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "publish-crontabs",
+		},
+		Spec: syncagentv1alpha1.PublishedResourceSpec{
+			Resource: syncagentv1alpha1.SourceResourceDescriptor{
+				APIGroup: "example.com",
+				Version:  "v1",
+				Kind:     "CronTab",
+			},
+			Naming: &syncagentv1alpha1.ResourceNaming{
+				Name:      "{{ .Object.metadata.name }}",
+				Namespace: "synced-{{ .Object.metadata.namespace }}",
+			},
+			Projection: &syncagentv1alpha1.ResourceProjection{
+				Group: "kcp.example.com",
+			},
+			Related: []syncagentv1alpha1.RelatedResourceSpec{
+				{
+					Identifier: "credentials",
+					Origin:     syncagentv1alpha1.RelatedResourceOriginKcp,
+					Kind:       "Secret",
+					Object: syncagentv1alpha1.RelatedResourceObject{
+						RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
+							Template: &syncagentv1alpha1.TemplateExpression{
+								Template: "my-credentials",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := envtestClient.Create(ctx, prCrontabs); err != nil {
+		t.Fatalf("Failed to create PublishedResource: %v", err)
+	}
+
+	// start the agent
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
+
+	// wait until the API is available
+	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
+
+	teamClusterPath := logicalcluster.NewPath("root").Join("delete-primary-related-kcp").Join("team-1")
+	teamClient := kcpClusterClient.Cluster(teamClusterPath)
+
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
+		Group:    apiExportName,
+		Version:  "v1",
+		Resource: "crontabs",
+	})
+
+	// Step 1: Create a CronTab in kcp
+	t.Log("Creating CronTab in kcp…")
+
+	crontab := &unstructured.Unstructured{}
+	crontab.SetAPIVersion("kcp.example.com/v1")
+	crontab.SetKind("CronTab")
+	crontab.SetName("my-crontab")
+	crontab.SetNamespace("default")
+	if err := unstructured.SetNestedField(crontab.Object, "* * *", "spec", "cronSpec"); err != nil {
+		t.Fatalf("Failed to set cronSpec: %v", err)
+	}
+
+	if err := teamClient.Create(ctx, crontab); err != nil {
+		t.Fatalf("Failed to create CronTab in kcp: %v", err)
+	}
+
+	// Step 2: Create the related Secret in kcp (origin: kcp means the source is on the kcp side)
+	t.Log("Creating credential Secret in kcp…")
+
+	kcpSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-credentials",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			"password": []byte("hunter2"),
+		},
+		Type: corev1.SecretTypeOpaque,
+	}
+
+	if err := teamClient.Create(ctx, kcpSecret); err != nil {
+		t.Fatalf("Failed to create Secret in kcp: %v", err)
+	}
+
+	// Step 3: Wait for the Secret to be synced down to the service cluster
+	t.Log("Waiting for Secret to be synced to service cluster…")
+
+	localSecret := &corev1.Secret{}
+	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
+		return envtestClient.Get(ctx, types.NamespacedName{Name: "my-credentials", Namespace: "synced-default"}, localSecret) == nil, nil
+	})
+	if err != nil {
+		t.Fatalf("Secret was not synced to service cluster: %v", err)
+	}
+
+	// Step 4: Verify the kcp Secret has a finalizer (the agent should have added one)
+	t.Log("Verifying finalizer on kcp Secret…")
+
+	err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
+		secret := &corev1.Secret{}
+		if err := teamClient.Get(ctx, types.NamespacedName{Name: "my-credentials", Namespace: "default"}, secret); err != nil {
+			return false, nil
+		}
+		for _, f := range secret.Finalizers {
+			if f == "syncagent.kcp.io/cleanup" {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("kcp Secret never received the cleanup finalizer: %v", err)
+	}
+
+	// Step 5: Delete the primary CronTab
+	t.Log("Deleting CronTab in kcp…")
+
+	if err := teamClient.Delete(ctx, crontab); err != nil {
+		t.Fatalf("Failed to delete CronTab: %v", err)
+	}
+
+	// Step 6: Verify the finalizer on the kcp Secret is removed
+	t.Log("Waiting for finalizer to be removed from kcp Secret…")
+
+	err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 60*time.Second, false, func(ctx context.Context) (done bool, err error) {
+		secret := &corev1.Secret{}
+		if err := teamClient.Get(ctx, types.NamespacedName{Name: "my-credentials", Namespace: "default"}, secret); err != nil {
+			// Secret might have been deleted too, which is also fine
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, nil
+		}
+		for _, f := range secret.Finalizers {
+			if f == "syncagent.kcp.io/cleanup" {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("Finalizer was not removed from kcp Secret after primary deletion: %v", err)
+	}
+
+	// Step 7: Verify the local copy on the service cluster is also deleted
+	t.Log("Verifying local Secret copy is deleted…")
+
+	err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (done bool, err error) {
+		err = envtestClient.Get(ctx, types.NamespacedName{Name: "my-credentials", Namespace: "synced-default"}, &corev1.Secret{})
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("Local Secret copy was not deleted after primary deletion: %v", err)
+	}
+
+	t.Log("Primary deletion correctly cleaned up related resources")
+}
+
 func toUnstructured(t *testing.T, obj ctrlruntimeclient.Object) *unstructured.Unstructured {
 	data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {

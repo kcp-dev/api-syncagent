@@ -63,6 +63,10 @@ type objectSyncer struct {
 	// receive events. Since these objects might be created during the sync,
 	// they cannot be specified here directly.
 	eventObjSide syncSideType
+	// forceDelete triggers the deletion flow even when the source object is not
+	// being deleted; used to clean up related resources when the primary object
+	// is being deleted.
+	forceDelete bool
 }
 
 type syncSideType int
@@ -93,8 +97,8 @@ func (s *objectSyncer) recordEvent(ctx context.Context, source, dest syncSide, e
 }
 
 func (s *objectSyncer) Sync(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
-	// handle deletion: if source object is in deletion, delete the destination object (the clone)
-	if source.object.GetDeletionTimestamp() != nil {
+	// handle deletion: if source object is in deletion (or forced), delete the destination object (the clone)
+	if source.object.GetDeletionTimestamp() != nil || s.forceDelete {
 		return s.handleDeletion(ctx, log, source, dest)
 	}
 
@@ -458,16 +462,9 @@ func (s *objectSyncer) handleDeletion(ctx context.Context, log *zap.SugaredLogge
 	// if we just removed the finalizer, we can requeue the source object
 	if updated {
 		s.recordEvent(ctx, source, dest, corev1.EventTypeNormal, "ObjectDeleted", "Object deletion has been completed, finalizer has been removed.")
-		return true, nil
 	}
 
-	// For now we do not delete related resources; since after this step the destination object is
-	// gone already, the remaining syncer logic would fail if it attempts to sync relate objects.
-	// For the MVP it's fine to just leave related resources around, but in the future this behaviour
-	// might be configurable per PublishedResource, in which case this `return true` here would need
-	// to go away and the cleanup in general would need to be rethought a bit (maybe owner refs would
-	// be a good idea?).
-	return true, nil
+	return updated, nil
 }
 
 func (s *objectSyncer) removeSubresources(obj *unstructured.Unstructured) *unstructured.Unstructured {
