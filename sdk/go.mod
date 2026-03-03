@@ -1,6 +1,6 @@
 module github.com/kcp-dev/api-syncagent/sdk
 
-go 1.23.0
+go 1.25.7
 
 require (
 	github.com/kcp-dev/apimachinery/v2 v2.0.1-0.20250223115924-431177b024f3
