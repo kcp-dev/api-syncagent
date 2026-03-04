@@ -61,6 +61,7 @@ type Reconciler struct {
 	recorder    record.EventRecorder
 	lcName      logicalcluster.Name
 	agentName   string
+	prFilter    labels.Selector
 }
 
 // Add creates a new controller and adds it to the given manager.
@@ -81,6 +82,7 @@ func Add(
 		log:         log.Named(ControllerName),
 		recorder:    mgr.GetEventRecorderFor(ControllerName),
 		agentName:   agentName,
+		prFilter:    prFilter,
 	}
 
 	_, err := builder.ControllerManagedBy(mgr).
@@ -98,7 +100,7 @@ func (r *Reconciler) enqueueMatchingPublishedResources(ctx context.Context, obj 
 	crd := obj.(*apiextensionsv1.CustomResourceDefinition)
 
 	pubResources := &syncagentv1alpha1.PublishedResourceList{}
-	if err := r.localClient.List(ctx, pubResources); err != nil {
+	if err := r.localClient.List(ctx, pubResources, &ctrlruntimeclient.ListOptions{LabelSelector: r.prFilter}); err != nil {
 		runtime.HandleError(err)
 		return nil
 	}
