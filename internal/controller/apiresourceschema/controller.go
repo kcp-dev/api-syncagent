@@ -164,7 +164,8 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubR
 	ars := &kcpapisv1alpha1.APIResourceSchema{}
 	err = r.kcpClient.Get(ctx, types.NamespacedName{Name: arsName}, ars, &ctrlruntimeclient.GetOptions{})
 
-	if apierrors.IsNotFound(err) {
+	switch {
+	case apierrors.IsNotFound(err):
 		ars, err := kcp.CreateAPIResourceSchema(projectedCRD, arsName, r.agentName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct APIResourceSchema: %w", err)
@@ -175,8 +176,40 @@ func (r *Reconciler) reconcile(ctx context.Context, log *zap.SugaredLogger, pubR
 		if err := r.kcpClient.Create(ctx, ars); err != nil {
 			return nil, fmt.Errorf("failed to create APIResourceSchema: %w", err)
 		}
-	} else if err != nil {
+
+	case err != nil:
 		return nil, fmt.Errorf("failed to check for APIResourceSchema: %w", err)
+
+	default:
+		// A bug in earlier api-syncagent versions made any agent potentially reconcile any PublishedResource,
+		// ignoring the configured PR filter. This would lead to the wrong agent name in the ARS labels
+		// and annotations.
+		// ARS are immutable and normally we would never need to update the metadata on one, we do it
+		// temporarily anyway to fix broken metadata. The metadata is of informational nature only,
+		// so having the wrong values is just a cosmetic issue.
+		//
+		// TODO: Remove this at some point when we're sure enough all ARS out there have been fixed.
+
+		validAnnotation := ars.Annotations[syncagentv1alpha1.AgentNameAnnotation] == r.agentName
+		validLabel := ars.Labels[syncagentv1alpha1.AgentNameLabel] == r.agentName
+
+		if !validAnnotation || !validLabel {
+			if ars.Labels == nil {
+				ars.Labels = map[string]string{}
+			}
+			if ars.Annotations == nil {
+				ars.Annotations = map[string]string{}
+			}
+
+			ars.Labels[syncagentv1alpha1.AgentNameLabel] = r.agentName
+			ars.Annotations[syncagentv1alpha1.AgentNameAnnotation] = r.agentName
+
+			log.With("name", arsName).Info("Fixing incorrect agent metadata…")
+
+			if err := r.kcpClient.Update(ctx, ars); err != nil {
+				return nil, fmt.Errorf("failed to update APIResourceSchema: %w", err)
+			}
+		}
 	}
 
 	// update Status with ARS name
