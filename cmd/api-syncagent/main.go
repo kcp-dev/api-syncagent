@@ -155,7 +155,12 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 	// regular mcmanager, capable of starting new controllers at any later time and
 	// allowing them to be also stopped at any time. The syncmanager needs it to
 	// start/stop sync controllers for each PublishedResource.
-	dmcm, err := kcp.NewDynamicMultiClusterManager(endpoint.EndpointSlice.Config, endpoint.EndpointSlice.Name)
+	var urlOverrideFunc func(string) string
+	if len(opts.APIExportHostPortOverrides) > 0 {
+		urlOverrideFunc = opts.ApplyURLOverride
+	}
+
+	dmcm, err := kcp.NewDynamicMultiClusterManager(endpoint.EndpointSlice.Config, endpoint.EndpointSlice.Name, urlOverrideFunc)
 	if err != nil {
 		return fmt.Errorf("failed to start dynamic multi cluster manager: %w", err)
 	}
@@ -195,6 +200,9 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 		// The syncmanager needs to be able to determine whether an API is already bound and available
 		// before it can start any sync controllers. That discovery logic is encapsulated in the ResourceProber.
 		prober := discovery.NewResourceProber(endpoint.EndpointSlice.Config, endpointSliceCluster.GetClient(), endpoint.EndpointSlice.Name)
+		if len(opts.APIExportHostPortOverrides) > 0 {
+			prober = prober.WithURLOverride(opts.ApplyURLOverride)
+		}
 
 		return syncmanager.Add(ctx, mgr, prober, dmcm, log, opts.PublishedResourceSelector, opts.Namespace, opts.AgentName)
 	}); err != nil {

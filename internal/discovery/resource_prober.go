@@ -30,9 +30,10 @@ import (
 )
 
 type ResourceProber struct {
-	name   string
-	config *rest.Config
-	client ctrlruntimeclient.Client
+	name            string
+	config          *rest.Config
+	client          ctrlruntimeclient.Client
+	urlOverrideFunc func(string) string
 }
 
 func NewResourceProber(endpointSliceWorkspaceConfig *rest.Config, endpointSliceWorkspaceClient ctrlruntimeclient.Client, endpointSliceName string) *ResourceProber {
@@ -41,6 +42,12 @@ func NewResourceProber(endpointSliceWorkspaceConfig *rest.Config, endpointSliceW
 		config: endpointSliceWorkspaceConfig,
 		client: endpointSliceWorkspaceClient,
 	}
+}
+
+// WithURLOverride sets a function to override endpoint URLs before use.
+func (p *ResourceProber) WithURLOverride(fn func(string) string) *ResourceProber {
+	p.urlOverrideFunc = fn
+	return p
 }
 
 func (p *ResourceProber) HasGVR(ctx context.Context, gvr schema.GroupVersionResource) (bool, error) {
@@ -75,6 +82,11 @@ func (p *ResourceProber) hasAPIThing(ctx context.Context, match matchFunc) (bool
 type matchFunc func(apiGroup, version, resource, kind string) bool
 
 func (p *ResourceProber) hasAPIThingInEndpoint(endpoint string, match matchFunc) (bool, error) {
+	// Apply URL override if configured.
+	if p.urlOverrideFunc != nil {
+		endpoint = p.urlOverrideFunc(endpoint)
+	}
+
 	endpointConfig := rest.CopyConfig(p.config)
 	endpointConfig.Host = endpoint + "/clusters/*"
 

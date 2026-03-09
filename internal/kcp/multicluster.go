@@ -54,9 +54,11 @@ type DynamicMultiClusterManager struct {
 	runnables map[string]mcmanager.Runnable
 
 	tracker *clusterTracker
+
+	urlOverrideFunc func(string) string
 }
 
-func NewDynamicMultiClusterManager(cfg *rest.Config, endpointSliceName string) (*DynamicMultiClusterManager, error) {
+func NewDynamicMultiClusterManager(cfg *rest.Config, endpointSliceName string, urlOverrideFunc func(string) string) (*DynamicMultiClusterManager, error) {
 	scheme := runtime.NewScheme()
 
 	if err := corev1.AddToScheme(scheme); err != nil {
@@ -94,9 +96,10 @@ func NewDynamicMultiClusterManager(cfg *rest.Config, endpointSliceName string) (
 	}
 
 	dynManager := &DynamicMultiClusterManager{
-		manager:       multiClusterManager,
-		runnablesLock: sync.RWMutex{},
-		runnables:     map[string]mcmanager.Runnable{},
+		manager:         multiClusterManager,
+		runnablesLock:   sync.RWMutex{},
+		runnables:       map[string]mcmanager.Runnable{},
+		urlOverrideFunc: urlOverrideFunc,
 	}
 
 	tracker := newClusterTracker(dynManager)
