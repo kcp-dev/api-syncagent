@@ -25,6 +25,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/kcp-dev/api-syncagent/internal/kcp"
 	"github.com/kcp-dev/api-syncagent/internal/log"
 
 	"k8s.io/apimachinery/pkg/labels"
@@ -203,23 +204,30 @@ func (o *Options) Complete() error {
 	return utilerrors.NewAggregate(errs)
 }
 
-// ApplyURLOverride applies the host:port overrides to the given URL if configured.
-// It applies all configured overrides in order.
-func (o *Options) ApplyURLOverride(rawURL string) (string, error) {
-	parsed, err := url.Parse(rawURL)
-	if err != nil {
-		return rawURL, err
-	}
-
-	// Apply each override in order
-	currentHost := parsed.Host
-	for _, override := range o.parsedHostPortOverrides {
-		if currentHost == override.Original {
-			currentHost = override.New
+// NewURLRewriter returns a new URL rewriter that applies the host:port overrides
+// to the given URL if configured. It applies all configured overrides in order.
+func NewURLRewriter(o *Options) kcp.URLRewriterFunc {
+	if len(o.parsedHostPortOverrides) == 0 {
+		return func(url string) (string, error) {
+			return url, nil // NOP
 		}
 	}
 
-	parsed.Host = currentHost
+	return func(rawURL string) (string, error) {
+		parsed, err := url.Parse(rawURL)
+		if err != nil {
+			return rawURL, err
+		}
 
-	return parsed.String(), nil
+		currentHost := parsed.Host
+		for _, override := range o.parsedHostPortOverrides {
+			if currentHost == override.Original {
+				currentHost = override.New
+			}
+		}
+
+		parsed.Host = currentHost
+
+		return parsed.String(), nil
+	}
 }

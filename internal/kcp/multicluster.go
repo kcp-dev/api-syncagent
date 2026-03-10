@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -55,10 +56,10 @@ type DynamicMultiClusterManager struct {
 
 	tracker *clusterTracker
 
-	urlOverrideFunc func(string) string
+	urlOverrideFunc URLRewriterFunc
 }
 
-func NewDynamicMultiClusterManager(cfg *rest.Config, endpointSliceName string, urlOverrideFunc func(string) string) (*DynamicMultiClusterManager, error) {
+func NewDynamicMultiClusterManager(cfg *rest.Config, endpointSliceName string, urlRewriter URLRewriterFunc) (*DynamicMultiClusterManager, error) {
 	scheme := runtime.NewScheme()
 
 	if err := corev1.AddToScheme(scheme); err != nil {
@@ -81,6 +82,26 @@ func NewDynamicMultiClusterManager(cfg *rest.Config, endpointSliceName string, u
 		return nil, fmt.Errorf("failed to create multicluster provider: %w", err)
 	}
 
+	if urlRewriter != nil {
+		origFunc := provider.GetVWs
+
+		provider.GetVWs = func(obj client.Object) ([]string, error) {
+			urls, err := origFunc(obj)
+			if err != nil {
+				return nil, err
+			}
+
+			for i, url := range urls {
+				urls[i], err = urlRewriter(url)
+				if err != nil {
+					return nil, fmt.Errorf("failed to rewrite %q: %w", url, err)
+				}
+			}
+
+			return urls, nil
+		}
+	}
+
 	// Setup a multiClusterManager, which will use the apiexport provider and
 	// try to engage a dummy controller, which will just keep track of all the
 	// engaged clusters over the entire lifetime of the process.
@@ -99,7 +120,7 @@ func NewDynamicMultiClusterManager(cfg *rest.Config, endpointSliceName string, u
 		manager:         multiClusterManager,
 		runnablesLock:   sync.RWMutex{},
 		runnables:       map[string]mcmanager.Runnable{},
-		urlOverrideFunc: urlOverrideFunc,
+		urlOverrideFunc: urlRewriter,
 	}
 
 	tracker := newClusterTracker(dynManager)

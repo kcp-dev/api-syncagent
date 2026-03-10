@@ -20,7 +20,7 @@ import (
 	"testing"
 )
 
-func TestOptions_ApplyURLOverride(t *testing.T) {
+func TestURLRewriter(t *testing.T) {
 	tests := []struct {
 		name             string
 		overrides        []string
@@ -120,9 +120,15 @@ func TestOptions_ApplyURLOverride(t *testing.T) {
 				return
 			}
 
-			result := opts.ApplyURLOverride(tt.inputURL)
+			rewriter := NewURLRewriter(opts)
+
+			result, err := rewriter(tt.inputURL)
+			if err != nil {
+				t.Fatalf("URLRewriter() returned unexpected error: %v", err)
+			}
+
 			if result != tt.expectedURL {
-				t.Errorf("ApplyURLOverride() = %q, want %q", result, tt.expectedURL)
+				t.Errorf("Expected %q, but got %q", tt.expectedURL, result)
 			}
 		})
 	}
@@ -180,7 +186,7 @@ func TestValidateHostPortOverride(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateHostPortOverride(tt.override)
 			if (err != nil) != tt.expectError {
-				t.Errorf("validateHostPortOverride() error = %v, expectError %v", err, tt.expectError)
+				t.Fatalf("returned error = %v, expectError %v", err, tt.expectError)
 			}
 		})
 	}
