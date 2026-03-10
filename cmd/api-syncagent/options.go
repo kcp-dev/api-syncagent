@@ -19,9 +19,13 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
+	"strings"
 
 	"github.com/spf13/pflag"
 
+	"github.com/kcp-dev/api-syncagent/internal/kcp"
 	"github.com/kcp-dev/api-syncagent/internal/log"
 
 	"k8s.io/apimachinery/pkg/labels"
@@ -65,12 +69,25 @@ type Options struct {
 	KubeconfigHostOverride   string
 	KubeconfigCAFileOverride string
 
+	// APIExportHostPortOverrides allows overriding the host:port of URLs found in
+	// APIExportEndpointSlice. Format: "original-host:port=new-host:port".
+	// Can be specified multiple times.
+	APIExportHostPortOverrides []string
+
+	// parsedHostPortOverrides stores the parsed overrides (original -> new).
+	parsedHostPortOverrides []hostPortOverride
+
 	LogOptions log.Options
 
 	MetricsAddr string
 	HealthAddr  string
 
 	DisabledControllers []string
+}
+
+type hostPortOverride struct {
+	Original string
+	New      string
 }
 
 func NewOptions() *Options {
@@ -92,6 +109,7 @@ func (o *Options) AddFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.EnableLeaderElection, "enable-leader-election", o.EnableLeaderElection, "whether to perform leader election")
 	flags.StringVar(&o.KubeconfigHostOverride, "kubeconfig-host-override", o.KubeconfigHostOverride, "override the host configured in the local kubeconfig")
 	flags.StringVar(&o.KubeconfigCAFileOverride, "kubeconfig-ca-file-override", o.KubeconfigCAFileOverride, "override the server CA file configured in the local kubeconfig")
+	flags.StringSliceVar(&o.APIExportHostPortOverrides, "apiexport-hostport-override", o.APIExportHostPortOverrides, "override the host:port in APIExportEndpointSlice URLs (format: original-host:port=new-host:port, can be specified multiple times)")
 	flags.StringVar(&o.MetricsAddr, "metrics-address", o.MetricsAddr, "host and port to serve Prometheus metrics via /metrics (HTTP)")
 	flags.StringVar(&o.HealthAddr, "health-address", o.HealthAddr, "host and port to serve probes via /readyz and /healthz (HTTP)")
 	flags.StringSliceVar(&o.DisabledControllers, "disabled-controllers", o.DisabledControllers, fmt.Sprintf("comma-separated list of controllers (out of %v) to disable (can be given multiple times)", sets.List(availableControllers)))
@@ -135,7 +153,29 @@ func (o *Options) Validate() error {
 		errs = append(errs, fmt.Errorf("unknown controller(s) %v, mut be any of %v", sets.List(unknown), sets.List(availableControllers)))
 	}
 
+	for i, s := range o.APIExportHostPortOverrides {
+		if err := validateHostPortOverride(s); err != nil {
+			errs = append(errs, fmt.Errorf("invalid --apiexport-hostport-override #%d %q: %w", i+1, s, err))
+		}
+	}
+
 	return utilerrors.NewAggregate(errs)
+}
+
+func validateHostPortOverride(s string) error {
+	parts := strings.Split(s, "=")
+	if len(parts) != 2 {
+		return errors.New("format must be 'original-host:port=new-host:port'")
+	}
+
+	// validate that both sides have valid host:port combination
+	for i, part := range parts {
+		if _, _, err := net.SplitHostPort(part); err != nil {
+			return fmt.Errorf("part %d is not a valid host:port: %w", i+1, err)
+		}
+	}
+
+	return nil
 }
 
 func (o *Options) Complete() error {
@@ -153,5 +193,41 @@ func (o *Options) Complete() error {
 		o.PublishedResourceSelector = selector
 	}
 
+	for _, s := range o.APIExportHostPortOverrides {
+		parts := strings.Split(s, "=")
+		o.parsedHostPortOverrides = append(o.parsedHostPortOverrides, hostPortOverride{
+			Original: parts[0],
+			New:      parts[1],
+		})
+	}
+
 	return utilerrors.NewAggregate(errs)
+}
+
+// NewURLRewriter returns a new URL rewriter that applies the host:port overrides
+// to the given URL if configured. It applies all configured overrides in order.
+func NewURLRewriter(o *Options) kcp.URLRewriterFunc {
+	if len(o.parsedHostPortOverrides) == 0 {
+		return func(url string) (string, error) {
+			return url, nil // NOP
+		}
+	}
+
+	return func(rawURL string) (string, error) {
+		parsed, err := url.Parse(rawURL)
+		if err != nil {
+			return rawURL, err
+		}
+
+		currentHost := parsed.Host
+		for _, override := range o.parsedHostPortOverrides {
+			if currentHost == override.Original {
+				currentHost = override.New
+			}
+		}
+
+		parsed.Host = currentHost
+
+		return parsed.String(), nil
+	}
 }

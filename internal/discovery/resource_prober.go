@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kcp-dev/api-syncagent/internal/kcp"
 	kcpapisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,16 +31,23 @@ import (
 )
 
 type ResourceProber struct {
-	name   string
-	config *rest.Config
-	client ctrlruntimeclient.Client
+	name        string
+	config      *rest.Config
+	client      ctrlruntimeclient.Client
+	urlRewriter kcp.URLRewriterFunc
 }
 
-func NewResourceProber(endpointSliceWorkspaceConfig *rest.Config, endpointSliceWorkspaceClient ctrlruntimeclient.Client, endpointSliceName string) *ResourceProber {
+func NewResourceProber(
+	endpointSliceWorkspaceConfig *rest.Config,
+	endpointSliceWorkspaceClient ctrlruntimeclient.Client,
+	endpointSliceName string,
+	urlRewriter kcp.URLRewriterFunc,
+) *ResourceProber {
 	return &ResourceProber{
-		name:   endpointSliceName,
-		config: endpointSliceWorkspaceConfig,
-		client: endpointSliceWorkspaceClient,
+		name:        endpointSliceName,
+		config:      endpointSliceWorkspaceConfig,
+		client:      endpointSliceWorkspaceClient,
+		urlRewriter: urlRewriter,
 	}
 }
 
@@ -75,6 +83,15 @@ func (p *ResourceProber) hasAPIThing(ctx context.Context, match matchFunc) (bool
 type matchFunc func(apiGroup, version, resource, kind string) bool
 
 func (p *ResourceProber) hasAPIThingInEndpoint(endpoint string, match matchFunc) (bool, error) {
+	if p.urlRewriter != nil {
+		var err error
+
+		endpoint, err = p.urlRewriter(endpoint)
+		if err != nil {
+			return false, fmt.Errorf("failed to apply URL rewriting: %w", err)
+		}
+	}
+
 	endpointConfig := rest.CopyConfig(p.config)
 	endpointConfig.Host = endpoint + "/clusters/*"
 
