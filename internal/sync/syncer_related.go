@@ -38,6 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
 func (s *ResourceSyncer) processRelatedResources(ctx context.Context, log *zap.SugaredLogger, stateStore ObjectStateStore, remote, local syncSide, primaryDeleting bool) (requeue bool, err error) {
@@ -89,6 +91,29 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 	// no objects were found yet, that's okay
 	if len(resolvedObjects) == 0 {
 		return false, nil
+	}
+
+	// Populate the reverse index for origin:kcp related resources so that watches
+	// on those resources can trigger reconciliation of the owning primary object.
+	if relRes.Origin == syncagentv1alpha1.RelatedResourceOriginKcp && s.relatedIndex != nil {
+		for _, resolved := range resolvedObjects {
+			s.relatedIndex.Set(
+				string(remote.clusterName),
+				relRes.Group,
+				relRes.Resource,
+				resolved.original.GetNamespace(),
+				resolved.original.GetName(),
+				mcreconcile.Request{
+					ClusterName: string(remote.clusterName),
+					Request: reconcile.Request{
+						NamespacedName: types.NamespacedName{
+							Namespace: remote.object.GetNamespace(),
+							Name:      remote.object.GetName(),
+						},
+					},
+				},
+			)
+		}
 	}
 
 	slices.SortStableFunc(resolvedObjects, func(a, b resolvedObject) int {

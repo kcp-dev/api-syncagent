@@ -39,9 +39,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/ptr"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -67,6 +72,41 @@ type Reconciler struct {
 	localCRD       *apiextensionsv1.CustomResourceDefinition
 	stateNamespace string
 	agentName      string
+	relatedIndex   *sync.RelatedObjectIndex
+}
+
+// relatedResourceEventHandler enqueues the primary object whenever a kcp-origin
+// related resource changes. It uses the RelatedObjectIndex to reverse-map the
+// changed related object back to its owning primary object.
+type relatedResourceEventHandler struct {
+	clusterName  string
+	relatedIndex *sync.RelatedObjectIndex
+	group        string
+	resource     string
+}
+
+func (h *relatedResourceEventHandler) Create(_ context.Context, evt event.TypedCreateEvent[*unstructured.Unstructured], q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
+	h.enqueue(evt.Object, q)
+}
+
+func (h *relatedResourceEventHandler) Update(_ context.Context, evt event.TypedUpdateEvent[*unstructured.Unstructured], q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
+	h.enqueue(evt.ObjectNew, q)
+}
+
+func (h *relatedResourceEventHandler) Delete(_ context.Context, evt event.TypedDeleteEvent[*unstructured.Unstructured], q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
+	h.enqueue(evt.Object, q)
+}
+
+func (h *relatedResourceEventHandler) Generic(_ context.Context, evt event.TypedGenericEvent[*unstructured.Unstructured], q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
+	h.enqueue(evt.Object, q)
+}
+
+func (h *relatedResourceEventHandler) enqueue(obj *unstructured.Unstructured, q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
+	req, ok := h.relatedIndex.Get(h.clusterName, h.group, h.resource, obj.GetNamespace(), obj.GetName())
+	if !ok {
+		return
+	}
+	q.Add(req)
 }
 
 // Create creates a new controller and importantly does *not* add it to the manager,
@@ -120,6 +160,7 @@ func Create(
 		stateNamespace: stateNamespace,
 		agentName:      agentName,
 		localCRD:       localCRD,
+		relatedIndex:   sync.NewRelatedObjectIndex(),
 	}
 
 	ctrlOptions := mccontroller.Options{
@@ -159,6 +200,59 @@ func Create(
 
 	if err := c.Watch(source.TypedKind(localManager.GetCache(), localDummy, enqueueRemoteObjForLocalObj, nameFilter)); err != nil {
 		return nil, fmt.Errorf("failed to setup local-side watch: %w", err)
+	}
+
+	// Watch origin:kcp related resources in the virtual workspace so that changes
+	// to them trigger reconciliation of their owning primary object.
+	watchedGVKs := sets.New[schema.GroupVersionKind]()
+	for _, relRes := range pubRes.Spec.Related {
+		if relRes.Origin != syncagentv1alpha1.RelatedResourceOriginKcp {
+			continue
+		}
+
+		gvr := schema.GroupVersionResource{
+			Group:    relRes.Group,
+			Version:  relRes.Version,
+			Resource: relRes.Resource,
+		}
+
+		// Use the local REST mapper to determine the Kind. Core resources (ConfigMap,
+		// Secret, …) and CRDs installed on the service cluster are covered by this.
+		gvk, err := localManager.GetRESTMapper().KindFor(gvr)
+		if err != nil {
+			log.Warnw("failed to determine Kind for origin:kcp related resource, skipping watch", "gvr", gvr, "error", err)
+			continue
+		}
+
+		// Deduplicate: only set up one watch per GVK.
+		if watchedGVKs.Has(gvk) {
+			continue
+		}
+
+		watchedGVKs.Insert(gvk)
+
+		relatedDummy := &unstructured.Unstructured{}
+		relatedDummy.SetGroupVersionKind(gvk)
+
+		group := relRes.Group
+		resource := relRes.Resource
+
+		enqueueForRelated := mchandler.TypedEventHandlerFunc[*unstructured.Unstructured, mcreconcile.Request](
+			func(clusterName string, _ cluster.Cluster) handler.TypedEventHandler[*unstructured.Unstructured, mcreconcile.Request] {
+				return &relatedResourceEventHandler{
+					clusterName:  clusterName,
+					relatedIndex: reconciler.relatedIndex,
+					group:        group,
+					resource:     resource,
+				}
+			},
+		)
+
+		if err := c.MultiClusterWatch(mcsource.TypedKind(relatedDummy, enqueueForRelated)); err != nil {
+			return nil, fmt.Errorf("failed to setup watch for origin:kcp related resource %v: %w", gvk, err)
+		}
+
+		log.Infow("Set up watch for origin:kcp related resource", "gvk", gvk)
 	}
 
 	log.Info("Done setting up unmanaged controller.")
@@ -226,7 +320,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request)
 	}
 
 	// sync main object
-	syncer, err := sync.NewResourceSyncer(log, r.localClient, vwClient, r.pubRes, r.localCRD, mutation.NewMutator, r.stateNamespace, r.agentName)
+	syncer, err := sync.NewResourceSyncer(log, r.localClient, vwClient, r.pubRes, r.localCRD, mutation.NewMutator, r.stateNamespace, r.agentName, r.relatedIndex)
 	if err != nil {
 		recorder.Event(remoteObj, corev1.EventTypeWarning, "ReconcilingError", "Failed to process object: a provider-side issue has occurred.")
 		return reconcile.Result{}, fmt.Errorf("failed to create syncer: %w", err)
