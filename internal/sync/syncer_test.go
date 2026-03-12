@@ -923,6 +923,7 @@ func TestSyncerProcessingSingleResourceWithoutStatus(t *testing.T) {
 				},
 				stateNamespace,
 				"textor-the-doctor",
+				nil,
 			)
 			if err != nil {
 				t.Fatalf("Failed to create syncer: %v", err)
@@ -1231,6 +1232,7 @@ func TestSyncerProcessingSingleResourceWithStatus(t *testing.T) {
 				},
 				stateNamespace,
 				"textor-the-doctor",
+				nil,
 			)
 			if err != nil {
 				t.Fatalf("Failed to create syncer: %v", err)

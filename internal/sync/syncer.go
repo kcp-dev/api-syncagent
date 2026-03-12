@@ -54,6 +54,10 @@ type ResourceSyncer struct {
 
 	agentName string
 
+	// relatedIndex is populated during reconciliation to enable watches on origin:kcp
+	// related resources to trigger primary object reconciliation.
+	relatedIndex *RelatedObjectIndex
+
 	// newObjectStateStore is used for testing purposes
 	newObjectStateStore newObjectStateStoreFunc
 }
@@ -69,6 +73,7 @@ func NewResourceSyncer(
 	mutatorCreator MutatorCreatorFunc,
 	stateNamespace string,
 	agentName string,
+	relatedIndex *RelatedObjectIndex,
 ) (*ResourceSyncer, error) {
 	// create a dummy that represents the type used on the local service cluster
 	localGVK, err := projection.PublishedResourceSourceGVK(localCRD, pubRes)
@@ -127,6 +132,7 @@ func NewResourceSyncer(
 		primaryMutator:      primaryMutator,
 		relatedMutators:     relatedMutators,
 		agentName:           agentName,
+		relatedIndex:        relatedIndex,
 		newObjectStateStore: newKubernetesStateStoreCreator(stateNamespace),
 	}, nil
 }
