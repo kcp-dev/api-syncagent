@@ -778,6 +778,35 @@ spec:
                           Version is the API version of the related resource. This can be left blank to automatically
                           use the preferred version.
                         type: string
+                      watch:
+                        description: |-
+                          Watch configures how the agent identifies the owning primary object when a related
+                          resource with origin: kcp changes. When set, the agent sets up a watch on the related
+                          resource type and uses the configured rule to enqueue the correct primary object.
+                          Without this field, changes to origin:kcp related resources do not trigger reconciliation.
+                        properties:
+                          byLabel:
+                            additionalProperties:
+                              type: string
+                            description: |-
+                              ByLabel configures the watch handler to list primary objects matching a label selector
+                              derived from the changed object. Each map key is a label key on the primary object;
+                              each value is a Go template expression evaluated with the changed object available as
+                              .watchObject (with fields .name, .namespace, .labels).
+                            type: object
+                          byOwner:
+                            description: |-
+                              ByOwner configures the watch handler to inspect the OwnerReferences of the changed
+                              object. When an OwnerReference with the given Kind is found, the referenced owner
+                              is enqueued as the primary object.
+                            properties:
+                              kind:
+                                description: Kind is the Kind to look for in the OwnerReferences of the changed related object.
+                                type: string
+                            required:
+                              - kind
+                            type: object
+                        type: object
                     required:
                       - identifier
                       - object

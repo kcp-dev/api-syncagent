@@ -39,9 +39,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -159,6 +162,73 @@ func Create(
 
 	if err := c.Watch(source.TypedKind(localManager.GetCache(), localDummy, enqueueRemoteObjForLocalObj, nameFilter)); err != nil {
 		return nil, fmt.Errorf("failed to setup local-side watch: %w", err)
+	}
+
+	// Watch origin:kcp related resources so that changes to them trigger reconciliation
+	// of the owning primary object. Only related resources with a Watch config are covered.
+	watchedGVKs := sets.New[schema.GroupVersionKind]()
+	for _, relRes := range pubRes.Spec.Related {
+		if relRes.Origin != syncagentv1alpha1.RelatedResourceOriginKcp || relRes.Watch == nil {
+			continue
+		}
+
+		gvr := schema.GroupVersionResource{
+			Group:    relRes.Group,
+			Version:  relRes.Version,
+			Resource: relRes.Resource,
+		}
+
+		// Use the local REST mapper to determine the Kind.
+		gvk, err := localManager.GetRESTMapper().KindFor(gvr)
+		if err != nil {
+			log.Warnw("Failed to determine Kind for origin:kcp related resource, skipping watch", "gvr", gvr, "error", err)
+			continue
+		}
+
+		// Deduplicate: only set up one watch per GVK.
+		if watchedGVKs.Has(gvk) {
+			continue
+		}
+		watchedGVKs.Insert(gvk)
+
+		relatedDummy := &unstructured.Unstructured{}
+		relatedDummy.SetGroupVersionKind(gvk)
+
+		var enqueueForRelated mchandler.TypedEventHandlerFunc[*unstructured.Unstructured, mcreconcile.Request]
+
+		switch {
+		case relRes.Watch.ByOwner != nil:
+			ownerKind := relRes.Watch.ByOwner.Kind
+			enqueueForRelated = func(clusterName string, _ cluster.Cluster) handler.TypedEventHandler[*unstructured.Unstructured, mcreconcile.Request] {
+				return &byOwnerEventHandler{
+					clusterName: clusterName,
+					ownerKind:   ownerKind,
+				}
+			}
+
+		case relRes.Watch.ByLabel != nil:
+			labelTemplates := relRes.Watch.ByLabel
+			primaryDummy := remoteDummy.DeepCopy()
+			enqueueForRelated = func(clusterName string, cl cluster.Cluster) handler.TypedEventHandler[*unstructured.Unstructured, mcreconcile.Request] {
+				return &byLabelEventHandler{
+					clusterName:    clusterName,
+					client:         cl.GetClient(),
+					primaryDummy:   primaryDummy,
+					labelTemplates: labelTemplates,
+					log:            log,
+				}
+			}
+
+		default:
+			log.Warnw("origin:kcp related resource has Watch set but neither byOwner nor byLabel configured, skipping", "gvk", gvk)
+			continue
+		}
+
+		if err := c.MultiClusterWatch(mcsource.TypedKind(relatedDummy, enqueueForRelated)); err != nil {
+			return nil, fmt.Errorf("failed to setup watch for origin:kcp related resource %v: %w", gvk, err)
+		}
+
+		log.Infow("Set up watch for origin:kcp related resource", "gvk", gvk)
 	}
 
 	log.Info("Done setting up unmanaged controller.")

@@ -256,6 +256,36 @@ type RelatedResourceSpec struct {
 	// Mutation configures optional transformation rules for the related resource.
 	// Status mutations are only performed when the related resource originates in kcp.
 	Mutation *ResourceMutationSpec `json:"mutation,omitempty"`
+
+	// Watch configures how the agent identifies the owning primary object when a related
+	// resource with origin: kcp changes. When set, the agent sets up a watch on the related
+	// resource type and uses the configured rule to enqueue the correct primary object.
+	// Without this field, changes to origin:kcp related resources do not trigger reconciliation.
+	Watch *RelatedResourceWatch `json:"watch,omitempty"`
+}
+
+// RelatedResourceWatch configures how the watch handler maps a changed related resource
+// back to its owning primary object.
+// Exactly one of ByOwner or ByLabel must be set.
+type RelatedResourceWatch struct {
+	// ByOwner configures the watch handler to inspect the OwnerReferences of the changed
+	// object. When an OwnerReference with the given Kind is found, the referenced owner
+	// is enqueued as the primary object.
+	// +optional
+	ByOwner *RelatedResourceWatchByOwner `json:"byOwner,omitempty"`
+
+	// ByLabel configures the watch handler to list primary objects matching a label selector
+	// derived from the changed object. Each map key is a label key on the primary object;
+	// each value is a Go template expression evaluated with the changed object available as
+	// .watchObject (with fields .name, .namespace, .labels).
+	// +optional
+	ByLabel map[string]string `json:"byLabel,omitempty"`
+}
+
+// RelatedResourceWatchByOwner configures reverse lookup via OwnerReferences.
+type RelatedResourceWatchByOwner struct {
+	// Kind is the Kind to look for in the OwnerReferences of the changed related object.
+	Kind string `json:"kind"`
 }
 
 // RelatedResourceProjection describes how the source GVK of a related resource (i.e.
