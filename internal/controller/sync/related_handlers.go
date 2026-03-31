@@ -18,12 +18,13 @@ package sync
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/zap"
 
-	"github.com/kcp-dev/api-syncagent/internal/sync/templating"
-
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,10 +34,10 @@ import (
 )
 
 // byOwnerEventHandler enqueues the primary object by inspecting the OwnerReferences
-// of the changed related object and finding one with the configured Kind.
+// of the changed related object and finding one matching the configured GVK.
 type byOwnerEventHandler struct {
 	clusterName string
-	ownerKind   string
+	ownerGVK    schema.GroupVersionKind
 }
 
 func (h *byOwnerEventHandler) Create(_ context.Context, evt event.TypedCreateEvent[*unstructured.Unstructured], q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
@@ -57,7 +58,11 @@ func (h *byOwnerEventHandler) Generic(_ context.Context, evt event.TypedGenericE
 
 func (h *byOwnerEventHandler) enqueue(obj *unstructured.Unstructured, q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
 	for _, ref := range obj.GetOwnerReferences() {
-		if ref.Kind == h.ownerKind {
+		refGV, err := schema.ParseGroupVersion(ref.APIVersion)
+		if err != nil {
+			continue
+		}
+		if refGV.Group == h.ownerGVK.Group && refGV.Version == h.ownerGVK.Version && ref.Kind == h.ownerGVK.Kind {
 			q.Add(mcreconcile.Request{
 				ClusterName: h.clusterName,
 				Request: reconcile.Request{
@@ -72,60 +77,46 @@ func (h *byOwnerEventHandler) enqueue(obj *unstructured.Unstructured, q workqueu
 	}
 }
 
-// byLabelEventHandler enqueues primary objects by evaluating label templates against
-// the changed related object and listing primaries matching the resulting label selector.
-type byLabelEventHandler struct {
-	clusterName    string
-	client         ctrlruntimeclient.Client
-	primaryDummy   *unstructured.Unstructured
-	labelTemplates map[string]string
-	log            *zap.SugaredLogger
+// bySelectorEventHandler enqueues primary objects by listing primaries matching the configured
+// label selector whenever a related object changes.
+type bySelectorEventHandler struct {
+	clusterName   string
+	client        ctrlruntimeclient.Client
+	primaryDummy  *unstructured.Unstructured
+	labelSelector *metav1.LabelSelector
+	log           *zap.SugaredLogger
 }
 
-func (h *byLabelEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*unstructured.Unstructured], q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
+func (h *bySelectorEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*unstructured.Unstructured], q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
 	h.enqueue(ctx, evt.Object, q)
 }
 
-func (h *byLabelEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*unstructured.Unstructured], q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
+func (h *bySelectorEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*unstructured.Unstructured], q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
 	h.enqueue(ctx, evt.ObjectNew, q)
 }
 
-func (h *byLabelEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*unstructured.Unstructured], q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
+func (h *bySelectorEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*unstructured.Unstructured], q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
 	h.enqueue(ctx, evt.Object, q)
 }
 
-func (h *byLabelEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*unstructured.Unstructured], q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
+func (h *bySelectorEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*unstructured.Unstructured], q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
 	h.enqueue(ctx, evt.Object, q)
 }
 
-func (h *byLabelEventHandler) enqueue(ctx context.Context, obj *unstructured.Unstructured, q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
-	// Build the template context using the changed related object.
-	data := map[string]any{
-		"watchObject": map[string]any{
-			"name":      obj.GetName(),
-			"namespace": obj.GetNamespace(),
-			"labels":    obj.GetLabels(),
-		},
+func (h *bySelectorEventHandler) enqueue(ctx context.Context, _ *unstructured.Unstructured, q workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
+	selector, err := metav1.LabelSelectorAsSelector(h.labelSelector)
+	if err != nil {
+		h.log.Warnw("Failed to convert bySelector selector", "error", err)
+		return
 	}
 
-	// Evaluate each label template to build the selector.
-	matchingLabels := ctrlruntimeclient.MatchingLabels{}
-	for key, tpl := range h.labelTemplates {
-		value, err := templating.Render(tpl, data)
-		if err != nil {
-			h.log.Warnw("Failed to evaluate byLabel template", "key", key, "template", tpl, "error", err)
-			return
-		}
-		matchingLabels[key] = value
-	}
-
-	// List primary objects matching the derived label selector.
+	// List primary objects matching the label selector.
 	primaryList := &unstructured.UnstructuredList{}
 	primaryList.SetAPIVersion(h.primaryDummy.GetAPIVersion())
 	primaryList.SetKind(h.primaryDummy.GetKind() + "List")
 
-	if err := h.client.List(ctx, primaryList, matchingLabels); err != nil {
-		h.log.Warnw("Failed to list primary objects for byLabel watch", "selector", matchingLabels, "error", err)
+	if err := h.client.List(ctx, primaryList, &ctrlruntimeclient.ListOptions{LabelSelector: selector}); err != nil {
+		h.log.Warnw("Failed to list primary objects for bySelector watch", "selector", fmt.Sprintf("%v", selector), "error", err)
 		return
 	}
 

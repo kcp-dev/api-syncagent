@@ -266,7 +266,8 @@ type RelatedResourceSpec struct {
 
 // RelatedResourceWatch configures how the watch handler maps a changed related resource
 // back to its owning primary object.
-// Exactly one of ByOwner or ByLabel must be set.
+// Exactly one of ByOwner or BySelector must be set.
+// +kubebuilder:validation:XValidation:rule="has(self.byOwner) != has(self.bySelector)",message="exactly one of byOwner or bySelector must be set"
 type RelatedResourceWatch struct {
 	// ByOwner configures the watch handler to inspect the OwnerReferences of the changed
 	// object. When an OwnerReference with the given Kind is found, the referenced owner
@@ -274,19 +275,18 @@ type RelatedResourceWatch struct {
 	// +optional
 	ByOwner *RelatedResourceWatchByOwner `json:"byOwner,omitempty"`
 
-	// ByLabel configures the watch handler to list primary objects matching a label selector
-	// derived from the changed object. Each map key is a label key on the primary object;
-	// each value is a Go template expression evaluated with the changed object available as
-	// .watchObject (with fields .name, .namespace, .labels).
+	// BySelector configures the watch handler to list primary objects matching the given label
+	// selector. When a related object changes, all primary objects matching this selector
+	// are enqueued for reconciliation.
 	// +optional
-	ByLabel map[string]string `json:"byLabel,omitempty"`
+	BySelector *metav1.LabelSelector `json:"bySelector,omitempty"`
 }
 
 // RelatedResourceWatchByOwner configures reverse lookup via OwnerReferences.
-type RelatedResourceWatchByOwner struct {
-	// Kind is the Kind to look for in the OwnerReferences of the changed related object.
-	Kind string `json:"kind"`
-}
+// The agent already knows the GVK of the primary object, so no further configuration
+// is needed: when a related object changes, its OwnerReferences are inspected for a
+// reference whose Kind matches the primary object's Kind.
+type RelatedResourceWatchByOwner struct{}
 
 // RelatedResourceProjection describes how the source GVK of a related resource (i.e.
 // the GVK on the related resource's origin side) should be modified when an object

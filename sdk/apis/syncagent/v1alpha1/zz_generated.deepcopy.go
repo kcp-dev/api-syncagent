@@ -329,12 +329,10 @@ func (in *RelatedResourceWatch) DeepCopyInto(out *RelatedResourceWatch) {
 		*out = new(RelatedResourceWatchByOwner)
 		**out = **in
 	}
-	if in.ByLabel != nil {
-		in, out := &in.ByLabel, &out.ByLabel
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+	if in.BySelector != nil {
+		in, out := &in.BySelector, &out.BySelector
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
 	}
 }
 

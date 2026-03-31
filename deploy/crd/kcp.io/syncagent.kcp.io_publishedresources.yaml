@@ -785,28 +785,63 @@ spec:
                           resource type and uses the configured rule to enqueue the correct primary object.
                           Without this field, changes to origin:kcp related resources do not trigger reconciliation.
                         properties:
-                          byLabel:
-                            additionalProperties:
-                              type: string
-                            description: |-
-                              ByLabel configures the watch handler to list primary objects matching a label selector
-                              derived from the changed object. Each map key is a label key on the primary object;
-                              each value is a Go template expression evaluated with the changed object available as
-                              .watchObject (with fields .name, .namespace, .labels).
-                            type: object
                           byOwner:
                             description: |-
                               ByOwner configures the watch handler to inspect the OwnerReferences of the changed
                               object. When an OwnerReference with the given Kind is found, the referenced owner
                               is enqueued as the primary object.
-                            properties:
-                              kind:
-                                description: Kind is the Kind to look for in the OwnerReferences of the changed related object.
-                                type: string
-                            required:
-                              - kind
                             type: object
+                          bySelector:
+                            description: |-
+                              BySelector configures the watch handler to list primary objects matching the given label
+                              selector. When a related object changes, all primary objects matching this selector
+                              are enqueued for reconciliation.
+                            properties:
+                              matchExpressions:
+                                description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
+                                items:
+                                  description: |-
+                                    A label selector requirement is a selector that contains values, a key, and an operator that
+                                    relates the key and values.
+                                  properties:
+                                    key:
+                                      description: key is the label key that the selector applies to.
+                                      type: string
+                                    operator:
+                                      description: |-
+                                        operator represents a key's relationship to a set of values.
+                                        Valid operators are In, NotIn, Exists and DoesNotExist.
+                                      type: string
+                                    values:
+                                      description: |-
+                                        values is an array of string values. If the operator is In or NotIn,
+                                        the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                        the values array must be empty. This array is replaced during a strategic
+                                        merge patch.
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: atomic
+                                  required:
+                                    - key
+                                    - operator
+                                  type: object
+                                type: array
+                                x-kubernetes-list-type: atomic
+                              matchLabels:
+                                additionalProperties:
+                                  type: string
+                                description: |-
+                                  matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                  map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                  operator is "In", and the values array contains only "value". The requirements are ANDed.
+                                type: object
+                            type: object
+                            x-kubernetes-map-type: atomic
                         type: object
+                        x-kubernetes-validations:
+                          - message: exactly one of byOwner or bySelector must be set
+                            rule: has(self.byOwner) != has(self.bySelector)
                     required:
                       - identifier
                       - object

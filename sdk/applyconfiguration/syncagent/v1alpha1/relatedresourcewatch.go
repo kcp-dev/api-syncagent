@@ -18,11 +18,17 @@ limitations under the License.
 
 package v1alpha1
 
+import (
+	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+
+	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
+)
+
 // RelatedResourceWatchApplyConfiguration represents a declarative configuration of the RelatedResourceWatch type for use
 // with apply.
 type RelatedResourceWatchApplyConfiguration struct {
-	ByOwner *RelatedResourceWatchByOwnerApplyConfiguration `json:"byOwner,omitempty"`
-	ByLabel map[string]string                              `json:"byLabel,omitempty"`
+	ByOwner    *syncagentv1alpha1.RelatedResourceWatchByOwner `json:"byOwner,omitempty"`
+	BySelector *v1.LabelSelectorApplyConfiguration            `json:"bySelector,omitempty"`
 }
 
 // RelatedResourceWatchApplyConfiguration constructs a declarative configuration of the RelatedResourceWatch type for use with
@@ -34,21 +40,15 @@ func RelatedResourceWatch() *RelatedResourceWatchApplyConfiguration {
 // WithByOwner sets the ByOwner field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ByOwner field is set to the value of the last call.
-func (b *RelatedResourceWatchApplyConfiguration) WithByOwner(value *RelatedResourceWatchByOwnerApplyConfiguration) *RelatedResourceWatchApplyConfiguration {
-	b.ByOwner = value
+func (b *RelatedResourceWatchApplyConfiguration) WithByOwner(value syncagentv1alpha1.RelatedResourceWatchByOwner) *RelatedResourceWatchApplyConfiguration {
+	b.ByOwner = &value
 	return b
 }
 
-// WithByLabel puts the entries into the ByLabel field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, the entries provided by each call will be put on the ByLabel field,
-// overwriting an existing map entries in ByLabel field with the same key.
-func (b *RelatedResourceWatchApplyConfiguration) WithByLabel(entries map[string]string) *RelatedResourceWatchApplyConfiguration {
-	if b.ByLabel == nil && len(entries) > 0 {
-		b.ByLabel = make(map[string]string, len(entries))
-	}
-	for k, v := range entries {
-		b.ByLabel[k] = v
-	}
+// WithBySelector sets the BySelector field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the BySelector field is set to the value of the last call.
+func (b *RelatedResourceWatchApplyConfiguration) WithBySelector(value *v1.LabelSelectorApplyConfiguration) *RelatedResourceWatchApplyConfiguration {
+	b.BySelector = value
 	return b
 }
