@@ -23,7 +23,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/kcp-dev/kcp/pkg/crdpuller"
+	"github.com/kcp-dev/api-syncagent/third_party/kcp/crdpuller"
 
 	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"

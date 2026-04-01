@@ -23,3 +23,5 @@ const (
 	// the logicalcluster name (e.g. "984235jkhwfowt45").
 	IdentityClusterName = "cluster"
 )
+
+type URLRewriterFunc func(url string) (string, error)

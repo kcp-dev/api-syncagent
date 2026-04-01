@@ -93,6 +93,8 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 
 	hello.Info("Moin, I'm the kcp Sync Agent")
 
+	urlRewriter := NewURLRewriter(opts)
+
 	// create the ctrl-runtime manager
 	mgr, err := setupLocalManager(ctx, opts)
 	if err != nil {
@@ -155,7 +157,7 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 	// regular mcmanager, capable of starting new controllers at any later time and
 	// allowing them to be also stopped at any time. The syncmanager needs it to
 	// start/stop sync controllers for each PublishedResource.
-	dmcm, err := kcp.NewDynamicMultiClusterManager(endpoint.EndpointSlice.Config, endpoint.EndpointSlice.Name)
+	dmcm, err := kcp.NewDynamicMultiClusterManager(endpoint.EndpointSlice.Config, endpoint.EndpointSlice.Name, urlRewriter)
 	if err != nil {
 		return fmt.Errorf("failed to start dynamic multi cluster manager: %w", err)
 	}
@@ -194,7 +196,7 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 	if err := startController("sync", func() error {
 		// The syncmanager needs to be able to determine whether an API is already bound and available
 		// before it can start any sync controllers. That discovery logic is encapsulated in the ResourceProber.
-		prober := discovery.NewResourceProber(endpoint.EndpointSlice.Config, endpointSliceCluster.GetClient(), endpoint.EndpointSlice.Name)
+		prober := discovery.NewResourceProber(endpoint.EndpointSlice.Config, endpointSliceCluster.GetClient(), endpoint.EndpointSlice.Name, urlRewriter)
 
 		return syncmanager.Add(ctx, mgr, prober, dmcm, log, opts.PublishedResourceSelector, opts.Namespace, opts.AgentName)
 	}); err != nil {
