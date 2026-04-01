@@ -35,6 +35,7 @@ type RelatedResourceSpecApplyConfiguration struct {
 	Projection   *RelatedResourceProjectionApplyConfiguration `json:"projection,omitempty"`
 	Object       *RelatedResourceObjectApplyConfiguration     `json:"object,omitempty"`
 	Mutation     *ResourceMutationSpecApplyConfiguration      `json:"mutation,omitempty"`
+	Watch        *RelatedResourceWatchApplyConfiguration      `json:"watch,omitempty"`
 }
 
 // RelatedResourceSpecApplyConfiguration constructs a declarative configuration of the RelatedResourceSpec type for use with
@@ -120,5 +121,13 @@ func (b *RelatedResourceSpecApplyConfiguration) WithObject(value *RelatedResourc
 // If called multiple times, the Mutation field is set to the value of the last call.
 func (b *RelatedResourceSpecApplyConfiguration) WithMutation(value *ResourceMutationSpecApplyConfiguration) *RelatedResourceSpecApplyConfiguration {
 	b.Mutation = value
+	return b
+}
+
+// WithWatch sets the Watch field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Watch field is set to the value of the last call.
+func (b *RelatedResourceSpecApplyConfiguration) WithWatch(value *RelatedResourceWatchApplyConfiguration) *RelatedResourceSpecApplyConfiguration {
+	b.Watch = value
 	return b
 }

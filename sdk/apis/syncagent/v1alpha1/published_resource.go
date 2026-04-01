@@ -256,7 +256,37 @@ type RelatedResourceSpec struct {
 	// Mutation configures optional transformation rules for the related resource.
 	// Status mutations are only performed when the related resource originates in kcp.
 	Mutation *ResourceMutationSpec `json:"mutation,omitempty"`
+
+	// Watch configures how the agent identifies the owning primary object when a related
+	// resource with origin: kcp changes. When set, the agent sets up a watch on the related
+	// resource type and uses the configured rule to enqueue the correct primary object.
+	// Without this field, changes to origin:kcp related resources do not trigger reconciliation.
+	Watch *RelatedResourceWatch `json:"watch,omitempty"`
 }
+
+// RelatedResourceWatch configures how the watch handler maps a changed related resource
+// back to its owning primary object.
+// Exactly one of ByOwner or BySelector must be set.
+// +kubebuilder:validation:XValidation:rule="has(self.byOwner) != has(self.bySelector)",message="exactly one of byOwner or bySelector must be set"
+type RelatedResourceWatch struct {
+	// ByOwner configures the watch handler to inspect the OwnerReferences of the changed
+	// object. When an OwnerReference with the given Kind is found, the referenced owner
+	// is enqueued as the primary object.
+	// +optional
+	ByOwner *RelatedResourceWatchByOwner `json:"byOwner,omitempty"`
+
+	// BySelector configures the watch handler to list primary objects matching the given label
+	// selector. When a related object changes, all primary objects matching this selector
+	// are enqueued for reconciliation.
+	// +optional
+	BySelector *metav1.LabelSelector `json:"bySelector,omitempty"`
+}
+
+// RelatedResourceWatchByOwner configures reverse lookup via OwnerReferences.
+// The agent already knows the GVK of the primary object, so no further configuration
+// is needed: when a related object changes, its OwnerReferences are inspected for a
+// reference whose Kind matches the primary object's Kind.
+type RelatedResourceWatchByOwner struct{}
 
 // RelatedResourceProjection describes how the source GVK of a related resource (i.e.
 // the GVK on the related resource's origin side) should be modified when an object
