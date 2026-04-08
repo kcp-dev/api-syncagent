@@ -18,12 +18,10 @@ package utils
 
 import (
 	"context"
-	"slices"
 	"testing"
 	"time"
 
-	kcpapisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
-
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -45,36 +43,21 @@ func WaitForObject(t *testing.T, ctx context.Context, client ctrlruntimeclient.C
 	t.Logf("%T is ready.", obj)
 }
 
-func WaitForBoundAPI(t *testing.T, ctx context.Context, client ctrlruntimeclient.Client, gvr schema.GroupVersionResource) {
+func WaitForBoundAPI(t *testing.T, ctx context.Context, client ctrlruntimeclient.Client, gvk schema.GroupVersionKind) {
 	t.Helper()
 
-	t.Logf("Waiting for API %s/%s to be bound in kcp…", gvr.Group, gvr.Resource)
+	t.Logf("Waiting for API %s/%s to be bound in kcp…", gvk.Group, gvk.Kind)
+
+	// Wait for actual resource availability instead of checking the APIBinding, because this is more
+	// reliable, especially on slower CI environments.
 	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
-		apiBindings := &kcpapisv1alpha1.APIBindingList{}
-		err := client.List(ctx, apiBindings)
-		if err != nil {
-			return false, err
-		}
+		// Try to list resources of this type - if the resource isn't ready, this will fail
+		list := &unstructured.UnstructuredList{}
+		list.SetGroupVersionKind(gvk)
 
-		for _, binding := range apiBindings.Items {
-			if bindingHasGVR(binding, gvr) {
-				return true, nil
-			}
-		}
-
-		return false, nil
+		return client.List(ctx, list) == nil, nil
 	})
 	if err != nil {
-		t.Fatalf("Failed to wait for API %v to become available: %v", gvr, err)
+		t.Fatalf("Failed to wait for API %v to become available: %v", gvk, err)
 	}
-}
-
-func bindingHasGVR(binding kcpapisv1alpha1.APIBinding, gvr schema.GroupVersionResource) bool {
-	for _, bound := range binding.Status.BoundResources {
-		if bound.Group == gvr.Group && bound.Resource == gvr.Resource && slices.Contains(bound.StorageVersions, gvr.Version) {
-			return true
-		}
-	}
-
-	return false
 }

@@ -116,10 +116,10 @@ func TestAPIExportEndpointSliceSameCluster(t *testing.T) {
 	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
 	teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
-	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
-		Group:    kcpGroupName,
-		Version:  "v1",
-		Resource: "crontabs",
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+		Group:   kcpGroupName,
+		Version: "v1",
+		Kind:    "CronTab",
 	})
 
 	// In kcp 0.27, the binding' status is not perfectly in-sync with the actual APIs available in
@@ -260,10 +260,10 @@ func TestAPIExportEndpointSliceDifferentCluster(t *testing.T) {
 	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
 	teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
-	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
-		Group:    kcpGroupName,
-		Version:  "v1",
-		Resource: "crontabs",
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+		Group:   kcpGroupName,
+		Version: "v1",
+		Kind:    "CronTab",
 	})
 
 	// TODO: Remove this once we do not support kcp 0.27 anymore.

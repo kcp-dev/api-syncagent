@@ -97,10 +97,10 @@ func TestSyncSimpleObject(t *testing.T) {
 	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
 	teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
-	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
-		Group:    kcpGroupName,
-		Version:  "v1",
-		Resource: "crontabs",
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+		Group:   kcpGroupName,
+		Version: "v1",
+		Kind:    "CronTab",
 	})
 
 	// create a Crontab object in a team workspace
@@ -190,10 +190,10 @@ func TestSyncSimpleObjectOldNaming(t *testing.T) {
 	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
 	teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
-	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
-		Group:    kcpGroupName,
-		Version:  "v1",
-		Resource: "crontabs",
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+		Group:   kcpGroupName,
+		Version: "v1",
+		Kind:    "CronTab",
 	})
 
 	// create a Crontab object in a team workspace
@@ -274,10 +274,10 @@ func TestSyncWithDefaultNamingRules(t *testing.T) {
 	// wait until the API is available
 	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
 
-	crontabsGVR := schema.GroupVersionResource{
-		Group:    "kcp.example.com",
-		Version:  "v1",
-		Resource: "crontabs",
+	crontabsGVK := schema.GroupVersionKind{
+		Group:   "kcp.example.com",
+		Version: "v1",
+		Kind:    "CronTab",
 	}
 
 	// create a Crontab object in each team workspace, importantly using the same name and
@@ -298,7 +298,7 @@ spec:
 		teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join(team)
 		teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
-		utils.WaitForBoundAPI(t, ctx, teamClient, crontabsGVR)
+		utils.WaitForBoundAPI(t, ctx, teamClient, crontabsGVK)
 
 		if err := teamClient.Create(ctx, utils.YAMLToUnstructured(t, crontabYAML)); err != nil {
 			t.Fatalf("Failed to create %s's CronTab in kcp: %v", team, err)
@@ -380,10 +380,10 @@ func TestLocalChangesAreKept(t *testing.T) {
 	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
 	teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
-	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
-		Group:    kcpGroupName,
-		Version:  "v1",
-		Resource: "crontabs",
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+		Group:   kcpGroupName,
+		Version: "v1",
+		Kind:    "CronTab",
 	})
 
 	// create a Crontab object in a team workspace
@@ -577,10 +577,10 @@ func TestResourceFilter(t *testing.T) {
 	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
 	teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
-	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
-		Group:    kcpGroupName,
-		Version:  "v1",
-		Resource: "crontabs",
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+		Group:   kcpGroupName,
+		Version: "v1",
+		Kind:    "CronTab",
 	})
 
 	// create two Crontab objects in a team workspace
@@ -694,10 +694,10 @@ func TestSyncingOverlyLongNames(t *testing.T) {
 	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
 	teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
-	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
-		Group:    kcpGroupName,
-		Version:  "v1",
-		Resource: "crontabs",
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+		Group:   kcpGroupName,
+		Version: "v1",
+		Kind:    "CronTab",
 	})
 
 	// create a namespace and CronTab with extremely long names
@@ -796,10 +796,10 @@ func TestSyncWithWorkspacePath(t *testing.T) {
 	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
 	teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
-	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
-		Group:    kcpGroupName,
-		Version:  "v1",
-		Resource: "crontabs",
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+		Group:   kcpGroupName,
+		Version: "v1",
+		Kind:    "CronTab",
 	})
 
 	// create a Crontab object in a team workspace
@@ -921,10 +921,10 @@ func TestSyncMultiResources(t *testing.T) {
 	teamClusterPath := logicalcluster.NewPath("root").Join(orgWorkspace).Join("team-1")
 	teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
-	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
-		Group:    kcpGroupName,
-		Version:  "v1",
-		Resource: "crontabs",
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+		Group:   kcpGroupName,
+		Version: "v1",
+		Kind:    "CronTab",
 	})
 
 	// create a Crontab object in a team workspace
