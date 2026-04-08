@@ -1,6 +1,6 @@
 module github.com/kcp-dev/api-syncagent
 
-go 1.25.7
+go 1.25.0
 
 replace github.com/kcp-dev/api-syncagent/sdk => ./sdk
 
