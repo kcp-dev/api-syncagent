@@ -8,7 +8,7 @@ If this is your first time, please make sure to review CONTRIBUTING.md.
 ## Summary
 <!--
 Please provide a description that explains *why* your PR is changing something
-in the codebase, and focus less on what *what* you're changing. The following are
+in the codebase, and focus less on *what* you're changing. The following are
 good questions to ask yourself when writing the PR summary:
 
 * What are the problems you are trying to solve?
