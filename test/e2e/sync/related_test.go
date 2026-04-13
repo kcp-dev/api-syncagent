@@ -593,10 +593,10 @@ func TestSyncRelatedObjects(t *testing.T) {
 			teamClusterPath := logicalcluster.NewPath("root").Join(testcase.workspace).Join("team-1")
 			teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
-			utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
-				Group:    apiExportName,
-				Version:  "v1",
-				Resource: "crontabs",
+			utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+				Group:   apiExportName,
+				Version: "v1",
+				Kind:    "CronTab",
 			})
 
 			// create a Crontab object in a team workspace
@@ -951,10 +951,10 @@ func TestSyncRelatedMultiObjects(t *testing.T) {
 			utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
 
 			// wait until the API is available
-			utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
-				Group:    apiExportName,
-				Version:  "v1",
-				Resource: "backups",
+			utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+				Group:   apiExportName,
+				Version: "v1",
+				Kind:    "Backup",
 			})
 
 			// create a Backup object in a team workspace
@@ -1226,10 +1226,10 @@ func TestSyncNonStandardRelatedResources(t *testing.T) {
 			teamClusterPath := logicalcluster.NewPath("root").Join(testcase.workspace).Join("team-1")
 			teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
-			utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
-				Group:    apiExportName,
-				Version:  "v1",
-				Resource: "crontabs",
+			utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+				Group:   apiExportName,
+				Version: "v1",
+				Kind:    "CronTab",
 			})
 
 			// create a Crontab object in a team workspace
@@ -1470,14 +1470,14 @@ func TestSyncNonStandardRelatedResourcesMultipleAPIExports(t *testing.T) {
 			utils.RunAgent(ctx, t, "initroid", initroidOrgKubconfig, envtestKubeconfig, initroidAPIExportName, "agent=initroid")
 
 			// wait until the APIs are available
-			for orgWs, gvr := range map[string]schema.GroupVersionResource{
-				initechOrgWorkspace:  {Group: initechAPIExportName, Version: "v1", Resource: "crontabs"},
-				initroidOrgWorkspace: {Group: initroidAPIExportName, Version: "v1", Resource: "backups"},
+			for orgWs, gvk := range map[string]schema.GroupVersionKind{
+				initechOrgWorkspace:  {Group: initechAPIExportName, Version: "v1", Kind: "CronTab"},
+				initroidOrgWorkspace: {Group: initroidAPIExportName, Version: "v1", Kind: "Backup"},
 			} {
 				teamClusterPath := logicalcluster.NewPath("root").Join(orgWs).Join("team-1")
 				teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
-				utils.WaitForBoundAPI(t, ctx, teamClient, gvr)
+				utils.WaitForBoundAPI(t, ctx, teamClient, gvk)
 			}
 
 			// Since we are claiming resources from other APIExports, the default accepted claims
@@ -1620,10 +1620,10 @@ func TestDeletePrimaryWithRelatedKcpResource(t *testing.T) {
 	teamClusterPath := logicalcluster.NewPath("root").Join("delete-primary-related-kcp").Join("team-1")
 	teamClient := kcpClusterClient.Cluster(teamClusterPath)
 
-	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionResource{
-		Group:    apiExportName,
-		Version:  "v1",
-		Resource: "crontabs",
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+		Group:   apiExportName,
+		Version: "v1",
+		Kind:    "CronTab",
 	})
 
 	// Step 1: Create a CronTab in kcp
