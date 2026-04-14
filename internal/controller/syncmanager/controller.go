@@ -95,7 +95,7 @@ func Add(
 		localManager:    localManager,
 		dmcm:            dmcm,
 		log:             log,
-		recorder:        localManager.GetEventRecorderFor(ControllerName),
+		recorder:        localManager.GetEventRecorderFor(ControllerName), //nolint:staticcheck // https://github.com/kcp-dev/api-syncagent/issues/157
 		discoveryClient: discoveryClient,
 		prFilter:        prFilter,
 		stateNamespace:  stateNamespace,

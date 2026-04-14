@@ -85,7 +85,7 @@ func Add(
 		discoveryClient: discoveryClient,
 		lcName:          lcName,
 		log:             log.Named(ControllerName),
-		recorder:        kcpCluster.GetEventRecorderFor(ControllerName),
+		recorder:        kcpCluster.GetEventRecorderFor(ControllerName), //nolint:staticcheck // https://github.com/kcp-dev/api-syncagent/issues/157
 		apiExportName:   apiExportName,
 		agentName:       agentName,
 		prFilter:        prFilter,
