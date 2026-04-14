@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/multicluster-runtime/pkg/multicluster"
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
@@ -151,7 +152,7 @@ func RemoteNameForLocalObject(localObj ctrlruntimeclient.Object) *mcreconcile.Re
 	}
 
 	return &mcreconcile.Request{
-		ClusterName: clusterName,
+		ClusterName: multicluster.ClusterName(clusterName),
 		Request: reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Namespace: namespace,

@@ -30,13 +30,14 @@ import (
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/multicluster-runtime/pkg/multicluster"
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
 // byOwnerEventHandler enqueues the primary object by inspecting the OwnerReferences
 // of the changed related object and finding one matching the configured GVK.
 type byOwnerEventHandler struct {
-	clusterName string
+	clusterName multicluster.ClusterName
 	ownerGVK    schema.GroupVersionKind
 }
 
@@ -80,7 +81,7 @@ func (h *byOwnerEventHandler) enqueue(obj *unstructured.Unstructured, q workqueu
 // bySelectorEventHandler enqueues primary objects by listing primaries matching the configured
 // label selector whenever a related object changes.
 type bySelectorEventHandler struct {
-	clusterName   string
+	clusterName   multicluster.ClusterName
 	client        ctrlruntimeclient.Client
 	primaryDummy  *unstructured.Unstructured
 	labelSelector *metav1.LabelSelector

@@ -20,7 +20,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/kcp-dev/api-syncagent/sdk v0.0.0-00010101000000-000000000000
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
-	github.com/kcp-dev/multicluster-provider v0.3.2-0.20251209135920-e758bf0f4e48
+	github.com/kcp-dev/multicluster-provider v0.6.0
 	github.com/kcp-dev/sdk v0.31.0
 	github.com/kcp-dev/virtual-workspace-framework v0.31.0
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
@@ -38,8 +38,8 @@ require (
 	k8s.io/component-base v0.35.1
 	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
-	sigs.k8s.io/controller-runtime v0.22.4
-	sigs.k8s.io/multicluster-runtime v0.22.4-beta.1
+	sigs.k8s.io/controller-runtime v0.23.3
+	sigs.k8s.io/multicluster-runtime v0.23.3
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -89,6 +89,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kcp-dev/apimachinery/v2 v2.31.0 // indirect
 	github.com/kcp-dev/client-go v0.31.0 // indirect
+	github.com/kcp-dev/multicluster-provider/client v0.0.0-20260412105142-7979b3b2700b // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mailru/easyjson v0.9.1 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
@@ -144,5 +145,5 @@ require (
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
 )
