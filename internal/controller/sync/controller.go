@@ -54,6 +54,7 @@ import (
 	mccontroller "sigs.k8s.io/multicluster-runtime/pkg/controller"
 	mchandler "sigs.k8s.io/multicluster-runtime/pkg/handler"
 	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
+	"sigs.k8s.io/multicluster-runtime/pkg/multicluster"
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 	mcsource "sigs.k8s.io/multicluster-runtime/pkg/source"
 )
@@ -263,7 +264,7 @@ func buildKcpRelatedHandler(
 	switch {
 	case watch.ByOwner != nil:
 		ownerGVK := remoteDummy.GroupVersionKind()
-		return func(clusterName string, _ cluster.Cluster) handler.TypedEventHandler[*unstructured.Unstructured, mcreconcile.Request] {
+		return func(clusterName multicluster.ClusterName, _ cluster.Cluster) handler.TypedEventHandler[*unstructured.Unstructured, mcreconcile.Request] {
 			return &byOwnerEventHandler{
 				clusterName: clusterName,
 				ownerGVK:    ownerGVK,
@@ -273,7 +274,7 @@ func buildKcpRelatedHandler(
 	case watch.BySelector != nil:
 		labelSelector := watch.BySelector
 		primaryDummy := remoteDummy.DeepCopy()
-		return func(clusterName string, cl cluster.Cluster) handler.TypedEventHandler[*unstructured.Unstructured, mcreconcile.Request] {
+		return func(clusterName multicluster.ClusterName, cl cluster.Cluster) handler.TypedEventHandler[*unstructured.Unstructured, mcreconcile.Request] {
 			return &bySelectorEventHandler{
 				clusterName:   clusterName,
 				client:        cl.GetClient(),
@@ -391,7 +392,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request)
 		return reconcile.Result{}, nil
 	}
 
-	recorder := cl.GetEventRecorderFor(ControllerName)
+	recorder := cl.GetEventRecorderFor(ControllerName) //nolint:staticcheck // https://github.com/kcp-dev/api-syncagent/issues/157
 
 	ctx = sync.WithClusterName(ctx, logicalcluster.Name(request.ClusterName))
 	ctx = sync.WithEventRecorder(ctx, recorder)

@@ -80,7 +80,7 @@ func Add(
 		restConfig:  mgr.GetConfig(),
 		lcName:      lcName,
 		log:         log.Named(ControllerName),
-		recorder:    mgr.GetEventRecorderFor(ControllerName),
+		recorder:    mgr.GetEventRecorderFor(ControllerName), //nolint:staticcheck // https://github.com/kcp-dev/api-syncagent/issues/157
 		agentName:   agentName,
 		prFilter:    prFilter,
 	}

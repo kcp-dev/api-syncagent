@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
+	"sigs.k8s.io/multicluster-runtime/pkg/multicluster"
 )
 
 // DynamicMultiClusterManager (DMCM) is an extension to the regular multicluster manager.
@@ -162,14 +163,14 @@ type engagedCluster struct {
 type clusterTracker struct {
 	dynManager *DynamicMultiClusterManager
 	lock       sync.RWMutex
-	clusters   map[string]engagedCluster
+	clusters   map[multicluster.ClusterName]engagedCluster
 }
 
 func newClusterTracker(dmcm *DynamicMultiClusterManager) *clusterTracker {
 	return &clusterTracker{
 		dynManager: dmcm,
 		lock:       sync.RWMutex{},
-		clusters:   map[string]engagedCluster{},
+		clusters:   map[multicluster.ClusterName]engagedCluster{},
 	}
 }
 
@@ -178,7 +179,7 @@ func (s *clusterTracker) Start(_ context.Context) error {
 	return nil
 }
 
-func (s *clusterTracker) Engage(ctx context.Context, clusterName string, cl cluster.Cluster) error {
+func (s *clusterTracker) Engage(ctx context.Context, clusterName multicluster.ClusterName, cl cluster.Cluster) error {
 	if _, ok := s.clusters[clusterName]; !ok {
 		s.lock.Lock()
 		s.clusters[clusterName] = engagedCluster{ctx: ctx, cl: cl}
