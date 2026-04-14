@@ -21,6 +21,7 @@ require (
 	github.com/kcp-dev/api-syncagent/sdk v0.0.0-00010101000000-000000000000
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
 	github.com/kcp-dev/multicluster-provider v0.6.0
+	github.com/kcp-dev/multicluster-provider/client v0.0.0-20260412105142-7979b3b2700b
 	github.com/kcp-dev/sdk v0.31.0
 	github.com/kcp-dev/virtual-workspace-framework v0.31.0
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
@@ -82,14 +83,12 @@ require (
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
-	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kcp-dev/apimachinery/v2 v2.31.0 // indirect
 	github.com/kcp-dev/client-go v0.31.0 // indirect
-	github.com/kcp-dev/multicluster-provider/client v0.0.0-20260412105142-7979b3b2700b // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mailru/easyjson v0.9.1 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
