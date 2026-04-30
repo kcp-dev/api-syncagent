@@ -243,6 +243,12 @@ type RelatedResourceSpec struct {
 	// provided by an APIExport and not Kube-native.
 	IdentityHash string `json:"identityHash,omitempty"`
 
+	// Cleanup can be set to true to make the syncagent delete any copy of this related resource on
+	// the destination side (i.e. the original related object will not be touched, regardless of this
+	// option). Leaving this disabled, the syncagent will only create copies of the related objects,
+	// but never delete them itself.
+	Cleanup bool `json:"cleanup,omitempty"`
+
 	// Projection is used to change the GVK of a related resource on the opposite side of
 	// its origin.
 	// All fields in the projection are optional. If a field is set, it will overwrite
