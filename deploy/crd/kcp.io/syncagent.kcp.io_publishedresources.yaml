@@ -381,6 +381,13 @@ spec:
                       (in the following rule, group is optional becaue core/v1 is represented by group="")
                       group is included here because when an identityHash is used, core/v1 cannot possible be targetted
                     properties:
+                      cleanup:
+                        description: |-
+                          Cleanup can be set to true to make the syncagent delete any copy of this related resource on
+                          the destination side (i.e. the original related object will not be touched, regardless of this
+                          option). Leaving this disabled, the syncagent will only create copies of the related objects,
+                          but never delete them itself.
+                        type: boolean
                       group:
                         description: |-
                           Group is the API group of the related resource. This should be left blank for resources

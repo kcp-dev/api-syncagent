@@ -32,6 +32,7 @@ type RelatedResourceSpecApplyConfiguration struct {
 	Resource     *string                                      `json:"resource,omitempty"`
 	Kind         *string                                      `json:"kind,omitempty"`
 	IdentityHash *string                                      `json:"identityHash,omitempty"`
+	Cleanup      *bool                                        `json:"cleanup,omitempty"`
 	Projection   *RelatedResourceProjectionApplyConfiguration `json:"projection,omitempty"`
 	Object       *RelatedResourceObjectApplyConfiguration     `json:"object,omitempty"`
 	Mutation     *ResourceMutationSpecApplyConfiguration      `json:"mutation,omitempty"`
@@ -97,6 +98,14 @@ func (b *RelatedResourceSpecApplyConfiguration) WithKind(value string) *RelatedR
 // If called multiple times, the IdentityHash field is set to the value of the last call.
 func (b *RelatedResourceSpecApplyConfiguration) WithIdentityHash(value string) *RelatedResourceSpecApplyConfiguration {
 	b.IdentityHash = &value
+	return b
+}
+
+// WithCleanup sets the Cleanup field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Cleanup field is set to the value of the last call.
+func (b *RelatedResourceSpecApplyConfiguration) WithCleanup(value bool) *RelatedResourceSpecApplyConfiguration {
+	b.Cleanup = &value
 	return b
 }
 

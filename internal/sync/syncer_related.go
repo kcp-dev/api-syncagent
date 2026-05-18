@@ -127,6 +127,12 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 			object:      destObject,
 		}
 
+		// We "forward" the deletion to the related objects only if the primary is already in deletion
+		// and the related object either originated from the user (so on the service cluster we just
+		// have a useless copy once the main object has been cleared up) OR the admin explicitly opted
+		// into the cleanup procedure to ensure that copies of the related object are removed.
+		forceDelete := primaryDeleting && (relRes.Cleanup || relRes.Origin == syncagentv1alpha1.RelatedResourceOriginKcp)
+
 		syncer := objectSyncer{
 			// Related objects within kcp are not labelled with the agent name because it's unnecessary.
 			// agentName: "",
@@ -155,8 +161,10 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 			// feature at all.
 			syncStatusBack: false,
 			// if the origin is on the remote side, we want to add a finalizer to make
-			// sure we can clean up properly
-			blockSourceDeletion: relRes.Origin == "kcp",
+			// sure we can clean up properly; when forceDelete is enabled, we are in deletion mode and
+			// want to force the deletion, so we ignore the related object's origin (it was taken into
+			// account when defining forceDelete).
+			blockSourceDeletion: forceDelete || relRes.Origin == syncagentv1alpha1.RelatedResourceOriginKcp,
 			// apply mutation rules configured for the related resource
 			mutator: s.relatedMutators[relRes.Identifier],
 			// we never want to store sync-related metadata inside kcp
@@ -164,8 +172,7 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 			// events are always created on the kcp side
 			eventObjSide: eventObjSide,
 			// force deletion of related resources when the primary object is being deleted
-			// (only for origin:kcp resources that have blockSourceDeletion)
-			forceDelete: primaryDeleting && relRes.Origin == syncagentv1alpha1.RelatedResourceOriginKcp,
+			forceDelete: forceDelete,
 		}
 
 		req, err := syncer.Sync(ctx, log, sourceSide, destSide)

@@ -194,11 +194,8 @@ func setupRelatedResourceWatches(
 			continue
 		}
 
-		gvr := schema.GroupVersionResource{
-			Group:    relRes.Group,
-			Version:  relRes.Version,
-			Resource: relRes.Resource,
-		}
+		// this handles the legacy .Kind-based related resources
+		gvr := projection.RelatedResourceGVR(&relRes)
 
 		// Use the REST mapper of the origin side: related resources may have projected GVKs
 		// that differ between kcp and the service cluster, so we must resolve using the
