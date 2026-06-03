@@ -2261,6 +2261,27 @@ group is included here because when an identityHash is used, core/v1 cannot poss
 
 <div class="property depth-3">
 <div class="property-header">
+<h3 class="property-path" id="v1alpha1-.spec.related[*].cleanup">.spec.related[*].cleanup</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">boolean</span>
+
+</div>
+
+<div class="property-description">
+<p>Cleanup can be set to true to make the syncagent delete any copy of this related resource on
+the destination side (i.e. the original related object will not be touched, regardless of this
+option). Leaving this disabled, the syncagent will only create copies of the related objects,
+but never delete them itself.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-3">
+<div class="property-header">
 <h3 class="property-path" id="v1alpha1-.spec.related[*].group">.spec.related[*].group</h3>
 </div>
 <div class="property-body">
