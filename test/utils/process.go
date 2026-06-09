@@ -77,6 +77,19 @@ func RunAgent(
 	apiExportEndpointSlice string,
 	labelSelector string,
 ) context.CancelFunc {
+	return RunAgentWithMetrics(ctx, t, name, kcpKubeconfig, localKubeconfig, apiExportEndpointSlice, labelSelector, "0")
+}
+
+func RunAgentWithMetrics(
+	ctx context.Context,
+	t *testing.T,
+	name string,
+	kcpKubeconfig string,
+	localKubeconfig string,
+	apiExportEndpointSlice string,
+	labelSelector string,
+	metricsAddr string,
+) context.CancelFunc {
 	t.Helper()
 
 	t.Logf("Running agent %q…", name)
@@ -91,7 +104,7 @@ func RunAgent(
 		"--log-format", "Console",
 		"--log-debug=true",
 		"--health-address", "0",
-		"--metrics-address", "0",
+		"--metrics-address", metricsAddr,
 	}
 
 	if labelSelector != "" {
