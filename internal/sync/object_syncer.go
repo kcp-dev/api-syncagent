@@ -69,6 +69,13 @@ type objectSyncer struct {
 	// being deleted; used to clean up related resources when the primary object
 	// is being deleted.
 	forceDelete bool
+	// useServerSideApply switches the syncer from client-side merge patches
+	// (backed by a last-known-state secret) to Kubernetes Server-Side Apply
+	// using a stable field manager. SSA preserves fields owned by other
+	// controllers (e.g. Crossplane's spec.resourceRef on a claim) and removes
+	// the full update fallback that could otherwise clobber such
+	// fields.
+	useServerSideApply bool
 }
 
 type syncSideType int
@@ -124,6 +131,24 @@ func (s *objectSyncer) Sync(ctx context.Context, log *zap.SugaredLogger, source,
 	source, dest, err = s.applyMutations(source, dest)
 	if err != nil {
 		return false, fmt.Errorf("failed to apply mutations: %w", err)
+	}
+
+	// Server-Side Apply path: a single Apply patch handles create-or-update
+	// in one round-trip and the API server tracks our managed fields. Fields
+	// the syncagent does not include in the payload (e.g. spec.resourceRef
+	// written by Crossplane on a downstream claim) are preserved by SSA.
+	if s.useServerSideApply {
+		newDest, err := s.applyServerSide(ctx, log, source, dest)
+		if err != nil {
+			return false, fmt.Errorf("failed to apply destination object: %w", err)
+		}
+
+		// Do not back-sync status onto an object that is being deleted.
+		if newDest.object == nil || newDest.object.GetDeletionTimestamp() != nil {
+			return false, nil
+		}
+
+		return s.syncObjectStatus(ctx, log, source, newDest)
 	}
 
 	// if no destination object exists yet, attempt to create it;
@@ -359,6 +384,95 @@ func (s *objectSyncer) syncObjectStatusForward(ctx context.Context, log *zap.Sug
 	}
 
 	return nil
+}
+
+// applyServerSide is the Server-Side Apply equivalent of the
+// ensureDestinationObject + syncObjectSpec pair. It builds the desired
+// destination object from the (mutated) source, strips runtime metadata,
+// drops subresources (status is reconciled separately) and applies the
+// resulting object as a single SSA patch with a stable field manager.
+//
+// SSA preserves every field that is owned by another field manager.
+func (s *objectSyncer) applyServerSide(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) (syncSide, error) {
+	// build the desired destination object (GVK projection + renaming).
+	desired, err := s.destCreator(source.object)
+	if err != nil {
+		return dest, fmt.Errorf("failed to create destination object: %w", err)
+	}
+
+	// the API server cannot create the namespace for us via SSA
+	if err := s.ensureNamespace(ctx, log, dest.client, desired.GetNamespace()); err != nil {
+		return dest, fmt.Errorf("failed to ensure destination namespace: %w", err)
+	}
+
+	// drop runtime metadata that must not be part of an apply payload
+	// (uid, resourceVersion, managedFields, ownerRefs, …). stripMetadata
+	// also runs the unsyncable label/annotation filter for us.
+	if err := stripMetadata(desired); err != nil {
+		return dest, fmt.Errorf("failed to strip metadata from destination object: %w", err)
+	}
+
+	// remember the connection between the source and destination object
+	sourceObjKey := newObjectKey(source.object, source.clusterName, source.workspacePath)
+	if s.metadataOnDestination {
+		ensureLabels(desired, sourceObjKey.Labels())
+		ensureAnnotations(desired, sourceObjKey.Annotations())
+		s.labelWithAgent(desired)
+	}
+
+	// do not claim ownership of subresource content via the main resource
+	// apply; status is reconciled separately and "scale" is never written.
+	s.removeSubresources(desired)
+
+	// do not apply onto an object that is currently being deleted; SSA would
+	// otherwise revive removed labels/annotations and confuse the deletion
+	// flow on the next reconcile.
+	if dest.object != nil && dest.object.GetDeletionTimestamp() != nil {
+		log.Debugw("Destination object is in deletion, skipping SSA", "dest-object", newObjectKey(dest.object, dest.clusterName, logicalcluster.None))
+		return dest, nil
+	}
+
+	created := dest.object == nil
+	fieldManager := s.fieldManager()
+
+	objectLog := log.With(
+		"dest-object", newObjectKey(desired, dest.clusterName, logicalcluster.None),
+		"field-manager", fieldManager,
+	)
+	objectLog.Debugw("Applying destination object (server-side apply)…")
+
+	// ForceOwnership lets us take over fields that may have been written by
+	// the legacy client-side-apply field manager during a previous version
+	// of the syncagent, and to recover from rare conflicts with other
+	// controllers that briefly write the same path.
+	if err := dest.client.Apply(ctx, ctrlruntimeclient.ApplyConfigurationFromUnstructured(desired),
+		ctrlruntimeclient.FieldOwner(fieldManager),
+		ctrlruntimeclient.ForceOwnership,
+	); err != nil {
+		return dest, fmt.Errorf("failed to server-side apply destination object: %w", err)
+	}
+
+	if created {
+		s.recordEvent(ctx, source, syncSide{object: desired}, corev1.EventTypeNormal, "ObjectPlaced", "Object has been placed.")
+	}
+
+	// hand the server's view of the object (now including any fields owned
+	// by other managers, e.g. spec.resourceRef from Crossplane) back to the
+	// caller so that status back-syncing can read it without an extra GET.
+	dest.object = desired
+	return dest, nil
+}
+
+// fieldManager returns the SSA field manager string used by this syncer.
+// It is stable across restarts and unique per agent name, so that multi-
+// agent setups (the same API synced from multiple kcp's into one backend
+// cluster) each get their own ownership track.
+func (s *objectSyncer) fieldManager() string {
+	const base = "api-syncagent"
+	if s.agentName == "" {
+		return base
+	}
+	return base + "/" + s.agentName
 }
 
 func (s *objectSyncer) ensureDestinationObject(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) error {

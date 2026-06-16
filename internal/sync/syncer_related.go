@@ -173,6 +173,9 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 			eventObjSide: eventObjSide,
 			// force deletion of related resources when the primary object is being deleted
 			forceDelete: forceDelete,
+			// propagate the SSA mode chosen for the primary syncer to keep
+			// behavior consistent across the whole resource graph
+			useServerSideApply: s.useServerSideApply,
 		}
 
 		req, err := syncer.Sync(ctx, log, sourceSide, destSide)

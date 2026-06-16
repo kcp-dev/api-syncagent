@@ -196,7 +196,7 @@ func run(ctx context.Context, log *zap.SugaredLogger, opts *Options) error {
 		// before it can start any sync controllers. That discovery logic is encapsulated in the ResourceProber.
 		prober := discovery.NewResourceProber(endpoint.EndpointSlice.Config, endpointSliceCluster.GetClient(), endpoint.EndpointSlice.Name)
 
-		return syncmanager.Add(ctx, mgr, prober, dmcm, log, opts.PublishedResourceSelector, opts.Namespace, opts.AgentName)
+		return syncmanager.Add(ctx, mgr, prober, dmcm, log, opts.PublishedResourceSelector, opts.Namespace, opts.AgentName, opts.EnableServerSideApply)
 	}); err != nil {
 		return err
 	}

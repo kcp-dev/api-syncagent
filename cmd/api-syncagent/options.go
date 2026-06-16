@@ -71,6 +71,13 @@ type Options struct {
 	HealthAddr  string
 
 	DisabledControllers []string
+
+	// EnableServerSideApply switches the sync controller to use Kubernetes
+	// Server-Side Apply when writing synchronized objects to the local
+	// cluster. This preserves fields owned by other field managers (e.g.
+	// Crossplane writing spec.resourceRef onto a claim) and hopefully avoids
+	// accidentally creating duplicate composite resources.
+	EnableServerSideApply bool
 }
 
 func NewOptions() *Options {
@@ -78,6 +85,7 @@ func NewOptions() *Options {
 		LogOptions:                log.NewDefaultOptions(),
 		PublishedResourceSelector: labels.Everything(),
 		MetricsAddr:               "127.0.0.1:8085",
+		EnableServerSideApply:     false,
 	}
 }
 
@@ -95,6 +103,7 @@ func (o *Options) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.MetricsAddr, "metrics-address", o.MetricsAddr, "host and port to serve Prometheus metrics via /metrics (HTTP)")
 	flags.StringVar(&o.HealthAddr, "health-address", o.HealthAddr, "host and port to serve probes via /readyz and /healthz (HTTP)")
 	flags.StringSliceVar(&o.DisabledControllers, "disabled-controllers", o.DisabledControllers, fmt.Sprintf("comma-separated list of controllers (out of %v) to disable (can be given multiple times)", sets.List(availableControllers)))
+	flags.BoolVar(&o.EnableServerSideApply, "enable-server-side-apply", o.EnableServerSideApply, "use Kubernetes Server-Side Apply when writing synchronized objects to the local cluster (recommended; preserves fields owned by other controllers such as Crossplane's claim binder)")
 }
 
 func (o *Options) Validate() error {

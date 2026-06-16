@@ -54,8 +54,19 @@ type ResourceSyncer struct {
 
 	agentName string
 
+	useServerSideApply bool
+
 	// newObjectStateStore is used for testing purposes
 	newObjectStateStore newObjectStateStoreFunc
+}
+
+// ResourceSyncerOption configures a ResourceSyncer at construction time.
+type ResourceSyncerOption func(*ResourceSyncer)
+
+func WithServerSideApply() ResourceSyncerOption {
+	return func(r *ResourceSyncer) {
+		r.useServerSideApply = true
+	}
 }
 
 type MutatorCreatorFunc func(*syncagentv1alpha1.ResourceMutationSpec) (mutation.Mutator, error)
@@ -69,6 +80,7 @@ func NewResourceSyncer(
 	mutatorCreator MutatorCreatorFunc,
 	stateNamespace string,
 	agentName string,
+	opts ...ResourceSyncerOption,
 ) (*ResourceSyncer, error) {
 	// create a dummy that represents the type used on the local service cluster
 	localGVK, err := projection.PublishedResourceSourceGVK(localCRD, pubRes)
@@ -116,7 +128,7 @@ func NewResourceSyncer(
 		relatedMutators[rr.Identifier] = mutator
 	}
 
-	return &ResourceSyncer{
+	r := &ResourceSyncer{
 		log:                 log.With("local-gvk", localGVK, "remote-gvk", remoteGVK),
 		localClient:         localClient,
 		remoteClient:        remoteClient,
@@ -128,7 +140,13 @@ func NewResourceSyncer(
 		relatedMutators:     relatedMutators,
 		agentName:           agentName,
 		newObjectStateStore: newKubernetesStateStoreCreator(stateNamespace),
-	}, nil
+	}
+
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r, nil
 }
 
 // Process is the primary entrypoint for object synchronization. This function will create/update
@@ -196,6 +214,8 @@ func (s *ResourceSyncer) Process(ctx context.Context, remoteObj *unstructured.Un
 		// together and can be found.
 		metadataOnDestination: true,
 		eventObjSide:          syncSideSource,
+		// propagate the SSA mode to the per-object syncer
+		useServerSideApply: s.useServerSideApply,
 	}
 
 	// When the primary object is being deleted, clean up related resources FIRST,

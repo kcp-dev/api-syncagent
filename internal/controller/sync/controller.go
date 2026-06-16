@@ -64,14 +64,15 @@ const (
 )
 
 type Reconciler struct {
-	localClient    ctrlruntimeclient.Client
-	remoteManager  mcmanager.Manager
-	log            *zap.SugaredLogger
-	remoteDummy    *unstructured.Unstructured
-	pubRes         *syncagentv1alpha1.PublishedResource
-	localCRD       *apiextensionsv1.CustomResourceDefinition
-	stateNamespace string
-	agentName      string
+	localClient           ctrlruntimeclient.Client
+	remoteManager         mcmanager.Manager
+	log                   *zap.SugaredLogger
+	remoteDummy           *unstructured.Unstructured
+	pubRes                *syncagentv1alpha1.PublishedResource
+	localCRD              *apiextensionsv1.CustomResourceDefinition
+	stateNamespace        string
+	agentName             string
+	enableServerSideApply bool
 }
 
 // Create creates a new controller and importantly does *not* add it to the manager,
@@ -84,6 +85,7 @@ func Create(
 	discoveryClient *discovery.Client,
 	stateNamespace string,
 	agentName string,
+	enableServerSideApply bool,
 	log *zap.SugaredLogger,
 	numWorkers int,
 ) (mccontroller.Controller, error) {
@@ -117,14 +119,15 @@ func Create(
 
 	// setup the reconciler
 	reconciler := &Reconciler{
-		localClient:    localManager.GetClient(),
-		remoteManager:  remoteManager,
-		log:            log,
-		remoteDummy:    remoteDummy,
-		pubRes:         pubRes,
-		stateNamespace: stateNamespace,
-		agentName:      agentName,
-		localCRD:       localCRD,
+		localClient:           localManager.GetClient(),
+		remoteManager:         remoteManager,
+		log:                   log,
+		remoteDummy:           remoteDummy,
+		pubRes:                pubRes,
+		stateNamespace:        stateNamespace,
+		agentName:             agentName,
+		localCRD:              localCRD,
+		enableServerSideApply: enableServerSideApply,
 	}
 
 	ctrlOptions := mccontroller.Options{
@@ -389,7 +392,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request)
 		return reconcile.Result{}, nil
 	}
 
-	recorder := cl.GetEventRecorderFor(ControllerName) //nolint:staticcheck // https://github.com/kcp-dev/api-syncagent/issues/157
+	recorder := cl.GetEventRecorderFor(ControllerName)
 
 	ctx = sync.WithClusterName(ctx, logicalcluster.Name(request.ClusterName))
 	ctx = sync.WithEventRecorder(ctx, recorder)
@@ -407,8 +410,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request)
 		ctx = sync.WithWorkspacePath(ctx, logicalcluster.NewPath(path))
 	}
 
+	var syncerOpts []sync.ResourceSyncerOption
+	if r.enableServerSideApply {
+		syncerOpts = append(syncerOpts, sync.WithServerSideApply())
+	}
+
 	// sync main object
-	syncer, err := sync.NewResourceSyncer(log, r.localClient, vwClient, r.pubRes, r.localCRD, mutation.NewMutator, r.stateNamespace, r.agentName)
+	syncer, err := sync.NewResourceSyncer(log, r.localClient, vwClient, r.pubRes, r.localCRD, mutation.NewMutator, r.stateNamespace, r.agentName, syncerOpts...)
 	if err != nil {
 		recorder.Event(remoteObj, corev1.EventTypeWarning, "ReconcilingError", "Failed to process object: a provider-side issue has occurred.")
 		return reconcile.Result{}, fmt.Errorf("failed to create syncer: %w", err)
