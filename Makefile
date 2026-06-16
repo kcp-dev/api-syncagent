@@ -112,7 +112,7 @@ WWHRD_VERSION ?= 06b99400ca6db678386ba5dc39bbbdcdadb664ff
 YQ_VERSION ?= 4.44.6
 
 # exported because the e2e tests make use of it
-export KCP_VERSION ?= 0.28.1
+export KCP_VERSION ?= 0.32.0
 
 APPLYCONFIGURATION_GEN_VERSION ?= v0.33.4
 CLIENT_GEN_VERSION ?= v0.33.4
