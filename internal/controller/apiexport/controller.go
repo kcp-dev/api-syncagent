@@ -26,6 +26,7 @@ import (
 	predicateutil "github.com/kcp-dev/api-syncagent/internal/controllerutil/predicate"
 	"github.com/kcp-dev/api-syncagent/internal/discovery"
 	"github.com/kcp-dev/api-syncagent/internal/kcp"
+	"github.com/kcp-dev/api-syncagent/internal/metrics"
 	"github.com/kcp-dev/api-syncagent/internal/projection"
 	"github.com/kcp-dev/api-syncagent/internal/resources/reconciling"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
@@ -143,6 +144,8 @@ func (r *Reconciler) reconcile(ctx context.Context, apiExport *kcpapisv1alpha1.A
 	}); err != nil {
 		return fmt.Errorf("failed to list PublishedResources: %w", err)
 	}
+
+	metrics.PublishedResourcesManaged.Set(float64(len(pubResources.Items)))
 
 	// Create two lists of schema names: ready schemas are those already processed by the
 	// apiresourceschema controller, the other list includes all possible schema names.
