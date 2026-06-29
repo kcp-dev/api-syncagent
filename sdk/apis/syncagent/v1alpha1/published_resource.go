@@ -268,6 +268,17 @@ type RelatedResourceSpec struct {
 	// resource type and uses the configured rule to enqueue the correct primary object.
 	// Without this field, changes to origin:kcp related resources do not trigger reconciliation.
 	Watch *RelatedResourceWatch `json:"watch,omitempty"`
+
+	// SyncStatus enables synchronization of the status subresource in the same direction as
+	// the spec (from the origin side to the destination side). When enabled, the agent will
+	// use the status subresource endpoint to update the destination object's status.
+	// This requires the related resource to have a status subresource configured in its CRD.
+	//
+	//   - origin: kcp -> status is synced from kcp to the service cluster
+	//   - origin: service -> status is synced from the service cluster to kcp
+	//
+	// +optional
+	SyncStatus bool `json:"syncStatus,omitempty"`
 }
 
 // RelatedResourceWatch configures how the watch handler maps a changed related resource

@@ -49,8 +49,10 @@ type objectSyncer struct {
 	destCreator objectCreatorFunc
 	// list of subresources in the resource type
 	subresources []string
-	// whether to enable status subresource back-syncing
+	// whether to enable status subresource back-syncing (dest -> source)
 	syncStatusBack bool
+	// whether to sync status in the forward direction (source -> dest)
+	syncStatusForward bool
 	// whether or not to add/expect a finalizer on the source
 	blockSourceDeletion bool
 	// whether or not to place sync-related metadata on the destination object
@@ -197,8 +199,18 @@ func (s *objectSyncer) applyMutations(source, dest syncSide) (syncSide, syncSide
 func (s *objectSyncer) syncObjectContents(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
 	// Sync the spec (or more generally, the desired state) from source to dest.
 	requeue, err = s.syncObjectSpec(ctx, log, source, dest)
-	if requeue || err != nil {
+	if err != nil {
+		return false, err
+	}
+
+	// Always attempt forward status sync regardless of whether spec was just updated,
+	// so that a simultaneous spec+status change doesn't defer the status by one cycle.
+	if _, err = s.syncObjectStatusForward(ctx, log, source, dest); err != nil {
 		return requeue, err
+	}
+
+	if requeue {
+		return true, nil
 	}
 
 	// Sync the status back in the opposite direction, from dest to source.
@@ -320,6 +332,28 @@ func (s *objectSyncer) syncObjectStatus(ctx context.Context, log *zap.SugaredLog
 	}
 
 	// always return false; there is no need to requeue the source object when we changed its status
+	return false, nil
+}
+
+func (s *objectSyncer) syncObjectStatusForward(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
+	if !s.syncStatusForward || dest.object == nil {
+		return false, nil
+	}
+
+	sourceContent := source.object.UnstructuredContent()
+	destContent := dest.object.UnstructuredContent()
+
+	if !equality.Semantic.DeepEqual(sourceContent["status"], destContent["status"]) {
+		destContent["status"] = sourceContent["status"]
+
+		log.Debug("Updating destination object status…")
+		if err := dest.client.Status().Update(ctx, dest.object); err != nil {
+			return false, fmt.Errorf("failed to update destination object status: %w", err)
+		}
+
+		s.recordEvent(ctx, source, dest, corev1.EventTypeNormal, "ObjectStatusSynced", "The current object status has been synchronized to the destination.")
+	}
+
 	return false, nil
 }
 
