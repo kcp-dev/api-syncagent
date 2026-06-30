@@ -106,15 +106,14 @@ func (c *Client) RetrieveCRD(ctx context.Context, gk schema.GroupKind) (*apiexte
 			if subresource == "" {
 				resource = &res
 			} else {
-				list, ok := subresourcesPerVersion[res.Version]
+				list, ok := subresourcesPerVersion[gv.Version]
 				if !ok {
 					list = sets.New[string]()
 				}
 				list.Insert(subresource)
-				subresourcesPerVersion[res.Version] = list
+				subresourcesPerVersion[gv.Version] = list
 			}
 
-			// res.Version is also empty for built-in resources
 			availableVersions.Insert(gv.Version)
 		}
 	}
