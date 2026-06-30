@@ -277,6 +277,11 @@ type RelatedResourceSpec struct {
 	//   - origin: kcp -> status is synced from kcp to the service cluster
 	//   - origin: service -> status is synced from the service cluster to kcp
 	//
+	// For origin: service, it is strongly recommended to also configure Watch so that
+	// changes to the related resource's status trigger reconciliation and ensure the
+	// informer cache is populated. Without Watch, status is only synced as a side effect
+	// of the primary object being reconciled, which may be infrequent.
+	//
 	// +optional
 	SyncStatus bool `json:"syncStatus,omitempty"`
 }

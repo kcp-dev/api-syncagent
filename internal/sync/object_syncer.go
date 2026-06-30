@@ -348,6 +348,12 @@ func (s *objectSyncer) syncObjectStatusForward(ctx context.Context, log *zap.Sug
 
 		log.Debug("Updating destination object status…")
 		if err := dest.client.Status().Update(ctx, dest.object); err != nil {
+			if apierrors.IsNotFound(err) {
+				// The /status subresource does not exist on the destination CRD.
+				// Retrying will not help; emit a warning so the user knows what to fix.
+				s.recordEvent(ctx, source, dest, corev1.EventTypeWarning, "StatusSubresourceMissing", "Cannot sync status: the destination resource does not have a status subresource. Set syncStatus: false or add subresources.status to the CRD.")
+				return false, nil
+			}
 			return false, fmt.Errorf("failed to update destination object status: %w", err)
 		}
 
