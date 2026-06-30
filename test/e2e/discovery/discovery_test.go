@@ -35,11 +35,12 @@ import (
 
 func TestDiscoverSingleVersionCRD(t *testing.T) {
 	testcases := []struct {
-		name             string
-		crdFiles         []string
-		groupKind        schema.GroupKind
-		expectedVersions []string
-		expectedNames    apiextensionsv1.CustomResourceDefinitionNames
+		name                 string
+		crdFiles             []string
+		groupKind            schema.GroupKind
+		expectedVersions     []string
+		expectedNames        apiextensionsv1.CustomResourceDefinitionNames
+		expectedSubresources map[string]apiextensionsv1.CustomResourceSubresources
 	}{
 		{
 			name:             "get non-CRD resource",
@@ -89,6 +90,18 @@ func TestDiscoverSingleVersionCRD(t *testing.T) {
 				ListKind:   "HorizontalPodAutoscalerList",
 				Categories: []string{"all"},
 			},
+			expectedSubresources: map[string]apiextensionsv1.CustomResourceSubresources{
+				"v1": {
+					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					// envtest returns nil here instead of the real default value.
+					Scale: nil,
+				},
+				"v2": {
+					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					// envtest returns nil here instead of the real default value.
+					Scale: nil,
+				},
+			},
 		},
 	}
 
@@ -129,6 +142,18 @@ func TestDiscoverSingleVersionCRD(t *testing.T) {
 
 			if diff := cmp.Diff(testcase.expectedVersions, versions); diff != "" {
 				t.Errorf("Did not get expected CRD versions:\n\n%s", diff)
+			}
+
+			if testcase.expectedSubresources != nil {
+				gotSubresources := map[string]apiextensionsv1.CustomResourceSubresources{}
+				for _, v := range crd.Spec.Versions {
+					if v.Subresources != nil {
+						gotSubresources[v.Name] = *v.Subresources
+					}
+				}
+				if diff := cmp.Diff(testcase.expectedSubresources, gotSubresources); diff != "" {
+					t.Errorf("Did not get expected CRD subresources:\n\n%s", diff)
+				}
 			}
 		})
 	}
