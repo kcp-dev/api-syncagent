@@ -66,7 +66,7 @@ func TestSyncObjectStatusForward(t *testing.T) {
 		syncer := &objectSyncer{syncStatusForward: false}
 		ctx := WithEventRecorder(t.Context(), record.NewFakeRecorder(10))
 
-		_, err := syncer.syncObjectStatusForward(ctx, log, syncSide{object: source}, syncSide{object: dest, client: destClient})
+		err := syncer.syncObjectStatusForward(ctx, log, syncSide{object: source}, syncSide{object: dest, client: destClient})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -83,7 +83,7 @@ func TestSyncObjectStatusForward(t *testing.T) {
 		syncer := &objectSyncer{syncStatusForward: true}
 		ctx := WithEventRecorder(t.Context(), record.NewFakeRecorder(10))
 
-		_, err := syncer.syncObjectStatusForward(ctx, log, syncSide{object: source}, syncSide{object: nil})
+		err := syncer.syncObjectStatusForward(ctx, log, syncSide{object: source}, syncSide{object: nil})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -97,7 +97,7 @@ func TestSyncObjectStatusForward(t *testing.T) {
 		syncer := &objectSyncer{syncStatusForward: true, eventObjSide: syncSideSource}
 		ctx := WithEventRecorder(t.Context(), record.NewFakeRecorder(10))
 
-		_, err := syncer.syncObjectStatusForward(ctx, log, syncSide{object: source}, syncSide{object: dest, client: destClient})
+		err := syncer.syncObjectStatusForward(ctx, log, syncSide{object: source}, syncSide{object: dest, client: destClient})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -117,7 +117,7 @@ func TestSyncObjectStatusForward(t *testing.T) {
 		syncer := &objectSyncer{syncStatusForward: true}
 		ctx := WithEventRecorder(t.Context(), record.NewFakeRecorder(10))
 
-		_, err := syncer.syncObjectStatusForward(ctx, log, syncSide{object: source}, syncSide{object: dest, client: destClient})
+		err := syncer.syncObjectStatusForward(ctx, log, syncSide{object: source}, syncSide{object: dest, client: destClient})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -134,12 +134,9 @@ func TestSyncObjectStatusForward(t *testing.T) {
 		recorder := record.NewFakeRecorder(10)
 		ctx := WithEventRecorder(t.Context(), recorder)
 
-		requeue, err := syncer.syncObjectStatusForward(ctx, log, syncSide{object: source}, syncSide{object: dest, client: destClient})
+		err := syncer.syncObjectStatusForward(ctx, log, syncSide{object: source}, syncSide{object: dest, client: destClient})
 		if err != nil {
 			t.Fatalf("expected no error on 404, got: %v", err)
-		}
-		if requeue {
-			t.Error("expected requeue=false on 404")
 		}
 
 		select {

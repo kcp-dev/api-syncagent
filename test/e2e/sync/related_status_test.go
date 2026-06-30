@@ -39,13 +39,13 @@ import (
 	ctrlruntime "sigs.k8s.io/controller-runtime"
 )
 
-const subnetAPIVersion = "aws.example.com/v1"
-const subnetKind = "Subnet"
+const crontabWithStatusAPIVersion = "example.com/v1"
+const crontabWithStatusKind = "CronTabWithStatus"
 
-func makeSubnet(name, namespace string) *unstructured.Unstructured {
+func makeCronTabWithStatus(name, namespace string) *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{}
-	obj.SetAPIVersion(subnetAPIVersion)
-	obj.SetKind(subnetKind)
+	obj.SetAPIVersion(crontabWithStatusAPIVersion)
+	obj.SetKind(crontabWithStatusKind)
 	obj.SetName(name)
 	obj.SetNamespace(namespace)
 	return obj
@@ -64,17 +64,17 @@ func TestSyncRelatedObjectStatusFromKcp(t *testing.T) {
 
 	envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
 		"test/crds/crontab.yaml",
-		"test/crds/subnet.yaml",
+		"test/crds/crontabswithstatus.yaml",
 	})
 
-	// Publish Subnets (with sync disabled) so the Subnet schema is available in kcp.
-	prSubnets := &syncagentv1alpha1.PublishedResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "publish-subnets"},
+	// Publish CronTabsWithStatus (with sync disabled) so the schema is available in kcp.
+	prCronTabsWithStatus := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "publish-crontabswithstatus"},
 		Spec: syncagentv1alpha1.PublishedResourceSpec{
 			Resource: syncagentv1alpha1.SourceResourceDescriptor{
-				APIGroup: "aws.example.com",
+				APIGroup: "example.com",
 				Version:  "v1",
-				Kind:     "Subnet",
+				Kind:     "CronTabWithStatus",
 			},
 			Projection: &syncagentv1alpha1.ResourceProjection{
 				Group: "kcp.example.com",
@@ -82,11 +82,11 @@ func TestSyncRelatedObjectStatusFromKcp(t *testing.T) {
 			Synchronization: &syncagentv1alpha1.SynchronizationSpec{Enabled: false},
 		},
 	}
-	if err := envtestClient.Create(ctx, prSubnets); err != nil {
-		t.Fatalf("Failed to create Subnet PublishedResource: %v", err)
+	if err := envtestClient.Create(ctx, prCronTabsWithStatus); err != nil {
+		t.Fatalf("Failed to create CronTabWithStatus PublishedResource: %v", err)
 	}
 
-	// Publish CronTabs with a related Subnet (origin: kcp, syncStatus: true).
+	// Publish CronTabs with a related CronTabWithStatus (origin: kcp, syncStatus: true).
 	prCrontabs := &syncagentv1alpha1.PublishedResource{
 		ObjectMeta: metav1.ObjectMeta{Name: "publish-crontabs"},
 		Spec: syncagentv1alpha1.PublishedResourceSpec{
@@ -102,19 +102,19 @@ func TestSyncRelatedObjectStatusFromKcp(t *testing.T) {
 			Projection: &syncagentv1alpha1.ResourceProjection{Group: "kcp.example.com"},
 			Related: []syncagentv1alpha1.RelatedResourceSpec{
 				{
-					Identifier: "subnet",
+					Identifier: "crontabwithstatus",
 					Origin:     syncagentv1alpha1.RelatedResourceOriginKcp,
 					Group:      "kcp.example.com",
 					Version:    "v1",
-					Resource:   "subnets",
+					Resource:   "crontabswithstatus",
 					Projection: &syncagentv1alpha1.RelatedResourceProjection{
-						Group: "aws.example.com",
+						Group: "example.com",
 					},
 					SyncStatus: true,
 					Object: syncagentv1alpha1.RelatedResourceObject{
 						RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 							Template: &syncagentv1alpha1.TemplateExpression{
-								Template: "my-subnet",
+								Template: "my-related",
 							},
 						},
 					},
@@ -140,29 +140,29 @@ func TestSyncRelatedObjectStatusFromKcp(t *testing.T) {
 	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
 		Group:   apiExportName,
 		Version: "v1",
-		Kind:    "Subnet",
+		Kind:    "CronTabWithStatus",
 	})
 
-	// Create the Subnet in kcp first (origin: kcp means the user creates it there) and set its
-	// status before creating the CronTab. This ensures the status is already present when the
+	// Create the related object in kcp first (origin: kcp means the user creates it there) and set
+	// its status before creating the CronTab. This ensures the status is already present when the
 	// agent's second reconciliation cycle (after creating the service cluster copy) runs, so
 	// syncObjectStatusForward can see it without needing a Watch trigger.
-	kcpSubnet := makeSubnet("my-subnet", "default")
-	kcpSubnet.SetAPIVersion("kcp.example.com/v1")
-	kcpSubnet.SetKind("Subnet")
-	if err := teamClient.Create(ctx, kcpSubnet); err != nil {
-		t.Fatalf("Failed to create Subnet in kcp: %v", err)
+	kcpObj := makeCronTabWithStatus("my-related", "default")
+	kcpObj.SetAPIVersion("kcp.example.com/v1")
+	kcpObj.SetKind("CronTabWithStatus")
+	if err := teamClient.Create(ctx, kcpObj); err != nil {
+		t.Fatalf("Failed to create CronTabWithStatus in kcp: %v", err)
 	}
 
-	// Simulate a controller in kcp setting the subnet's status (e.g. the provisioned subnet ID).
-	if err := unstructured.SetNestedField(kcpSubnet.Object, "subnet-kcp-12345", "status", "id"); err != nil {
+	// Simulate a controller in kcp setting the object's status.
+	if err := unstructured.SetNestedField(kcpObj.Object, "id-kcp-12345", "status", "id"); err != nil {
 		t.Fatalf("Failed to set status.id: %v", err)
 	}
-	if err := teamClient.Status().Update(ctx, kcpSubnet); err != nil {
-		t.Fatalf("Failed to update Subnet status in kcp: %v", err)
+	if err := teamClient.Status().Update(ctx, kcpObj); err != nil {
+		t.Fatalf("Failed to update CronTabWithStatus status in kcp: %v", err)
 	}
 
-	// Create the primary CronTab in kcp after the Subnet is ready.
+	// Create the primary CronTab in kcp after the related object is ready.
 	crontab := utils.ToUnstructured(t, &crds.Crontab{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "kcp.example.com/v1", Kind: "CronTab"},
 		ObjectMeta: metav1.ObjectMeta{Name: "my-crontab", Namespace: "default"},
@@ -172,59 +172,59 @@ func TestSyncRelatedObjectStatusFromKcp(t *testing.T) {
 		t.Fatalf("Failed to create CronTab: %v", err)
 	}
 
-	// Wait for the Subnet copy to appear in the service cluster.
-	t.Log("Waiting for Subnet copy to appear in the service cluster…")
-	serviceSubnet := makeSubnet("my-subnet", "synced-default")
-	serviceSubnet.SetAPIVersion(subnetAPIVersion)
-	serviceSubnet.SetKind(subnetKind)
+	// Wait for the service cluster copy to appear.
+	t.Log("Waiting for CronTabWithStatus copy to appear in the service cluster…")
+	svcObj := makeCronTabWithStatus("my-related", "synced-default")
+	svcObj.SetAPIVersion(crontabWithStatusAPIVersion)
+	svcObj.SetKind(crontabWithStatusKind)
 
 	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 3*time.Minute, false, func(ctx context.Context) (bool, error) {
-		return envtestClient.Get(ctx, types.NamespacedName{Name: "my-subnet", Namespace: "synced-default"}, serviceSubnet) == nil, nil
+		return envtestClient.Get(ctx, types.NamespacedName{Name: "my-related", Namespace: "synced-default"}, svcObj) == nil, nil
 	})
 	if err != nil {
-		t.Fatalf("Subnet copy never appeared in service cluster: %v", err)
+		t.Fatalf("CronTabWithStatus copy never appeared in service cluster: %v", err)
 	}
 
 	// Verify the status was forwarded from kcp to the service cluster.
-	t.Log("Waiting for Subnet status to be synced to service cluster…")
+	t.Log("Waiting for CronTabWithStatus status to be synced to service cluster…")
 	err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 3*time.Minute, false, func(ctx context.Context) (bool, error) {
-		if err := envtestClient.Get(ctx, types.NamespacedName{Name: "my-subnet", Namespace: "synced-default"}, serviceSubnet); err != nil {
+		if err := envtestClient.Get(ctx, types.NamespacedName{Name: "my-related", Namespace: "synced-default"}, svcObj); err != nil {
 			return false, nil
 		}
 
-		id, _, _ := unstructured.NestedString(serviceSubnet.Object, "status", "id")
-		return id == "subnet-kcp-12345", nil
+		id, _, _ := unstructured.NestedString(svcObj.Object, "status", "id")
+		return id == "id-kcp-12345", nil
 	})
 	if err != nil {
-		id, _, _ := unstructured.NestedString(serviceSubnet.Object, "status", "id")
-		t.Fatalf("Subnet status was not synced to service cluster (got status.id=%q, want %q)", id, "subnet-kcp-12345")
+		id, _, _ := unstructured.NestedString(svcObj.Object, "status", "id")
+		t.Fatalf("CronTabWithStatus status was not synced to service cluster (got status.id=%q, want %q)", id, "id-kcp-12345")
 	}
 
 	// Verify that updating status on the service cluster does NOT propagate back to kcp
 	// (there is no reverse sync for origin:kcp + syncStatus).
-	serviceSubnet2 := makeSubnet("my-subnet", "synced-default")
-	serviceSubnet2.SetAPIVersion(subnetAPIVersion)
-	serviceSubnet2.SetKind(subnetKind)
-	if err := envtestClient.Get(ctx, types.NamespacedName{Name: "my-subnet", Namespace: "synced-default"}, serviceSubnet2); err != nil {
-		t.Fatalf("Failed to re-fetch service cluster Subnet: %v", err)
+	svcObj2 := makeCronTabWithStatus("my-related", "synced-default")
+	svcObj2.SetAPIVersion(crontabWithStatusAPIVersion)
+	svcObj2.SetKind(crontabWithStatusKind)
+	if err := envtestClient.Get(ctx, types.NamespacedName{Name: "my-related", Namespace: "synced-default"}, svcObj2); err != nil {
+		t.Fatalf("Failed to re-fetch service cluster CronTabWithStatus: %v", err)
 	}
-	if err := unstructured.SetNestedField(serviceSubnet2.Object, "subnet-local-override", "status", "id"); err != nil {
+	if err := unstructured.SetNestedField(svcObj2.Object, "id-local-override", "status", "id"); err != nil {
 		t.Fatalf("Failed to set status.id: %v", err)
 	}
-	if err := envtestClient.Status().Update(ctx, serviceSubnet2); err != nil {
-		t.Fatalf("Failed to update service cluster Subnet status: %v", err)
+	if err := envtestClient.Status().Update(ctx, svcObj2); err != nil {
+		t.Fatalf("Failed to update service cluster CronTabWithStatus status: %v", err)
 	}
 
 	// Briefly poll kcp to confirm its status was not overwritten.
-	kcpSubnetCheck := makeSubnet("my-subnet", "default")
-	kcpSubnetCheck.SetAPIVersion("kcp.example.com/v1")
-	kcpSubnetCheck.SetKind("Subnet")
-	if err := teamClient.Get(ctx, types.NamespacedName{Name: "my-subnet", Namespace: "default"}, kcpSubnetCheck); err != nil {
-		t.Fatalf("Failed to get kcp Subnet: %v", err)
+	kcpObjCheck := makeCronTabWithStatus("my-related", "default")
+	kcpObjCheck.SetAPIVersion("kcp.example.com/v1")
+	kcpObjCheck.SetKind("CronTabWithStatus")
+	if err := teamClient.Get(ctx, types.NamespacedName{Name: "my-related", Namespace: "default"}, kcpObjCheck); err != nil {
+		t.Fatalf("Failed to get kcp CronTabWithStatus: %v", err)
 	}
-	kcpID, _, _ := unstructured.NestedString(kcpSubnetCheck.Object, "status", "id")
-	if kcpID != "subnet-kcp-12345" {
-		t.Fatalf("kcp Subnet status was unexpectedly modified (got %q, want %q)", kcpID, "subnet-kcp-12345")
+	kcpID, _, _ := unstructured.NestedString(kcpObjCheck.Object, "status", "id")
+	if kcpID != "id-kcp-12345" {
+		t.Fatalf("kcp CronTabWithStatus status was unexpectedly modified (got %q, want %q)", kcpID, "id-kcp-12345")
 	}
 }
 
@@ -241,18 +241,18 @@ func TestSyncRelatedObjectStatusFromService(t *testing.T) {
 
 	envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
 		"test/crds/crontab.yaml",
-		"test/crds/subnet.yaml",
+		"test/crds/crontabswithstatus.yaml",
 	})
 
-	// Publish Subnets (with sync disabled) so the Subnet schema is available in kcp
+	// Publish CronTabsWithStatus (with sync disabled) so the schema is available in kcp
 	// and the agent can create kcp-side copies when syncing service-origin related resources.
-	prSubnets := &syncagentv1alpha1.PublishedResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "publish-subnets"},
+	prCronTabsWithStatus := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "publish-crontabswithstatus"},
 		Spec: syncagentv1alpha1.PublishedResourceSpec{
 			Resource: syncagentv1alpha1.SourceResourceDescriptor{
-				APIGroup: "aws.example.com",
+				APIGroup: "example.com",
 				Version:  "v1",
-				Kind:     "Subnet",
+				Kind:     "CronTabWithStatus",
 			},
 			Projection: &syncagentv1alpha1.ResourceProjection{
 				Group: "kcp.example.com",
@@ -260,11 +260,11 @@ func TestSyncRelatedObjectStatusFromService(t *testing.T) {
 			Synchronization: &syncagentv1alpha1.SynchronizationSpec{Enabled: false},
 		},
 	}
-	if err := envtestClient.Create(ctx, prSubnets); err != nil {
-		t.Fatalf("Failed to create Subnet PublishedResource: %v", err)
+	if err := envtestClient.Create(ctx, prCronTabsWithStatus); err != nil {
+		t.Fatalf("Failed to create CronTabWithStatus PublishedResource: %v", err)
 	}
 
-	// Publish CronTabs with a related Subnet (origin: service, syncStatus: true).
+	// Publish CronTabs with a related CronTabWithStatus (origin: service, syncStatus: true).
 	prCrontabs := &syncagentv1alpha1.PublishedResource{
 		ObjectMeta: metav1.ObjectMeta{Name: "publish-crontabs"},
 		Spec: syncagentv1alpha1.PublishedResourceSpec{
@@ -280,17 +280,17 @@ func TestSyncRelatedObjectStatusFromService(t *testing.T) {
 			Projection: &syncagentv1alpha1.ResourceProjection{Group: "kcp.example.com"},
 			Related: []syncagentv1alpha1.RelatedResourceSpec{
 				{
-					Identifier: "subnet",
+					Identifier: "crontabwithstatus",
 					Origin:     syncagentv1alpha1.RelatedResourceOriginService,
-					Group:      "aws.example.com",
+					Group:      "example.com",
 					Version:    "v1",
-					Resource:   "subnets",
+					Resource:   "crontabswithstatus",
 					Projection: &syncagentv1alpha1.RelatedResourceProjection{
 						Group: "kcp.example.com",
 					},
 					SyncStatus: true,
-					// Watch triggers CronTab reconciliation whenever a service cluster Subnet
-					// changes. This also registers a Subnet informer in the local cache, so
+					// Watch triggers CronTab reconciliation whenever a service cluster
+					// CronTabWithStatus changes. This also registers an informer so that
 					// syncObjectStatusForward can read the up-to-date status from the cache.
 					Watch: &syncagentv1alpha1.RelatedResourceWatch{
 						BySelector: &metav1.LabelSelector{},
@@ -298,7 +298,7 @@ func TestSyncRelatedObjectStatusFromService(t *testing.T) {
 					Object: syncagentv1alpha1.RelatedResourceObject{
 						RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 							Template: &syncagentv1alpha1.TemplateExpression{
-								Template: "my-subnet",
+								Template: "my-related",
 							},
 						},
 					},
@@ -332,48 +332,47 @@ func TestSyncRelatedObjectStatusFromService(t *testing.T) {
 		t.Fatalf("Failed to create CronTab: %v", err)
 	}
 
-	// Simulate a service-cluster operator creating the Subnet and setting its status.
+	// Create the related object on the service cluster and set its status.
 	ensureNamespace(t, ctx, envtestClient, "synced-default")
 
-	serviceSubnet := makeSubnet("my-subnet", "synced-default")
-	if err := envtestClient.Create(ctx, serviceSubnet); err != nil {
-		t.Fatalf("Failed to create Subnet in service cluster: %v", err)
+	svcObj := makeCronTabWithStatus("my-related", "synced-default")
+	if err := envtestClient.Create(ctx, svcObj); err != nil {
+		t.Fatalf("Failed to create CronTabWithStatus in service cluster: %v", err)
 	}
 
-	// Set the status (e.g. the real AWS subnet ID returned after provisioning).
-	if err := unstructured.SetNestedField(serviceSubnet.Object, "subnet-svc-99999", "status", "id"); err != nil {
+	if err := unstructured.SetNestedField(svcObj.Object, "id-svc-99999", "status", "id"); err != nil {
 		t.Fatalf("Failed to set status.id: %v", err)
 	}
-	if err := envtestClient.Status().Update(ctx, serviceSubnet); err != nil {
-		t.Fatalf("Failed to update Subnet status: %v", err)
+	if err := envtestClient.Status().Update(ctx, svcObj); err != nil {
+		t.Fatalf("Failed to update CronTabWithStatus status: %v", err)
 	}
 
 	// Wait for the kcp copy to appear.
-	t.Log("Waiting for Subnet copy to appear in kcp…")
-	kcpSubnet := &unstructured.Unstructured{}
-	kcpSubnet.SetAPIVersion("kcp.example.com/v1")
-	kcpSubnet.SetKind("Subnet")
+	t.Log("Waiting for CronTabWithStatus copy to appear in kcp…")
+	kcpObj := &unstructured.Unstructured{}
+	kcpObj.SetAPIVersion("kcp.example.com/v1")
+	kcpObj.SetKind("CronTabWithStatus")
 
 	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 3*time.Minute, false, func(ctx context.Context) (bool, error) {
-		return teamClient.Get(ctx, types.NamespacedName{Name: "my-subnet", Namespace: "default"}, kcpSubnet) == nil, nil
+		return teamClient.Get(ctx, types.NamespacedName{Name: "my-related", Namespace: "default"}, kcpObj) == nil, nil
 	})
 	if err != nil {
-		t.Fatalf("Subnet copy never appeared in kcp: %v", err)
+		t.Fatalf("CronTabWithStatus copy never appeared in kcp: %v", err)
 	}
 
 	// Wait for the status to be synced to kcp.
-	t.Log("Waiting for Subnet status to be synced to kcp…")
+	t.Log("Waiting for CronTabWithStatus status to be synced to kcp…")
 	err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 3*time.Minute, false, func(ctx context.Context) (bool, error) {
-		if err := teamClient.Get(ctx, types.NamespacedName{Name: "my-subnet", Namespace: "default"}, kcpSubnet); err != nil {
+		if err := teamClient.Get(ctx, types.NamespacedName{Name: "my-related", Namespace: "default"}, kcpObj); err != nil {
 			return false, nil
 		}
 
-		id, _, _ := unstructured.NestedString(kcpSubnet.Object, "status", "id")
-		return id == "subnet-svc-99999", nil
+		id, _, _ := unstructured.NestedString(kcpObj.Object, "status", "id")
+		return id == "id-svc-99999", nil
 	})
 	if err != nil {
-		id, _, _ := unstructured.NestedString(kcpSubnet.Object, "status", "id")
-		t.Fatalf("Subnet status was not synced to kcp (got status.id=%q, want %q)", id, "subnet-svc-99999")
+		id, _, _ := unstructured.NestedString(kcpObj.Object, "status", "id")
+		t.Fatalf("CronTabWithStatus status was not synced to kcp (got status.id=%q, want %q)", id, "id-svc-99999")
 	}
 }
 
@@ -390,16 +389,16 @@ func TestSyncRelatedObjectStatusNotSyncedByDefault(t *testing.T) {
 
 	envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
 		"test/crds/crontab.yaml",
-		"test/crds/subnet.yaml",
+		"test/crds/crontabswithstatus.yaml",
 	})
 
-	prSubnets := &syncagentv1alpha1.PublishedResource{
-		ObjectMeta: metav1.ObjectMeta{Name: "publish-subnets"},
+	prCronTabsWithStatus := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "publish-crontabswithstatus"},
 		Spec: syncagentv1alpha1.PublishedResourceSpec{
 			Resource: syncagentv1alpha1.SourceResourceDescriptor{
-				APIGroup: "aws.example.com",
+				APIGroup: "example.com",
 				Version:  "v1",
-				Kind:     "Subnet",
+				Kind:     "CronTabWithStatus",
 			},
 			Projection: &syncagentv1alpha1.ResourceProjection{
 				Group: "kcp.example.com",
@@ -407,8 +406,8 @@ func TestSyncRelatedObjectStatusNotSyncedByDefault(t *testing.T) {
 			Synchronization: &syncagentv1alpha1.SynchronizationSpec{Enabled: false},
 		},
 	}
-	if err := envtestClient.Create(ctx, prSubnets); err != nil {
-		t.Fatalf("Failed to create Subnet PublishedResource: %v", err)
+	if err := envtestClient.Create(ctx, prCronTabsWithStatus); err != nil {
+		t.Fatalf("Failed to create CronTabWithStatus PublishedResource: %v", err)
 	}
 
 	// SyncStatus is intentionally NOT set here.
@@ -427,19 +426,19 @@ func TestSyncRelatedObjectStatusNotSyncedByDefault(t *testing.T) {
 			Projection: &syncagentv1alpha1.ResourceProjection{Group: "kcp.example.com"},
 			Related: []syncagentv1alpha1.RelatedResourceSpec{
 				{
-					Identifier: "subnet",
+					Identifier: "crontabwithstatus",
 					Origin:     syncagentv1alpha1.RelatedResourceOriginKcp,
 					Group:      "kcp.example.com",
 					Version:    "v1",
-					Resource:   "subnets",
+					Resource:   "crontabswithstatus",
 					Projection: &syncagentv1alpha1.RelatedResourceProjection{
-						Group: "aws.example.com",
+						Group: "example.com",
 					},
 					// SyncStatus: false (default)
 					Object: syncagentv1alpha1.RelatedResourceObject{
 						RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
 							Template: &syncagentv1alpha1.TemplateExpression{
-								Template: "my-subnet",
+								Template: "my-related",
 							},
 						},
 					},
@@ -465,7 +464,7 @@ func TestSyncRelatedObjectStatusNotSyncedByDefault(t *testing.T) {
 	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
 		Group:   apiExportName,
 		Version: "v1",
-		Kind:    "Subnet",
+		Kind:    "CronTabWithStatus",
 	})
 
 	// Create primary CronTab in kcp.
@@ -478,45 +477,43 @@ func TestSyncRelatedObjectStatusNotSyncedByDefault(t *testing.T) {
 		t.Fatalf("Failed to create CronTab: %v", err)
 	}
 
-	// Create the Subnet in kcp and set its status.
-	kcpSubnet := makeSubnet("my-subnet", "default")
-	kcpSubnet.SetAPIVersion("kcp.example.com/v1")
-	kcpSubnet.SetKind("Subnet")
-	if err := teamClient.Create(ctx, kcpSubnet); err != nil {
-		t.Fatalf("Failed to create Subnet in kcp: %v", err)
+	// Create the related object in kcp and set its status.
+	kcpObj := makeCronTabWithStatus("my-related", "default")
+	kcpObj.SetAPIVersion("kcp.example.com/v1")
+	kcpObj.SetKind("CronTabWithStatus")
+	if err := teamClient.Create(ctx, kcpObj); err != nil {
+		t.Fatalf("Failed to create CronTabWithStatus in kcp: %v", err)
 	}
-	if err := unstructured.SetNestedField(kcpSubnet.Object, "subnet-should-not-appear", "status", "id"); err != nil {
+	if err := unstructured.SetNestedField(kcpObj.Object, "id-should-not-appear", "status", "id"); err != nil {
 		t.Fatalf("Failed to set status.id: %v", err)
 	}
-	if err := teamClient.Status().Update(ctx, kcpSubnet); err != nil {
-		t.Fatalf("Failed to update Subnet status in kcp: %v", err)
+	if err := teamClient.Status().Update(ctx, kcpObj); err != nil {
+		t.Fatalf("Failed to update CronTabWithStatus status in kcp: %v", err)
 	}
 
 	// Wait for the service cluster copy to appear.
-	t.Log("Waiting for Subnet copy to appear in service cluster…")
-	serviceSubnet := makeSubnet("my-subnet", "synced-default")
-	serviceSubnet.SetAPIVersion(subnetAPIVersion)
-	serviceSubnet.SetKind(subnetKind)
+	t.Log("Waiting for CronTabWithStatus copy to appear in service cluster…")
+	svcObj := makeCronTabWithStatus("my-related", "synced-default")
+	svcObj.SetAPIVersion(crontabWithStatusAPIVersion)
+	svcObj.SetKind(crontabWithStatusKind)
 	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 3*time.Minute, false, func(ctx context.Context) (bool, error) {
-		return envtestClient.Get(ctx, types.NamespacedName{Name: "my-subnet", Namespace: "synced-default"}, serviceSubnet) == nil, nil
+		return envtestClient.Get(ctx, types.NamespacedName{Name: "my-related", Namespace: "synced-default"}, svcObj) == nil, nil
 	})
 	if err != nil {
-		t.Fatalf("Subnet copy never appeared in service cluster: %v", err)
+		t.Fatalf("CronTabWithStatus copy never appeared in service cluster: %v", err)
 	}
 
-	// Give the agent a moment to settle and confirm status is not present.
-	// We wait a short time for any potential erroneous status sync to occur.
-	var finalServiceSubnet unstructured.Unstructured
-	finalServiceSubnet.SetAPIVersion(subnetAPIVersion)
-	finalServiceSubnet.SetKind(subnetKind)
+	// Poll briefly to confirm no status appears on the service cluster copy.
+	var finalSvcObj unstructured.Unstructured
+	finalSvcObj.SetAPIVersion(crontabWithStatusAPIVersion)
+	finalSvcObj.SetKind(crontabWithStatusKind)
 
-	// Poll briefly to check that no status appears.
 	statusSeen := false
 	_ = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
-		if err := envtestClient.Get(ctx, types.NamespacedName{Name: "my-subnet", Namespace: "synced-default"}, &finalServiceSubnet); err != nil {
+		if err := envtestClient.Get(ctx, types.NamespacedName{Name: "my-related", Namespace: "synced-default"}, &finalSvcObj); err != nil {
 			return false, nil
 		}
-		id, exists, _ := unstructured.NestedString(finalServiceSubnet.Object, "status", "id")
+		id, exists, _ := unstructured.NestedString(finalSvcObj.Object, "status", "id")
 		if exists && id != "" {
 			statusSeen = true
 			return true, nil
@@ -525,7 +522,7 @@ func TestSyncRelatedObjectStatusNotSyncedByDefault(t *testing.T) {
 	})
 
 	if statusSeen {
-		id, _, _ := unstructured.NestedString(finalServiceSubnet.Object, "status", "id")
-		t.Fatalf("Subnet status was unexpectedly synced to service cluster (got status.id=%q)", id)
+		id, _, _ := unstructured.NestedString(finalSvcObj.Object, "status", "id")
+		t.Fatalf("CronTabWithStatus status was unexpectedly synced to service cluster (got status.id=%q)", id)
 	}
 }

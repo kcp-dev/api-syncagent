@@ -1,14 +1,14 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: subnets.aws.example.com
+  name: crontabswithstatus.example.com
 spec:
-  group: aws.example.com
+  group: example.com
   scope: Namespaced
   names:
-    plural: subnets
-    singular: subnet
-    kind: Subnet
+    plural: crontabswithstatus
+    singular: crontabwithstatus
+    kind: CronTabWithStatus
   versions:
     - name: v1
       served: true

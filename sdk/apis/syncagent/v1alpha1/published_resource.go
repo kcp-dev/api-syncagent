@@ -210,6 +210,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="!has(self.group) || (has(self.resource) && has(self.version))",message="configuring a group also requires a version and resource"
 // group is included here because when an identityHash is used, core/v1 cannot possible be targetted
 // +kubebuilder:validation:XValidation:rule="!has(self.identityHash) || (has(self.group) && has(self.version) && has(self.resource))",message="identity hashes can only be used with GVRs"
+// +kubebuilder:validation:XValidation:rule="!(self.origin == 'service' && has(self.syncStatus) && self.syncStatus) || has(self.watch)",message="watch must be configured when origin is service and syncStatus is true"
 type RelatedResourceSpec struct {
 	// Identifier is a unique name for this related resource. The name must be unique within one
 	// PublishedResource and is the key by which consumers (end users) can identify and consume the
@@ -277,10 +278,8 @@ type RelatedResourceSpec struct {
 	//   - origin: kcp -> status is synced from kcp to the service cluster
 	//   - origin: service -> status is synced from the service cluster to kcp
 	//
-	// For origin: service, it is strongly recommended to also configure Watch so that
-	// changes to the related resource's status trigger reconciliation and ensure the
-	// informer cache is populated. Without Watch, status is only synced as a side effect
-	// of the primary object being reconciled, which may be infrequent.
+	// For origin: service, Watch must also be configured so that changes to the related
+	// resource's status trigger reconciliation and ensure the informer cache is populated.
 	//
 	// +optional
 	SyncStatus bool `json:"syncStatus,omitempty"`
