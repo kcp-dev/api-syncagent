@@ -176,6 +176,39 @@ func TestValidateRelatedResourceSpec(t *testing.T) {
 				IdentityHash: "abc123",
 			},
 		},
+		{
+			name:  "syncStatus with origin service requires watch",
+			valid: false,
+			spec: syncagentv1alpha1.RelatedResourceSpec{
+				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
+				Resource:   "things",
+				Version:    "v1",
+				SyncStatus: true,
+			},
+		},
+		{
+			name:  "syncStatus with origin service and watch is valid",
+			valid: true,
+			spec: syncagentv1alpha1.RelatedResourceSpec{
+				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
+				Resource:   "things",
+				Version:    "v1",
+				SyncStatus: true,
+				Watch: &syncagentv1alpha1.RelatedResourceWatch{
+					ByOwner: &syncagentv1alpha1.RelatedResourceWatchByOwner{},
+				},
+			},
+		},
+		{
+			name:  "syncStatus with origin kcp does not require watch",
+			valid: true,
+			spec: syncagentv1alpha1.RelatedResourceSpec{
+				Origin:     syncagentv1alpha1.RelatedResourceOriginKcp,
+				Resource:   "things",
+				Version:    "v1",
+				SyncStatus: true,
+			},
+		},
 	}
 
 	alphaNum := regexp.MustCompile(`[^a-z0-9]`)

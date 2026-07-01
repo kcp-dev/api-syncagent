@@ -49,8 +49,10 @@ type objectSyncer struct {
 	destCreator objectCreatorFunc
 	// list of subresources in the resource type
 	subresources []string
-	// whether to enable status subresource back-syncing
+	// whether to enable status subresource back-syncing (dest -> source)
 	syncStatusBack bool
+	// whether to sync status in the forward direction (source -> dest)
+	syncStatusForward bool
 	// whether or not to add/expect a finalizer on the source
 	blockSourceDeletion bool
 	// whether or not to place sync-related metadata on the destination object
@@ -197,8 +199,18 @@ func (s *objectSyncer) applyMutations(source, dest syncSide) (syncSide, syncSide
 func (s *objectSyncer) syncObjectContents(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) (requeue bool, err error) {
 	// Sync the spec (or more generally, the desired state) from source to dest.
 	requeue, err = s.syncObjectSpec(ctx, log, source, dest)
-	if requeue || err != nil {
+	if err != nil {
+		return false, err
+	}
+
+	// Always attempt forward status sync regardless of whether spec was just updated,
+	// so that a simultaneous spec+status change doesn't defer the status by one cycle.
+	if err = s.syncObjectStatusForward(ctx, log, source, dest); err != nil {
 		return requeue, err
+	}
+
+	if requeue {
+		return true, nil
 	}
 
 	// Sync the status back in the opposite direction, from dest to source.
@@ -321,6 +333,32 @@ func (s *objectSyncer) syncObjectStatus(ctx context.Context, log *zap.SugaredLog
 
 	// always return false; there is no need to requeue the source object when we changed its status
 	return false, nil
+}
+
+func (s *objectSyncer) syncObjectStatusForward(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) error {
+	if !s.syncStatusForward || dest.object == nil {
+		return nil
+	}
+
+	sourceContent := source.object.UnstructuredContent()
+	destContent := dest.object.UnstructuredContent()
+
+	if !equality.Semantic.DeepEqual(sourceContent["status"], destContent["status"]) {
+		destContent["status"] = sourceContent["status"]
+
+		log.Debug("Updating destination object status…")
+		if err := dest.client.Status().Update(ctx, dest.object); err != nil {
+			if apierrors.IsNotFound(err) {
+				// The /status subresource does not exist on the destination CRD.
+				// Retrying will not help; emit a warning so the user knows what to fix.
+				s.recordEvent(ctx, source, dest, corev1.EventTypeWarning, "StatusSubresourceMissing", "Cannot sync status: the destination resource does not have a status subresource. Set syncStatus: false or add subresources.status to the CRD.")
+				return nil
+			}
+			return fmt.Errorf("failed to update destination object status: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *objectSyncer) ensureDestinationObject(ctx context.Context, log *zap.SugaredLogger, source, dest syncSide) error {

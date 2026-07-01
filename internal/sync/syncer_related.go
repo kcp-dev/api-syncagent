@@ -133,6 +133,14 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 		// into the cleanup procedure to ensure that copies of the related object are removed.
 		forceDelete := primaryDeleting && (relRes.Cleanup || relRes.Origin == syncagentv1alpha1.RelatedResourceOriginKcp)
 
+		// When status sync is enabled, include "status" in subresources so it is stripped from
+		// the spec patch (avoiding a no-op write on resources that have a status subresource).
+		// The status is then separately written via the status subresource endpoint by syncStatusForward.
+		relatedSubresources := []string(nil)
+		if relRes.SyncStatus {
+			relatedSubresources = []string{"status"}
+		}
+
 		syncer := objectSyncer{
 			// Related objects within kcp are not labelled with the agent name because it's unnecessary.
 			// agentName: "",
@@ -149,17 +157,9 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 
 				return dest, nil
 			},
-			// Originally related resources were only ConfigMaps and Secrets, which do not have subresources;
-			// nowadays we support arbitrary APIs for related resources, but for simplicity do not [yet?]
-			// support syncing the subresources back. For this we would first need to figure out which
-			// subresources even exist.
-			subresources: nil,
-			// Theoretically we would only want to sync the status back if the related resource
-			// originates in kcp, because it would be weird if the service provider relied on status
-			// information provided to them by the consumer.
-			// However since we do not know anything about subresources, we currently cannot enable this
-			// feature at all.
-			syncStatusBack: false,
+			subresources:      relatedSubresources,
+			syncStatusBack:    false,
+			syncStatusForward: relRes.SyncStatus,
 			// if the origin is on the remote side, we want to add a finalizer to make
 			// sure we can clean up properly; when forceDelete is enabled, we are in deletion mode and
 			// want to force the deletion, so we ignore the related object's origin (it was taken into
