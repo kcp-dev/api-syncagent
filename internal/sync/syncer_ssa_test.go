@@ -331,7 +331,7 @@ func TestSyncerServerSideApplyFieldOwner(t *testing.T) {
 	if syncerEntry.Operation != metav1.ManagedFieldsOperationApply {
 		t.Errorf("Expected managedFields entry operation %q, got %q", metav1.ManagedFieldsOperationApply, syncerEntry.Operation)
 	}
-	if syncerEntry.FieldsV1 == nil || len(syncerEntry.FieldsV1.Raw) == 0 {
+	if syncerEntry.FieldsV1 == nil || len(syncerEntry.FieldsV1.GetRawBytes()) == 0 {
 		t.Errorf("Expected managedFields entry %q to declare owned fields (FieldsV1 was empty)", wantFM)
 	}
 }

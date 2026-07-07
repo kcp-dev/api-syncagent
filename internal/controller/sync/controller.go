@@ -392,7 +392,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request mcreconcile.Request)
 		return reconcile.Result{}, nil
 	}
 
-	recorder := cl.GetEventRecorderFor(ControllerName)
+	recorder := cl.GetEventRecorderFor(ControllerName) //nolint:staticcheck // https://github.com/kcp-dev/api-syncagent/issues/157
 
 	ctx = sync.WithClusterName(ctx, logicalcluster.Name(request.ClusterName))
 	ctx = sync.WithEventRecorder(ctx, recorder)

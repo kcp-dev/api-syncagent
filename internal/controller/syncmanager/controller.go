@@ -33,7 +33,6 @@ import (
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -60,7 +59,6 @@ type Reconciler struct {
 	localManager          manager.Manager
 	dmcm                  *kcp.DynamicMultiClusterManager
 	log                   *zap.SugaredLogger
-	recorder              record.EventRecorder
 	discoveryClient       *discovery.Client
 	resourceProber        *discovery.ResourceProber
 	prFilter              labels.Selector
@@ -97,7 +95,6 @@ func Add(
 		localManager:          localManager,
 		dmcm:                  dmcm,
 		log:                   log,
-		recorder:              localManager.GetEventRecorderFor(ControllerName),
 		discoveryClient:       discoveryClient,
 		prFilter:              prFilter,
 		stateNamespace:        stateNamespace,
