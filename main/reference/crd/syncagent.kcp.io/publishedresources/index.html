@@ -3659,6 +3659,35 @@ that field in the GVK.</p>
 
 <div class="property depth-3">
 <div class="property-header">
+<h3 class="property-path" id="v1alpha1-.spec.related[*].syncStatus">.spec.related[*].syncStatus</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">boolean</span>
+
+</div>
+
+<div class="property-description">
+<p>SyncStatus enables synchronization of the status subresource in the same direction as
+the spec (from the origin side to the destination side). When enabled, the agent will
+use the status subresource endpoint to update the destination object&rsquo;s status.
+This requires the related resource to have a status subresource configured in its CRD.</p>
+
+<ul>
+<li>origin: kcp -&gt; status is synced from kcp to the service cluster</li>
+<li>origin: service -&gt; status is synced from the service cluster to kcp</li>
+</ul>
+
+<p>For origin: service, Watch must also be configured so that changes to the related
+resource&rsquo;s status trigger reconciliation and ensure the informer cache is populated.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-3">
+<div class="property-header">
 <h3 class="property-path" id="v1alpha1-.spec.related[*].version">.spec.related[*].version</h3>
 </div>
 <div class="property-body">
