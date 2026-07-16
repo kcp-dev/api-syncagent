@@ -501,8 +501,9 @@ func TestSyncerProcessingSingleResourceWithoutStatus(t *testing.T) {
 						deletionFinalizer,
 					},
 					Annotations: map[string]string{
-						"existing-annotation": "new-annotation-value",
-						"new-annotation":      "hei-verden",
+						deletionPropagationPolicyAnnotation: deletionPropagationForeground,
+						"existing-annotation":               "new-annotation-value",
+						"new-annotation":                    "hei-verden",
 					},
 					Labels: map[string]string{
 						remoteObjectClusterLabel: "this-should-be-ignored",
@@ -542,8 +543,9 @@ func TestSyncerProcessingSingleResourceWithoutStatus(t *testing.T) {
 					},
 					// syncer does not strip remote objects of bad metadata, so it remains
 					Annotations: map[string]string{
-						"existing-annotation": "new-annotation-value",
-						"new-annotation":      "hei-verden",
+						deletionPropagationPolicyAnnotation: deletionPropagationForeground,
+						"existing-annotation":               "new-annotation-value",
+						"new-annotation":                    "hei-verden",
 					},
 					Labels: map[string]string{
 						remoteObjectClusterLabel: "this-should-be-ignored",

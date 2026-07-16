@@ -17,6 +17,7 @@ limitations under the License.
 package sync
 
 import (
+	"context"
 	"testing"
 
 	"go.uber.org/zap"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 func TestEffectiveCleanupPolicy(t *testing.T) {
@@ -266,7 +268,7 @@ func TestPruneRelatedCopies(t *testing.T) {
 		client := buildFakeClient(keepMe, pruneMe, foreign)
 
 		keep := sets.New(relatedCopyKey("default", "keep-me"))
-		requeue, err := (&ResourceSyncer{}).pruneRelatedCopies(t.Context(), log, syncSide{client: client}, primary, secretGVK, selector, keep, false)
+		requeue, err := (&ResourceSyncer{}).pruneRelatedCopies(t.Context(), log, syncSide{client: client}, primary, secretGVK, selector, keep, nil, false)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -291,7 +293,7 @@ func TestPruneRelatedCopies(t *testing.T) {
 		b := makeCopy("copy-b", "default", identifier, false)
 		client := buildFakeClient(a, b, foreign)
 
-		requeue, err := (&ResourceSyncer{}).pruneRelatedCopies(t.Context(), log, syncSide{client: client}, primary, secretGVK, selector, nil, true)
+		requeue, err := (&ResourceSyncer{}).pruneRelatedCopies(t.Context(), log, syncSide{client: client}, primary, secretGVK, selector, nil, nil, true)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -311,7 +313,7 @@ func TestPruneRelatedCopies(t *testing.T) {
 	t.Run("empty match set is a no-op", func(t *testing.T) {
 		client := buildFakeClient(foreign)
 
-		requeue, err := (&ResourceSyncer{}).pruneRelatedCopies(t.Context(), log, syncSide{client: client}, primary, secretGVK, selector, nil, true)
+		requeue, err := (&ResourceSyncer{}).pruneRelatedCopies(t.Context(), log, syncSide{client: client}, primary, secretGVK, selector, nil, nil, true)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -333,7 +335,7 @@ func TestPruneRelatedCopies(t *testing.T) {
 			t.Fatalf("failed to start deletion: %v", err)
 		}
 
-		requeue, err := (&ResourceSyncer{}).pruneRelatedCopies(t.Context(), log, syncSide{client: client}, primary, secretGVK, selector, nil, true)
+		requeue, err := (&ResourceSyncer{}).pruneRelatedCopies(t.Context(), log, syncSide{client: client}, primary, secretGVK, selector, nil, nil, true)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -342,6 +344,48 @@ func TestPruneRelatedCopies(t *testing.T) {
 		}
 		if !listSecretNames(t, client).Has("deleting-copy") {
 			t.Error("a copy that is already being deleted must not be treated as an error or vanish early")
+		}
+	})
+
+	t.Run("uses the resolved propagation policy", func(t *testing.T) {
+		copy := makeCopy("foreground-copy", "default", identifier, false)
+		var got *metav1.DeletionPropagation
+		client := newFakeClientBuilder().
+			WithObjects(copy, foreign).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Delete: func(ctx context.Context, client ctrlruntimeclient.WithWatch, obj ctrlruntimeclient.Object, options ...ctrlruntimeclient.DeleteOption) error {
+					deleteOptions := &ctrlruntimeclient.DeleteOptions{}
+					for _, option := range options {
+						option.ApplyToDelete(deleteOptions)
+					}
+					got = deleteOptions.PropagationPolicy
+					return client.Delete(ctx, obj, options...)
+				},
+			}).
+			Build()
+
+		policies := map[string]metav1.DeletionPropagation{
+			relatedCopyKey(copy.GetNamespace(), copy.GetName()): metav1.DeletePropagationForeground,
+		}
+		requeue, err := (&ResourceSyncer{}).pruneRelatedCopies(
+			t.Context(),
+			log,
+			syncSide{client: client},
+			primary,
+			secretGVK,
+			selector,
+			nil,
+			policies,
+			true,
+		)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !requeue {
+			t.Error("expected requeue=true after deleting a copy")
+		}
+		if got == nil || *got != metav1.DeletePropagationForeground {
+			t.Fatalf("expected foreground propagation, got %v", got)
 		}
 	})
 }

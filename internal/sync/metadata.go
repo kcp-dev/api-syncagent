@@ -112,6 +112,7 @@ func filterUnsyncableLabels(original labels.Set) labels.Set {
 var unsyncableAnnotations = sets.New(
 	"kcp.io/cluster",
 	"kubectl.kubernetes.io/last-applied-configuration",
+	deletionPropagationPolicyAnnotation,
 	remoteObjectNamespaceAnnotation,
 	remoteObjectNameAnnotation,
 	remoteObjectWorkspacePathAnnotation,

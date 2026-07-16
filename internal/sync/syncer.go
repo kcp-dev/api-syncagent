@@ -209,6 +209,7 @@ func (s *ResourceSyncer) Process(ctx context.Context, remoteObj *unstructured.Un
 	// object state; this allows the code to create meaningful patches and not overwrite
 	// fields that were defaulted by the kube-apiserver or a mutating webhook
 	stateStore := s.newObjectStateStore(sourceSide, destSide)
+	deletionPolicy := deletionPropagationPolicy(remoteObj)
 
 	syncer := objectSyncer{
 		// The primary object should be labelled with the agent name.
@@ -223,6 +224,8 @@ func (s *ResourceSyncer) Process(ctx context.Context, remoteObj *unstructured.Un
 		// perform cleanup on the service cluster side when the source object
 		// in kcp is deleted
 		blockSourceDeletion: true,
+		// Apply the service-cluster deletion policy specified on the kcp source.
+		deletionPropagationPolicy: deletionPolicy,
 		// use the configured mutations from the PublishedResource
 		mutator: s.primaryMutator,
 		// make sure the syncer can remember the current state of any object

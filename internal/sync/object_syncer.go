@@ -31,6 +31,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -77,6 +78,8 @@ type objectSyncer struct {
 	// being deleted; used to clean up related resources when the primary object
 	// is being deleted.
 	forceDelete bool
+	// deletionPropagationPolicy is used when deleting the destination object.
+	deletionPropagationPolicy metav1.DeletionPropagation
 	// useServerSideApply switches the syncer from client-side merge patches
 	// (backed by a last-known-state secret) to Kubernetes Server-Side Apply
 	// using a stable field manager. SSA preserves fields owned by other
@@ -623,8 +626,9 @@ func (s *objectSyncer) handleDeletion(ctx context.Context, log *zap.SugaredLogge
 	if dest.object != nil {
 		if dest.object.GetDeletionTimestamp() == nil {
 			log.Debugw("Deleting destination object…", "dest-object", newObjectKey(dest.object, dest.clusterName, logicalcluster.None))
-			s.recordEvent(ctx, source, dest, corev1.EventTypeNormal, "ObjectCleanup", "Object deletion has been started and will progress in the background.")
-			if err := dest.client.Delete(ctx, dest.object); err != nil {
+			s.recordEvent(ctx, source, dest, corev1.EventTypeNormal, "ObjectCleanup", "Object deletion has been started.")
+			if err := dest.client.Delete(ctx, dest.object,
+				ctrlruntimeclient.PropagationPolicy(normalizeDeletionPropagationPolicy(s.deletionPropagationPolicy))); err != nil {
 				return false, fmt.Errorf("failed to delete destination object: %w", err)
 			}
 		}
