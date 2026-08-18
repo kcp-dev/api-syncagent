@@ -348,10 +348,10 @@ func TestPruneRelatedCopies(t *testing.T) {
 	})
 
 	t.Run("uses the resolved propagation policy", func(t *testing.T) {
-		copy := makeCopy("foreground-copy", "default", identifier, false)
+		copyObj := makeCopy("foreground-copy", "default", identifier, false)
 		var got *metav1.DeletionPropagation
 		client := newFakeClientBuilder().
-			WithObjects(copy, foreign).
+			WithObjects(copyObj, foreign).
 			WithInterceptorFuncs(interceptor.Funcs{
 				Delete: func(ctx context.Context, client ctrlruntimeclient.WithWatch, obj ctrlruntimeclient.Object, options ...ctrlruntimeclient.DeleteOption) error {
 					deleteOptions := &ctrlruntimeclient.DeleteOptions{}
@@ -365,7 +365,7 @@ func TestPruneRelatedCopies(t *testing.T) {
 			Build()
 
 		policies := map[string]metav1.DeletionPropagation{
-			relatedCopyKey(copy.GetNamespace(), copy.GetName()): metav1.DeletePropagationForeground,
+			relatedCopyKey(copyObj.GetNamespace(), copyObj.GetName()): metav1.DeletePropagationForeground,
 		}
 		requeue, err := (&ResourceSyncer{}).pruneRelatedCopies(
 			t.Context(),
