@@ -1335,7 +1335,7 @@ kubeconfig points to the right workspace (not necessarily the <code>root</code> 
 <p>This can be done via a command like this:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>$<span class="w"> </span>kubectl<span class="w"> </span>create<span class="w"> </span>secret<span class="w"> </span>generic<span class="w"> </span>kcp-kubeconfig<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>--namespace<span class="w"> </span>kcp-system<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--from-file<span class="w"> </span><span class="s2">&quot;kubeconfig=admin.kubeconfig&quot;</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--from-file<span class="w"> </span><span class="s2">"kubeconfig=admin.kubeconfig"</span>
 </code></pre></div>
 <h3 id="helm-chart-setup">Helm Chart Setup</h3>
 <p>The Sync Agent is shipped as a Helm chart and to install it, the next step is preparing a <code>values.yaml</code>
@@ -1352,7 +1352,7 @@ we just created.</p>
 <a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="c1"># the name of the APIExportEndpointSlice in kcp that this Sync Agent is supposed to serve.</span>
 <a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1"># apiExportEndpointSliceName: test.example.com</span>
 <a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="c1"># Required: This Agent&#39;s public name, used to signal ownership over locally synced objects.</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="c1"># Required: This Agent's public name, used to signal ownership over locally synced objects.</span>
 <a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="c1"># This value must be a valid Kubernetes label value, see</span>
 <a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="c1"># https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set</span>
 <a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="c1"># for more information.</span>
@@ -1360,7 +1360,7 @@ we just created.</p>
 <a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="c1"># so beware and relabel if necessary.</span>
 <a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="nt">agentName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unique-test</span>
 <a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>
-<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="c1"># Required: Name of the Kubernetes Secret that contains a &quot;kubeconfig&quot; key,</span>
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="c1"># Required: Name of the Kubernetes Secret that contains a "kubeconfig" key,</span>
 <a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="c1"># with the kubeconfig provided by kcp to access it.</span>
 <a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a><span class="nt">kcpKubeconfig</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kcp-kubeconfig</span>
 </code></pre></div>
@@ -1386,7 +1386,7 @@ you would need to grant it permissions on those:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io/v1</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ClusterRole</span>
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nt">metadata</span><span class="p">:</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;api-syncagent:unique-test&#39;</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">'api-syncagent:unique-test'</span>
 <a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nt">rules</span><span class="p">:</span>
 <a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">apiGroups</span><span class="p">:</span>
 <a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cert-manager.io</span>
@@ -1403,14 +1403,14 @@ you would need to grant it permissions on those:</p>
 <a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io/v1</span>
 <a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ClusterRoleBinding</span>
 <a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a><span class="nt">metadata</span><span class="p">:</span>
-<a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;api-syncagent:unique-test&#39;</span>
+<a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">'api-syncagent:unique-test'</span>
 <a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a><span class="nt">roleRef</span><span class="p">:</span>
 <a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a><span class="w">  </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io</span>
 <a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a><span class="w">  </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ClusterRole</span>
-<a id="__codelineno-7-25" name="__codelineno-7-25" href="#__codelineno-7-25"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;api-syncagent:unique-test&#39;</span>
+<a id="__codelineno-7-25" name="__codelineno-7-25" href="#__codelineno-7-25"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">'api-syncagent:unique-test'</span>
 <a id="__codelineno-7-26" name="__codelineno-7-26" href="#__codelineno-7-26"></a><span class="nt">subjects</span><span class="p">:</span>
 <a id="__codelineno-7-27" name="__codelineno-7-27" href="#__codelineno-7-27"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ServiceAccount</span>
-<a id="__codelineno-7-28" name="__codelineno-7-28" href="#__codelineno-7-28"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;kcp-api-syncagent&#39;</span>
+<a id="__codelineno-7-28" name="__codelineno-7-28" href="#__codelineno-7-28"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">'kcp-api-syncagent'</span>
 <a id="__codelineno-7-29" name="__codelineno-7-29" href="#__codelineno-7-29"></a><span class="w">    </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kcp-system</span>
 </code></pre></div>
 <p><strong>NB:</strong> Even though the PublishedResources might only create/update Certificates in a single namespace,
@@ -1473,7 +1473,7 @@ the RBAC rules that grant the Agent access.</p>
 <a id="__codelineno-8-38" name="__codelineno-8-38" href="#__codelineno-8-38"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">update</span>
 <a id="__codelineno-8-39" name="__codelineno-8-39" href="#__codelineno-8-39"></a><span class="w">  </span><span class="c1"># issue events for APIExports</span>
 <a id="__codelineno-8-40" name="__codelineno-8-40" href="#__codelineno-8-40"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">apiGroups</span><span class="p">:</span>
-<a id="__codelineno-8-41" name="__codelineno-8-41" href="#__codelineno-8-41"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<a id="__codelineno-8-41" name="__codelineno-8-41" href="#__codelineno-8-41"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">""</span>
 <a id="__codelineno-8-42" name="__codelineno-8-42" href="#__codelineno-8-42"></a><span class="w">    </span><span class="nt">resources</span><span class="p">:</span>
 <a id="__codelineno-8-43" name="__codelineno-8-43" href="#__codelineno-8-43"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">events</span>
 <a id="__codelineno-8-44" name="__codelineno-8-44" href="#__codelineno-8-44"></a><span class="w">    </span><span class="nt">verbs</span><span class="p">:</span>
@@ -1499,7 +1499,7 @@ the RBAC rules that grant the Agent access.</p>
 <a id="__codelineno-8-64" name="__codelineno-8-64" href="#__codelineno-8-64"></a><span class="w">    </span><span class="nt">resourceNames</span><span class="p">:</span>
 <a id="__codelineno-8-65" name="__codelineno-8-65" href="#__codelineno-8-65"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test.example.com</span>
 <a id="__codelineno-8-66" name="__codelineno-8-66" href="#__codelineno-8-66"></a><span class="w">    </span><span class="nt">verbs</span><span class="p">:</span>
-<a id="__codelineno-8-67" name="__codelineno-8-67" href="#__codelineno-8-67"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;*&#39;</span>
+<a id="__codelineno-8-67" name="__codelineno-8-67" href="#__codelineno-8-67"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'*'</span>
 <a id="__codelineno-8-68" name="__codelineno-8-68" href="#__codelineno-8-68"></a>
 <a id="__codelineno-8-69" name="__codelineno-8-69" href="#__codelineno-8-69"></a><span class="nn">---</span>
 <a id="__codelineno-8-70" name="__codelineno-8-70" href="#__codelineno-8-70"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io/v1</span>

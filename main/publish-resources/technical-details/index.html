@@ -1252,6 +1252,15 @@ service cluster is called the <code>destination object</code>.</p>
 is the only real evidence in the kcp side that the Sync Agent is even doing things. When a remote
 (source) object is deleted, the corresponding local object is deleted as well. Once the local object
 is gone, the finalizer is removed from the source object.</p>
+<p>By default, the local object is deleted with background propagation. A different policy can be
+selected by annotating the kcp object before deleting it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>kubectl<span class="w"> </span>annotate<span class="w"> </span>&lt;resource&gt;<span class="w"> </span>&lt;name&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>syncagent.kcp.io/deletion-propagation-policy<span class="o">=</span>foreground
+</code></pre></div>
+<p>Supported values are <code>background</code>, <code>foreground</code>, and <code>orphan</code>. A missing or invalid value defaults
+to <code>background</code>. The annotation controls deletion in the service cluster independently of the
+policy used to delete the kcp object. For kcp-origin related resources, annotate each related object
+with the policy to use for its local copy.</p>
 <h3 id="phase-3-ensure-object-existence">Phase 3: Ensure Object Existence</h3>
 <p>We have a source object and now need to create the destination. This chart shows what's happening.</p>
 <pre class="mermaid"><code>graph TB
