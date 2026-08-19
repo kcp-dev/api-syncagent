@@ -24,9 +24,11 @@ import (
 
 	"github.com/kcp-dev/logicalcluster/v3"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/tools/record"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 // fakeStateStore is a minimal ObjectStateStore for unit tests.
@@ -54,6 +56,81 @@ func makeUnstructuredWithStatus(name, namespace string, status map[string]interf
 		}
 	}
 	return obj
+}
+
+func TestHandleDeletionUsesPropagationPolicy(t *testing.T) {
+	testcases := []struct {
+		name     string
+		policy   metav1.DeletionPropagation
+		expected metav1.DeletionPropagation
+	}{
+		{
+			name:     "foreground",
+			policy:   metav1.DeletePropagationForeground,
+			expected: metav1.DeletePropagationForeground,
+		},
+		{
+			name:     "orphan",
+			policy:   metav1.DeletePropagationOrphan,
+			expected: metav1.DeletePropagationOrphan,
+		},
+		{
+			name:     "background",
+			policy:   metav1.DeletePropagationBackground,
+			expected: metav1.DeletePropagationBackground,
+		},
+		{
+			name:     "background by default",
+			expected: metav1.DeletePropagationBackground,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			destination := makeUnstructuredWithStatus("destination", "default", nil)
+
+			var got *metav1.DeletionPropagation
+			destinationClient := newFakeClientBuilder().
+				WithObjects(destination).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Delete: func(ctx context.Context, client ctrlruntimeclient.WithWatch, obj ctrlruntimeclient.Object, options ...ctrlruntimeclient.DeleteOption) error {
+						deleteOptions := &ctrlruntimeclient.DeleteOptions{}
+						for _, option := range options {
+							option.ApplyToDelete(deleteOptions)
+						}
+						got = deleteOptions.PropagationPolicy
+						return client.Delete(ctx, obj, options...)
+					},
+				}).
+				Build()
+
+			source := makeUnstructuredWithStatus("source", "default", nil)
+			source.SetFinalizers([]string{deletionFinalizer})
+			now := metav1.Now()
+			source.SetDeletionTimestamp(&now)
+
+			syncer := objectSyncer{
+				blockSourceDeletion:       true,
+				deletionPropagationPolicy: testcase.policy,
+				eventObjSide:              syncSideSource,
+			}
+			ctx := WithEventRecorder(t.Context(), record.NewFakeRecorder(1))
+
+			requeue, err := syncer.handleDeletion(ctx, zap.NewNop().Sugar(), syncSide{object: source}, syncSide{
+				client: destinationClient,
+				object: destination,
+			})
+			if err != nil {
+				t.Fatalf("handleDeletion returned an error: %v", err)
+			}
+			if !requeue {
+				t.Fatal("handleDeletion did not request a requeue")
+			}
+			if got == nil || *got != testcase.expected {
+				t.Fatalf("expected %q propagation policy, got %v", testcase.expected, got)
+			}
+		})
+	}
 }
 
 func TestSyncObjectStatusForward(t *testing.T) {

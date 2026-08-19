@@ -58,6 +58,19 @@ is the only real evidence in the kcp side that the Sync Agent is even doing thin
 (source) object is deleted, the corresponding local object is deleted as well. Once the local object
 is gone, the finalizer is removed from the source object.
 
+By default, the local object is deleted with background propagation. A different policy can be
+selected by annotating the kcp object before deleting it:
+
+```bash
+kubectl annotate <resource> <name> \
+  syncagent.kcp.io/deletion-propagation-policy=foreground
+```
+
+Supported values are `background`, `foreground`, and `orphan`. A missing or invalid value defaults
+to `background`. The annotation controls deletion in the service cluster independently of the
+policy used to delete the kcp object. For kcp-origin related resources, annotate each related object
+with the policy to use for its local copy.
+
 ### Phase 3: Ensure Object Existence
 
 We have a source object and now need to create the destination. This chart shows what's happening.

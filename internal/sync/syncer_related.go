@@ -118,6 +118,7 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 	// remember which destination copies we (re)synced this pass, so a MatchOrigin prune can delete
 	// the copies that no longer have a matching origin object.
 	synced := sets.New[string]()
+	deletionPolicies := map[string]metav1.DeletionPropagation{}
 
 	// We "forward" the deletion to the related objects only if the primary is already in deletion
 	// and the related object either originated from the user (so on the service cluster we just
@@ -148,6 +149,9 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 			client:      dest.client,
 			object:      destObject,
 		}
+
+		deletionPolicy := relatedDeletionPropagationPolicy(relRes.Origin, resolved.original)
+		deletionPolicies[relatedCopyKey(resolved.destination.Namespace, resolved.destination.Name)] = deletionPolicy
 
 		// When status sync is enabled, include "status" in subresources so it is stripped from
 		// the spec patch (avoiding a no-op write on resources that have a status subresource).
@@ -192,6 +196,8 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 			eventObjSide: eventObjSide,
 			// force deletion of related resources when the primary object is being deleted
 			forceDelete: forceDelete,
+			// Kcp-origin objects can request how their service-cluster copies are deleted.
+			deletionPropagationPolicy: deletionPolicy,
 			// propagate the SSA mode chosen for the primary syncer to keep
 			// behavior consistent across the whole resource graph
 			useServerSideApply: s.useServerSideApply,
@@ -237,7 +243,7 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 		// had already disappeared mid-life (which the loop can no longer resolve).
 		selector := relatedCopySelector(primary, remote.clusterName, s.pubRes.Name, relRes.Identifier, s.agentName)
 
-		pruneRequeue, err := s.pruneRelatedCopies(ctx, log, dest, primary, projectedGVK, selector, nil, true)
+		pruneRequeue, err := s.pruneRelatedCopies(ctx, log, dest, primary, projectedGVK, selector, nil, deletionPolicies, true)
 		if err != nil {
 			return false, fmt.Errorf("failed to tear down related copies: %w", err)
 		}
@@ -283,7 +289,7 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 			}
 		}
 
-		pruneRequeue, err := s.pruneRelatedCopies(ctx, log, dest, primary, projectedGVK, selector, synced, false)
+		pruneRequeue, err := s.pruneRelatedCopies(ctx, log, dest, primary, projectedGVK, selector, synced, deletionPolicies, false)
 		if err != nil {
 			return false, fmt.Errorf("failed to prune related copies: %w", err)
 		}
@@ -387,7 +393,7 @@ func (s *ResourceSyncer) rememberRelatedObjects(ctx context.Context, log *zap.Su
 // (mid-life prune). It only ever operates on the destination client, so origin objects are never
 // touched, and it only ever sees objects that carry our provenance labels, so hand-created objects
 // are never in scope.
-func (s *ResourceSyncer) pruneRelatedCopies(ctx context.Context, log *zap.SugaredLogger, dest syncSide, primary *unstructured.Unstructured, projectedGVK schema.GroupVersionKind, selector labels.Selector, keep sets.Set[string], deleteAll bool) (requeue bool, err error) {
+func (s *ResourceSyncer) pruneRelatedCopies(ctx context.Context, log *zap.SugaredLogger, dest syncSide, primary *unstructured.Unstructured, projectedGVK schema.GroupVersionKind, selector labels.Selector, keep sets.Set[string], deletionPolicies map[string]metav1.DeletionPropagation, deleteAll bool) (requeue bool, err error) {
 	list := &unstructured.UnstructuredList{}
 	list.SetAPIVersion(projectedGVK.GroupVersion().String())
 	list.SetKind(projectedGVK.Kind + "List")
@@ -421,7 +427,9 @@ func (s *ResourceSyncer) pruneRelatedCopies(ctx context.Context, log *zap.Sugare
 		}
 
 		log.Debugw("Pruning related object copy…", "namespace", item.GetNamespace(), "name", item.GetName())
-		if err := dest.client.Delete(ctx, item); err != nil {
+		policy := deletionPolicies[relatedCopyKey(item.GetNamespace(), item.GetName())]
+		if err := dest.client.Delete(ctx, item,
+			ctrlruntimeclient.PropagationPolicy(normalizeDeletionPropagationPolicy(policy))); err != nil {
 			if apierrors.IsNotFound(err) {
 				continue
 			}
