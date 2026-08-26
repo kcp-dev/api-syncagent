@@ -38,6 +38,20 @@ spec:
   image: ubuntu:latest
 `)
 
+	listInputObject := utils.YAMLToUnstructured(t, `
+apiVersion: kcp.example.com/v1
+kind: List
+metadata:
+  namespace: default
+  name: my-list
+spec:
+  items:
+    - name: foo
+      image: ubuntu:latest
+    - name: bar
+      image: alpine:latest
+`)
+
 	testcases := []struct {
 		name      string
 		inputData *unstructured.Unstructured
@@ -116,6 +130,41 @@ metadata:
 spec:
   cronSpec: ubuntu:latest
   image: ubuntu:latest
+`),
+		},
+		{
+			name:      "recreate list value",
+			inputData: listInputObject,
+			otherObj:  listInputObject,
+			mutation: syncagentv1alpha1.ResourceCELMutation{
+				Path:       "spec.items",
+				Expression: `other.spec.items`,
+			},
+			expected: listInputObject,
+		},
+		{
+			name:      "modify list value",
+			inputData: listInputObject,
+			otherObj:  listInputObject,
+			mutation: syncagentv1alpha1.ResourceCELMutation{
+				Path: "spec.items",
+				Expression: `self.spec.items.map(a, {
+					"name": a.name,
+					"image": "registry.example.com/" + a.image
+				})`,
+			},
+			expected: utils.YAMLToUnstructured(t, `
+apiVersion: kcp.example.com/v1
+kind: List
+metadata:
+  namespace: default
+  name: my-list
+spec:
+  items:
+    - name: foo
+      image: registry.example.com/ubuntu:latest
+    - name: bar
+      image: registry.example.com/alpine:latest
 `),
 		},
 	}
