@@ -18,9 +18,12 @@ package transformer
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/decls"
+	"github.com/google/cel-go/common/types"
+	"github.com/google/cel-go/common/types/ref"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
@@ -84,11 +87,66 @@ func (m *celTransformer) Apply(toMutate *unstructured.Unstructured, otherObj *un
 		return nil, fmt.Errorf("failed to evaluate CEL expression: %w", err)
 	}
 
+	// convert the result to its native go representation
+	value, err := celToNative(out)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert CEL result to native value: %w", err)
+	}
+
 	// update the object
-	updated, err := sjson.Set(encoded, m.path, out)
+	updated, err := sjson.Set(encoded, m.path, value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set updated value: %w", err)
 	}
 
 	return DecodeObject(updated)
+}
+
+// celToNative recursively converts a given value to its native Go
+// representation according to the reflected type description, or error if the
+// conversion is not feasible.
+func celToNative(value ref.Val) (any, error) {
+	switch value.Type() {
+	case types.ListType:
+		l, err := value.ConvertToNative(reflect.TypeFor[[]ref.Val]())
+		if err != nil {
+			return nil, err
+		}
+		list := l.([]ref.Val)
+
+		result := make([]any, len(list))
+		for i, item := range list {
+			result[i], err = celToNative(item)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return result, nil
+
+	case types.MapType:
+		m, err := value.ConvertToNative(reflect.TypeFor[map[ref.Val]ref.Val]())
+		if err != nil {
+			return nil, err
+		}
+		mmap := m.(map[ref.Val]ref.Val)
+
+		result := make(map[string]any, len(mmap))
+		for key, item := range mmap {
+			k, err := key.ConvertToNative(reflect.TypeFor[string]())
+			if err != nil {
+				return nil, err
+			}
+
+			v, err := celToNative(item)
+			if err != nil {
+				return nil, err
+			}
+
+			result[k.(string)] = v
+		}
+		return result, nil
+
+	default:
+		return value.ConvertToNative(reflect.TypeFor[any]())
+	}
 }
