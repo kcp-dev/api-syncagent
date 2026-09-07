@@ -680,7 +680,7 @@ func TestResolveRelatedResourceObjects(t *testing.T) {
 				Object:     testcase.objectSpec,
 			}
 
-			foundObjects, err := resolveRelatedResourceObjects(t.Context(), originSide, destSide, pubRes)
+			foundObjects, err := resolveRelatedResourceObjects(t.Context(), zap.NewNop().Sugar(), originSide, destSide, pubRes)
 			if err != nil {
 				t.Fatalf("Failed to resolve related objects: %v", err)
 			}
