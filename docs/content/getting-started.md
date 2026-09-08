@@ -117,15 +117,8 @@ file for the Sync Agent Helm chart. We need to pass the target `APIExport` or th
 we just created.
 
 ```yaml
-# Either of the following two are required, and both fields are mutually exclusive:
-
-# the name of the APIExport in kcp that this Sync Agent is supposed to serve.
-apiExportName: test.example.com
-
-# -- or --
-
-# the name of the APIExportEndpointSlice in kcp that this Sync Agent is supposed to serve.
-# apiExportEndpointSliceName: test.example.com
+# Required: the name of the APIExportEndpointSlice in kcp that this Sync Agent is supposed to serve.
+apiExportEndpointSliceName: test.example.com
 
 # Required: This Agent's public name, used to signal ownership over locally synced objects.
 # This value must be a valid Kubernetes label value, see
