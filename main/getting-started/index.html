@@ -1342,27 +1342,20 @@ kubeconfig points to the right workspace (not necessarily the <code>root</code> 
 file for the Sync Agent Helm chart. We need to pass the target <code>APIExport</code> or the target
 <code>APIExportEndpointSlice</code>, a name for the Sync Agent itself and a reference to the kubeconfig secret
 we just created.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Either of the following two are required, and both fields are mutually exclusive:</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># the name of the APIExport in kcp that this Sync Agent is supposed to serve.</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nt">apiExportName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test.example.com</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1"># -- or --</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="c1"># the name of the APIExportEndpointSlice in kcp that this Sync Agent is supposed to serve.</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1"># apiExportEndpointSliceName: test.example.com</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="c1"># Required: This Agent's public name, used to signal ownership over locally synced objects.</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="c1"># This value must be a valid Kubernetes label value, see</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="c1"># https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set</span>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="c1"># for more information.</span>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="c1"># Changing this value after the fact will make the agent ignore previously created objects,</span>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="c1"># so beware and relabel if necessary.</span>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="nt">agentName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unique-test</span>
-<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>
-<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="c1"># Required: Name of the Kubernetes Secret that contains a "kubeconfig" key,</span>
-<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="c1"># with the kubeconfig provided by kcp to access it.</span>
-<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a><span class="nt">kcpKubeconfig</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kcp-kubeconfig</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Required: the name of the APIExportEndpointSlice in kcp that this Sync Agent is supposed to serve.</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">apiExportEndpointSliceName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test.example.com</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Required: This Agent's public name, used to signal ownership over locally synced objects.</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># This value must be a valid Kubernetes label value, see</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1"># https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># for more information.</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="c1"># Changing this value after the fact will make the agent ignore previously created objects,</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1"># so beware and relabel if necessary.</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="nt">agentName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unique-test</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="c1"># Required: Name of the Kubernetes Secret that contains a "kubeconfig" key,</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="c1"># with the kubeconfig provided by kcp to access it.</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="nt">kcpKubeconfig</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kcp-kubeconfig</span>
 </code></pre></div>
 <p>Once this <code>values.yaml</code> file is prepared, install a recent development build of the Sync Agent:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>helm<span class="w"> </span>repo<span class="w"> </span>add<span class="w"> </span>kcp<span class="w"> </span>https://kcp-dev.github.io/helm-charts
