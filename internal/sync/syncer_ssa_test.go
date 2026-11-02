@@ -29,6 +29,7 @@ import (
 	"github.com/kcp-dev/logicalcluster/v3"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -177,6 +178,46 @@ func TestObjectSyncerFieldManager(t *testing.T) {
 				t.Errorf("fieldManager() = %q, want %q", got, tc.expected)
 			}
 		})
+	}
+}
+
+func TestObjectSyncerServerSideApplySyncsForwardStatus(t *testing.T) {
+	const readyPhase = "ready"
+
+	source := makeUnstructuredWithStatus("my-widget", "", map[string]interface{}{"phase": readyPhase})
+	dest := makeUnstructuredWithStatus("my-widget", "", map[string]interface{}{"phase": "pending"})
+	destClient := buildFakeClientWithStatus(dest)
+
+	syncer := &objectSyncer{
+		useServerSideApply: true,
+		syncStatusForward:  true,
+		subresources:       []string{"status"},
+		destCreator: func(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+			return obj.DeepCopy(), nil
+		},
+		eventObjSide: syncSideSource,
+	}
+
+	ctx := WithEventRecorder(t.Context(), record.NewFakeRecorder(10))
+	if _, err := syncer.Sync(
+		ctx,
+		zap.NewNop().Sugar(),
+		syncSide{object: source},
+		syncSide{object: dest, client: destClient},
+	); err != nil {
+		t.Fatalf("Sync returned an error: %v", err)
+	}
+
+	got := makeUnstructuredWithStatus("my-widget", "", nil)
+	if err := destClient.Get(ctx, ctrlruntimeclient.ObjectKeyFromObject(dest), got); err != nil {
+		t.Fatalf("Failed to get destination object: %v", err)
+	}
+	phase, _, err := unstructured.NestedString(got.Object, "status", "phase")
+	if err != nil {
+		t.Fatalf("Failed to read destination status: %v", err)
+	}
+	if phase != readyPhase {
+		t.Errorf("Expected destination status.phase=ready, got %q", phase)
 	}
 }
 

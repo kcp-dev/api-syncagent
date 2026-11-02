@@ -38,7 +38,7 @@ type RelatedResourceSpecApplyConfiguration struct {
 	Object        *RelatedResourceObjectApplyConfiguration        `json:"object,omitempty"`
 	Mutation      *ResourceMutationSpecApplyConfiguration         `json:"mutation,omitempty"`
 	Watch         *RelatedResourceWatchApplyConfiguration         `json:"watch,omitempty"`
-	SyncStatus    *bool                                           `json:"syncStatus,omitempty"`
+	SyncStatus    *syncagentv1alpha1.RelatedResourceOrigin        `json:"syncStatus,omitempty"`
 }
 
 // RelatedResourceSpecApplyConfiguration constructs a declarative configuration of the RelatedResourceSpec type for use with
@@ -154,7 +154,7 @@ func (b *RelatedResourceSpecApplyConfiguration) WithWatch(value *RelatedResource
 // WithSyncStatus sets the SyncStatus field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the SyncStatus field is set to the value of the last call.
-func (b *RelatedResourceSpecApplyConfiguration) WithSyncStatus(value bool) *RelatedResourceSpecApplyConfiguration {
+func (b *RelatedResourceSpecApplyConfiguration) WithSyncStatus(value syncagentv1alpha1.RelatedResourceOrigin) *RelatedResourceSpecApplyConfiguration {
 	b.SyncStatus = &value
 	return b
 }

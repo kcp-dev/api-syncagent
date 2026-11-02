@@ -36,7 +36,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -171,7 +170,7 @@ func Create(
 		return nil, fmt.Errorf("failed to setup local-side watch: %w", err)
 	}
 
-	if err := setupRelatedResourceWatches(c, localManager, remoteManager, pubRes, localDummy, remoteDummy, log); err != nil {
+	if err := setupRelatedResourceWatches(c, localManager, pubRes, localDummy, remoteDummy, log); err != nil {
 		return nil, err
 	}
 
@@ -180,18 +179,18 @@ func Create(
 	return c, nil
 }
 
-// setupRelatedResourceWatches sets up watches for all related resources that have a Watch
-// config, on their respective origin side, so that changes trigger primary reconciliation.
+// setupRelatedResourceWatches sets up watches for all related resources that have a Watch config.
+// The origin side is always watched. When status is synchronized from the opposite side, that side
+// is watched as well so changes in either direction trigger primary reconciliation.
 func setupRelatedResourceWatches(
 	c mccontroller.Controller,
 	localManager manager.Manager,
-	remoteManager mcmanager.Manager,
 	pubRes *syncagentv1alpha1.PublishedResource,
 	localDummy, remoteDummy *unstructured.Unstructured,
 	log *zap.SugaredLogger,
 ) error {
-	// Deduplication is per-origin to allow the same GVK on both sides.
-	watchedKcpGVKs := sets.New[schema.GroupVersionKind]()
+	// Deduplication is per-side to allow the same resource on both sides.
+	watchedKcpGVRs := sets.New[schema.GroupVersionResource]()
 	watchedServiceGVKs := sets.New[schema.GroupVersionKind]()
 
 	for _, relRes := range pubRes.Spec.Related {
@@ -199,67 +198,70 @@ func setupRelatedResourceWatches(
 			continue
 		}
 
-		// this handles the legacy .Kind-based related resources
-		gvr := projection.RelatedResourceGVR(&relRes)
+		watchKcp := relRes.Origin == syncagentv1alpha1.RelatedResourceOriginKcp ||
+			(relRes.SyncStatus != nil && *relRes.SyncStatus == syncagentv1alpha1.RelatedResourceOriginKcp)
+		if watchKcp {
+			kcpGVR := projection.RelatedResourceKcpGVR(&relRes)
+			if !watchedKcpGVRs.Has(kcpGVR) {
+				enqueueForRelated, err := buildKcpRelatedHandler(relRes.Watch, kcpGVR, remoteDummy, log)
+				if err != nil {
+					return err
+				}
 
-		// Use the REST mapper of the origin side: related resources may have projected GVKs
-		// that differ between kcp and the service cluster, so we must resolve using the
-		// mapper that actually knows about the GVR on that side.
-		var originRESTMapper meta.RESTMapper
-		if relRes.Origin == syncagentv1alpha1.RelatedResourceOriginKcp {
-			originRESTMapper = remoteManager.GetLocalManager().GetRESTMapper()
-		} else {
-			originRESTMapper = localManager.GetRESTMapper()
-		}
+				relatedSource := mcsource.TypedKind(&unstructured.Unstructured{}, enqueueForRelated).WithProjection(
+					func(cl cluster.Cluster, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+						gvk, err := cl.GetRESTMapper().KindFor(kcpGVR)
+						if err != nil {
+							return nil, fmt.Errorf("failed to determine Kind for kcp-side related resource %v: %w", kcpGVR, err)
+						}
 
-		gvk, err := originRESTMapper.KindFor(gvr)
-		if err != nil {
-			return fmt.Errorf("failed to determine Kind for related resource %v (origin: %s): %w", gvr, relRes.Origin, err)
-		}
+						projected := obj.DeepCopy()
+						projected.SetGroupVersionKind(gvk)
+						return projected, nil
+					},
+				)
+				if err := c.MultiClusterWatch(relatedSource); err != nil {
+					return fmt.Errorf("failed to setup watch for related resource %v on kcp side: %w", kcpGVR, err)
+				}
 
-		relatedDummy := &unstructured.Unstructured{}
-		relatedDummy.SetGroupVersionKind(gvk)
-
-		if relRes.Origin == syncagentv1alpha1.RelatedResourceOriginKcp {
-			if watchedKcpGVKs.Has(gvk) {
-				continue
+				watchedKcpGVRs.Insert(kcpGVR)
+				log.Infow("Set up watch for related resource", "gvr", kcpGVR, "side", syncagentv1alpha1.RelatedResourceOriginKcp)
 			}
-			watchedKcpGVKs.Insert(gvk)
+		}
 
-			enqueueForRelated, err := buildKcpRelatedHandler(relRes.Watch, gvk, remoteDummy, log)
+		watchService := relRes.Origin == syncagentv1alpha1.RelatedResourceOriginService ||
+			(relRes.SyncStatus != nil && *relRes.SyncStatus == syncagentv1alpha1.RelatedResourceOriginService)
+		if watchService {
+			serviceGVR := projection.RelatedResourceServiceGVK(&relRes)
+			gvk, err := localManager.GetRESTMapper().KindFor(serviceGVR)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to determine Kind for service-side related resource %v: %w", serviceGVR, err)
 			}
+			if !watchedServiceGVKs.Has(gvk) {
+				relatedDummy := &unstructured.Unstructured{}
+				relatedDummy.SetGroupVersionKind(gvk)
 
-			if err := c.MultiClusterWatch(mcsource.TypedKind(relatedDummy, enqueueForRelated)); err != nil {
-				return fmt.Errorf("failed to setup watch for kcp-origin related resource %v: %w", gvk, err)
-			}
-		} else {
-			if watchedServiceGVKs.Has(gvk) {
-				continue
-			}
-			watchedServiceGVKs.Insert(gvk)
+				enqueueForRelated, err := buildServiceRelatedHandler(relRes.Watch, gvk, localDummy, localManager, log)
+				if err != nil {
+					return err
+				}
+				if err := c.Watch(source.TypedKind(localManager.GetCache(), relatedDummy, enqueueForRelated)); err != nil {
+					return fmt.Errorf("failed to setup watch for related resource %v on service side: %w", gvk, err)
+				}
 
-			enqueueForRelated, err := buildServiceRelatedHandler(relRes.Watch, gvk, localDummy, localManager, log)
-			if err != nil {
-				return err
-			}
-
-			if err := c.Watch(source.TypedKind(localManager.GetCache(), relatedDummy, enqueueForRelated)); err != nil {
-				return fmt.Errorf("failed to setup watch for service-origin related resource %v: %w", gvk, err)
+				watchedServiceGVKs.Insert(gvk)
+				log.Infow("Set up watch for related resource", "gvk", gvk, "side", syncagentv1alpha1.RelatedResourceOriginService)
 			}
 		}
-
-		log.Infow("Set up watch for related resource", "gvk", gvk, "origin", relRes.Origin)
 	}
 
 	return nil
 }
 
-// buildKcpRelatedHandler constructs the per-cluster event handler for a kcp-origin related resource.
+// buildKcpRelatedHandler constructs the per-cluster event handler for a kcp-side related resource.
 func buildKcpRelatedHandler(
 	watch *syncagentv1alpha1.RelatedResourceWatch,
-	gvk schema.GroupVersionKind,
+	gvr schema.GroupVersionResource,
 	remoteDummy *unstructured.Unstructured,
 	log *zap.SugaredLogger,
 ) (mchandler.TypedEventHandlerFunc[*unstructured.Unstructured, mcreconcile.Request], error) {
@@ -287,11 +289,11 @@ func buildKcpRelatedHandler(
 		}, nil
 
 	default:
-		return nil, fmt.Errorf("related resource %v (origin: kcp) has Watch set but neither byOwner nor bySelector configured", gvk)
+		return nil, fmt.Errorf("related resource %v on kcp side has Watch set but neither byOwner nor bySelector configured", gvr)
 	}
 }
 
-// buildServiceRelatedHandler constructs the event handler for a service-cluster-origin related resource.
+// buildServiceRelatedHandler constructs the event handler for a service-side related resource.
 // It maps the changed related resource back to the remote (kcp) primary via sync metadata on the local primary.
 func buildServiceRelatedHandler(
 	watch *syncagentv1alpha1.RelatedResourceWatch,
@@ -328,7 +330,7 @@ func buildServiceRelatedHandler(
 	case watch.BySelector != nil:
 		selector, err := metav1.LabelSelectorAsSelector(watch.BySelector)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert bySelector for service-origin related resource %v: %w", gvk, err)
+			return nil, fmt.Errorf("failed to convert bySelector for service-side related resource %v: %w", gvk, err)
 		}
 		primaryDummy := localDummy.DeepCopy()
 		return handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, _ *unstructured.Unstructured) []mcreconcile.Request {
@@ -349,7 +351,7 @@ func buildServiceRelatedHandler(
 		}), nil
 
 	default:
-		return nil, fmt.Errorf("related resource %v (origin: service) has Watch set but neither byOwner nor bySelector configured", gvk)
+		return nil, fmt.Errorf("related resource %v on service side has Watch set but neither byOwner nor bySelector configured", gvk)
 	}
 }
 
