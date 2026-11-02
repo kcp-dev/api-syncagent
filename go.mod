@@ -15,7 +15,7 @@ require (
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/go-logr/logr v1.4.4
 	github.com/go-logr/zapr v1.3.0
-	github.com/google/cel-go v0.28.0
+	github.com/google/cel-go v0.30.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/kcp-dev/api-syncagent/sdk v0.0.0-00010101000000-000000000000
@@ -104,9 +104,9 @@ require (
 	github.com/tidwall/match v1.2.0 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	go.etcd.io/etcd/api/v3 v3.6.10 // indirect
-	go.etcd.io/etcd/client/pkg/v3 v3.6.10 // indirect
-	go.etcd.io/etcd/client/v3 v3.6.10 // indirect
+	go.etcd.io/etcd/api/v3 v3.6.14 // indirect
+	go.etcd.io/etcd/client/pkg/v3 v3.6.14 // indirect
+	go.etcd.io/etcd/client/v3 v3.6.14 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0 // indirect
