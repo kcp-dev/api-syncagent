@@ -52,6 +52,20 @@ func TestGenerateLocalObjectName(t *testing.T) {
 			expected:     types.NamespacedName{Namespace: "testcluster", Name: "2928c2aa0e510f017f07-73d08a1ba188f1340dae"},
 		},
 		{
+			name:         "follow default naming rules for cluster-scoped objects",
+			clusterName:  "testcluster",
+			remoteObject: createNewObject("objname", ""),
+			namingConfig: nil,
+			expected:     types.NamespacedName{Namespace: "testcluster", Name: "4f96fcff7885055b00ad-73d08a1ba188f1340dae"},
+		},
+		{
+			name:         "custom namespace pattern for cluster-scoped objects keeps the default name",
+			clusterName:  "testcluster",
+			remoteObject: createNewObject("objname", ""),
+			namingConfig: &syncagentv1alpha1.ResourceNaming{Namespace: "foobar"},
+			expected:     types.NamespacedName{Namespace: "foobar", Name: "4f96fcff7885055b00ad-73d08a1ba188f1340dae"},
+		},
+		{
 			name:         "custom static namespace pattern",
 			clusterName:  "testcluster",
 			remoteObject: createNewObject("objname", "objnamespace"),

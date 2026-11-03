@@ -266,6 +266,10 @@ spec:
                         This guarantees unique names as long as the cluster name is used for the local namespace
                         (the default unless configured otherwise).
 
+                        For cluster-scoped objects, which have no namespace, the default value is:
+
+                          "{{ .ClusterName | sha3short }}-{{ .Object.metadata.name | sha3short }}"
+
                         This value is a Go template, see the documentation for the available variables and functions.
 
                         Alternatively (but deprecated), this value can be a simple string using one of the following

@@ -53,6 +53,11 @@ var defaultNamingScheme = syncagentv1alpha1.ResourceNaming{
 	Name:      "{{ .Object.metadata.namespace | sha3short }}-{{ .Object.metadata.name | sha3short }}",
 }
 
+// defaultClusterScopedName is the default name for cluster-scoped remote objects. They have
+// no namespace to hash, and their local copy can be cluster-scoped too (so the cluster name
+// namespace is dropped), so the cluster name is part of the name instead.
+const defaultClusterScopedName = "{{ .ClusterName | sha3short }}-{{ .Object.metadata.name | sha3short }}"
+
 func GenerateLocalObjectName(pr *syncagentv1alpha1.PublishedResource, object *unstructured.Unstructured, clusterName logicalcluster.Name, workspacePath logicalcluster.Path) (types.NamespacedName, error) {
 	naming := pr.Spec.Naming
 	if naming == nil {
@@ -75,6 +80,9 @@ func GenerateLocalObjectName(pr *syncagentv1alpha1.PublishedResource, object *un
 	pattern = naming.Name
 	if pattern == "" {
 		pattern = defaultNamingScheme.Name
+		if object.GetNamespace() == "" {
+			pattern = defaultClusterScopedName
+		}
 	}
 	rendered, err = generateLocalObjectIdentifier(pattern, object, clusterName, workspacePath)
 	if err != nil {

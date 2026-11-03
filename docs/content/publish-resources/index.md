@@ -157,6 +157,10 @@ This configuration ensures that no collisions will happen: Each workspace in
 kcp will create a namespace on the local cluster, with a combination of namespace and name hashes
 used for the actual resource names.
 
+Cluster-scoped objects have no namespace, so for them the default name is
+{% raw %}`{{ .ClusterName | sha3short }}-{{ .Object.metadata.name | sha3short }}`{% endraw %} instead. This keeps
+names unique even when the local copy is cluster-scoped as well.
+
 You can override the name or namespaces rules, or both. It is your responsibility to ensure no
 naming conflicts can happen on the service cluster, as the agent cannot determine this automatically.
 
