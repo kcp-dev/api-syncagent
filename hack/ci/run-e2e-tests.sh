@@ -37,7 +37,7 @@ source <(make --no-print-directory envtest-env)
 # start a shared kcp process
 KCP="$(UGET_PRINT_PATH=relative make --no-print-directory install-kcp)"
 
-KCP_ROOT_DIRECTORY=.kcp.e2e
+KCP_ROOT_DIRECTORY="${KCP_ROOT_DIRECTORY:-.kcp.e2e}"
 KCP_LOGFILE="$ARTIFACTS/kcp.log"
 KCP_TOKENFILE=hack/ci/testdata/e2e-kcp.tokens
 
