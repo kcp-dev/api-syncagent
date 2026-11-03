@@ -197,17 +197,32 @@ func (r *Reconciler) ensureSyncController(ctx context.Context, log *zap.SugaredL
 		return reconcile.Result{}, fmt.Errorf("failed to create sync controller: %w", err)
 	}
 
-	r.syncCancels[key] = ctrlCancel
-
 	// time to start the controller; this will spawn a new goroutine if
 	// successful; the new controller will be pre-seeded with all knonwn
 	// (engaged) clusters by the DMCM.
-	if err = r.dmcm.StartController(ctrlCtx, log.With("prkey", key), syncController); err != nil {
-		ctrlCancel(errors.New("failed to start sync controller"))
-		return reconcile.Result{}, fmt.Errorf("failed to start sync controller: %w", err)
+	err = r.startAndRecord(key, ctrlCancel, func() error {
+		return r.dmcm.StartController(ctrlCtx, log.With("prkey", key), syncController)
+	})
+	if err != nil {
+		return reconcile.Result{}, err
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// startAndRecord starts a controller and only remembers its cancel function if the start
+// succeeded. Otherwise a failed start would block all later retries.
+func (r *Reconciler) startAndRecord(key string, cancel context.CancelCauseFunc, start func() error) error {
+	if err := start(); err != nil {
+		cancel(errors.New("failed to start sync controller"))
+		return fmt.Errorf("failed to start sync controller: %w", err)
+	}
+
+	r.syncCancelsLock.Lock()
+	r.syncCancels[key] = cancel
+	r.syncCancelsLock.Unlock()
+
+	return nil
 }
 
 func (r *Reconciler) cleanupController(log *zap.SugaredLogger, pubRes *syncagentv1alpha1.PublishedResource) error {
