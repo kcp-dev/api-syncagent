@@ -159,6 +159,12 @@ func (s *objectSyncer) Sync(ctx context.Context, log *zap.SugaredLogger, source,
 			return false, nil
 		}
 
+		// Status is removed from the SSA payload and must be synchronized through
+		// the status subresource separately.
+		if err := s.syncObjectStatusForward(ctx, log, source, newDest); err != nil {
+			return false, err
+		}
+
 		return s.syncObjectStatus(ctx, log, source, newDest)
 	}
 
@@ -399,7 +405,7 @@ func (s *objectSyncer) syncObjectStatusForward(ctx context.Context, log *zap.Sug
 			if apierrors.IsNotFound(err) {
 				// The /status subresource does not exist on the destination CRD.
 				// Retrying will not help; emit a warning so the user knows what to fix.
-				s.recordEvent(ctx, source, dest, corev1.EventTypeWarning, "StatusSubresourceMissing", "Cannot sync status: the destination resource does not have a status subresource. Set syncStatus: false or add subresources.status to the CRD.")
+				s.recordEvent(ctx, source, dest, corev1.EventTypeWarning, "StatusSubresourceMissing", "Cannot sync status: the destination resource does not have a status subresource. Unset syncStatus or add subresources.status to the CRD.")
 				return nil
 			}
 			return fmt.Errorf("failed to update destination object status: %w", err)

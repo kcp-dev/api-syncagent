@@ -27,6 +27,7 @@ import (
 	"github.com/kcp-dev/api-syncagent/test/utils"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestValidateRelatedResourceSpec(t *testing.T) {
@@ -177,36 +178,69 @@ func TestValidateRelatedResourceSpec(t *testing.T) {
 			},
 		},
 		{
-			name:  "syncStatus with origin service requires watch",
+			name:  "syncStatus service requires watch",
 			valid: false,
 			spec: syncagentv1alpha1.RelatedResourceSpec{
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Resource:   "things",
 				Version:    "v1",
-				SyncStatus: true,
+				SyncStatus: ptr.To(syncagentv1alpha1.RelatedResourceOriginService),
 			},
 		},
 		{
-			name:  "syncStatus with origin service and watch is valid",
+			name:  "syncStatus service with watch is valid",
 			valid: true,
 			spec: syncagentv1alpha1.RelatedResourceSpec{
 				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
 				Resource:   "things",
 				Version:    "v1",
-				SyncStatus: true,
+				SyncStatus: ptr.To(syncagentv1alpha1.RelatedResourceOriginService),
 				Watch: &syncagentv1alpha1.RelatedResourceWatch{
 					ByOwner: &syncagentv1alpha1.RelatedResourceWatchByOwner{},
 				},
 			},
 		},
 		{
-			name:  "syncStatus with origin kcp does not require watch",
+			name:  "syncStatus kcp does not require watch",
 			valid: true,
 			spec: syncagentv1alpha1.RelatedResourceSpec{
 				Origin:     syncagentv1alpha1.RelatedResourceOriginKcp,
 				Resource:   "things",
 				Version:    "v1",
-				SyncStatus: true,
+				SyncStatus: ptr.To(syncagentv1alpha1.RelatedResourceOriginKcp),
+			},
+		},
+		{
+			name:  "syncStatus service with origin kcp requires watch",
+			valid: false,
+			spec: syncagentv1alpha1.RelatedResourceSpec{
+				Origin:     syncagentv1alpha1.RelatedResourceOriginKcp,
+				Resource:   "things",
+				Version:    "v1",
+				SyncStatus: ptr.To(syncagentv1alpha1.RelatedResourceOriginService),
+			},
+		},
+		{
+			name:  "syncStatus kcp with origin service requires watch",
+			valid: false,
+			spec: syncagentv1alpha1.RelatedResourceSpec{
+				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
+				Resource:   "things",
+				Version:    "v1",
+				SyncStatus: ptr.To(syncagentv1alpha1.RelatedResourceOriginKcp),
+			},
+		},
+		{
+			name:  "syncStatus kcp with origin service and watch is valid",
+			valid: true,
+			spec: syncagentv1alpha1.RelatedResourceSpec{
+				Origin:     syncagentv1alpha1.RelatedResourceOriginService,
+				Resource:   "things",
+				Version:    "v1",
+				SyncStatus: ptr.To(syncagentv1alpha1.RelatedResourceOriginKcp),
+				Watch: &syncagentv1alpha1.RelatedResourceWatch{
+					ByOwner: &syncagentv1alpha1.RelatedResourceWatchByOwner{},
+				},
 			},
 		},
 		{

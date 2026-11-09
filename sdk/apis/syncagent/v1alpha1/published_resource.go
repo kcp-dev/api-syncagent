@@ -229,7 +229,7 @@ const (
 // +kubebuilder:validation:XValidation:rule="!has(self.group) || (has(self.resource) && has(self.version))",message="configuring a group also requires a version and resource"
 // group is included here because when an identityHash is used, core/v1 cannot possible be targetted
 // +kubebuilder:validation:XValidation:rule="!has(self.identityHash) || (has(self.group) && has(self.version) && has(self.resource))",message="identity hashes can only be used with GVRs"
-// +kubebuilder:validation:XValidation:rule="!(self.origin == 'service' && has(self.syncStatus) && self.syncStatus) || has(self.watch)",message="watch must be configured when origin is service and syncStatus is true"
+// +kubebuilder:validation:XValidation:rule="!has(self.syncStatus) || (self.origin == 'kcp' && self.syncStatus == 'kcp') || has(self.watch)",message="watch must be configured unless origin and syncStatus are both kcp"
 // +kubebuilder:validation:XValidation:rule="!(has(self.cleanupPolicy) && self.cleanupPolicy == 'MatchOrigin' && self.origin == 'service') || has(self.watch)",message="watch must be configured when cleanupPolicy is MatchOrigin and origin is service"
 // +kubebuilder:validation:XValidation:rule="!(has(self.cleanup) && self.cleanup && has(self.cleanupPolicy) && self.cleanupPolicy == 'Orphan')",message="cleanup:true conflicts with cleanupPolicy: Orphan"
 type RelatedResourceSpec struct {
@@ -308,24 +308,24 @@ type RelatedResourceSpec struct {
 	Mutation *ResourceMutationSpec `json:"mutation,omitempty"`
 
 	// Watch configures how the agent identifies the owning primary object when a related
-	// resource with origin: kcp changes. When set, the agent sets up a watch on the related
-	// resource type and uses the configured rule to enqueue the correct primary object.
-	// Without this field, changes to origin:kcp related resources do not trigger reconciliation.
+	// resource changes. The agent always watches the origin side. When SyncStatus selects the
+	// opposite side, the agent watches that side as well. Without this field, changes to related
+	// resources do not trigger reconciliation.
 	Watch *RelatedResourceWatch `json:"watch,omitempty"`
 
-	// SyncStatus enables synchronization of the status subresource in the same direction as
-	// the spec (from the origin side to the destination side). When enabled, the agent will
-	// use the status subresource endpoint to update the destination object's status.
-	// This requires the related resource to have a status subresource configured in its CRD.
+	// SyncStatus configures the side from which the status subresource is synchronized. The
+	// agent uses the status subresource endpoint to update the object on the opposite side.
+	// Both representations of the related resource must have a status subresource configured.
 	//
-	//   - origin: kcp -> status is synced from kcp to the service cluster
-	//   - origin: service -> status is synced from the service cluster to kcp
+	//   - kcp: status is synced from kcp to the service cluster
+	//   - service: status is synced from the service cluster to kcp
 	//
-	// For origin: service, Watch must also be configured so that changes to the related
-	// resource's status trigger reconciliation and ensure the informer cache is populated.
+	// Except when both Origin and SyncStatus are kcp, Watch must also be configured so that
+	// status changes trigger reconciliation and the required informer caches are populated.
 	//
+	// +kubebuilder:validation:Enum=service;kcp
 	// +optional
-	SyncStatus bool `json:"syncStatus,omitempty"`
+	SyncStatus *RelatedResourceOrigin `json:"syncStatus,omitempty"`
 }
 
 // EffectiveCleanupPolicy normalizes the deprecated Cleanup bool and the CleanupPolicy field into

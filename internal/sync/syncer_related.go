@@ -154,11 +154,13 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 		deletionPolicies[relatedCopyKey(resolved.destination.Namespace, resolved.destination.Name)] = deletionPolicy
 
 		// When status sync is enabled, include "status" in subresources so it is stripped from
-		// the spec patch (avoiding a no-op write on resources that have a status subresource).
-		// The status is then separately written via the status subresource endpoint by syncStatusForward.
+		// the spec patch and written separately via the status subresource endpoint.
 		relatedSubresources := []string(nil)
-		if relRes.SyncStatus {
+		syncStatusForward, syncStatusBack := false, false
+		if relRes.SyncStatus != nil {
 			relatedSubresources = []string{"status"}
+			syncStatusForward = *relRes.SyncStatus == relRes.Origin
+			syncStatusBack = *relRes.SyncStatus != relRes.Origin
 		}
 
 		syncer := objectSyncer{
@@ -178,8 +180,8 @@ func (s *ResourceSyncer) processRelatedResource(ctx context.Context, log *zap.Su
 				return dest, nil
 			},
 			subresources:      relatedSubresources,
-			syncStatusBack:    false,
-			syncStatusForward: relRes.SyncStatus,
+			syncStatusBack:    syncStatusBack,
+			syncStatusForward: syncStatusForward,
 			// if the origin is on the remote side, we want to add a finalizer to make
 			// sure we can clean up properly; when forceDelete is enabled, we are in deletion mode and
 			// want to force the deletion, so we ignore the related object's origin (it was taken into
