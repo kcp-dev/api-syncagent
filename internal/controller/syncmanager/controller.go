@@ -42,9 +42,6 @@ import (
 
 const (
 	ControllerName = "syncagent-syncmanager"
-
-	// numSyncWorkers is the number of concurrent workers within each sync controller.
-	numSyncWorkers = 4
 )
 
 type ClusterProviderFunc func() []string
@@ -65,6 +62,8 @@ type Reconciler struct {
 	stateNamespace        string
 	agentName             string
 	enableServerSideApply bool
+	// numSyncWorkers is the number of concurrent workers within each sync controller.
+	numSyncWorkers int
 
 	syncCancelsLock sync.RWMutex
 	// A map of sync controllers, one for each PublishedResource, using their
@@ -84,6 +83,7 @@ func Add(
 	stateNamespace string,
 	agentName string,
 	enableServerSideApply bool,
+	numSyncWorkers int,
 ) error {
 	discoveryClient, err := discovery.NewClient(localManager.GetConfig())
 	if err != nil {
@@ -101,6 +101,7 @@ func Add(
 		agentName:             agentName,
 		resourceProber:        resourceProber,
 		enableServerSideApply: enableServerSideApply,
+		numSyncWorkers:        numSyncWorkers,
 		syncCancelsLock:       sync.RWMutex{},
 		syncCancels:           map[string]context.CancelCauseFunc{},
 	}
@@ -190,7 +191,7 @@ func (r *Reconciler) ensureSyncController(ctx context.Context, log *zap.SugaredL
 		r.agentName,
 		r.enableServerSideApply,
 		r.log,
-		numSyncWorkers,
+		r.numSyncWorkers,
 	)
 	if err != nil {
 		ctrlCancel(errors.New("failed to create sync controller"))

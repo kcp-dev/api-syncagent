@@ -78,6 +78,10 @@ type Options struct {
 	// Crossplane writing spec.resourceRef onto a claim) and hopefully avoids
 	// accidentally creating duplicate composite resources.
 	EnableServerSideApply bool
+
+	// WorkerCount is the number of concurrent workers of each controller: of every
+	// sync controller (one per PublishedResource) and of the APIResourceSchema controller.
+	WorkerCount int
 }
 
 func NewOptions() *Options {
@@ -86,6 +90,7 @@ func NewOptions() *Options {
 		PublishedResourceSelector: labels.Everything(),
 		MetricsAddr:               "127.0.0.1:8085",
 		EnableServerSideApply:     false,
+		WorkerCount:               4,
 	}
 }
 
@@ -104,6 +109,7 @@ func (o *Options) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.HealthAddr, "health-address", o.HealthAddr, "host and port to serve probes via /readyz and /healthz (HTTP)")
 	flags.StringSliceVar(&o.DisabledControllers, "disabled-controllers", o.DisabledControllers, fmt.Sprintf("comma-separated list of controllers (out of %v) to disable (can be given multiple times)", sets.List(availableControllers)))
 	flags.BoolVar(&o.EnableServerSideApply, "enable-server-side-apply", o.EnableServerSideApply, "use Kubernetes Server-Side Apply when writing synchronized objects to the local cluster (recommended; preserves fields owned by other controllers such as Crossplane's claim binder)")
+	flags.IntVar(&o.WorkerCount, "worker-count", o.WorkerCount, "number of concurrent workers of each sync controller (and of the APIResourceSchema controller)")
 }
 
 func (o *Options) Validate() error {
@@ -111,6 +117,10 @@ func (o *Options) Validate() error {
 
 	if err := o.LogOptions.Validate(); err != nil {
 		errs = append(errs, err)
+	}
+
+	if o.WorkerCount < 1 {
+		errs = append(errs, errors.New("--worker-count must be at least 1"))
 	}
 
 	if len(o.Namespace) == 0 {
