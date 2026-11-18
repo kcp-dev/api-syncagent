@@ -71,6 +71,13 @@ func (r dynamicRunnable) engage(ctx context.Context, clusterName multicluster.Cl
 
 	if err := r.Engage(ctx, clusterName, cl); err != nil {
 		cancel()
+
+		// a controller that is stopping cannot start watches anymore; that must not fail
+		// the engagement, or the cluster provider would drop the cluster for all controllers
+		if r.ctx.Err() != nil {
+			return nil
+		}
+
 		return err
 	}
 

@@ -23,8 +23,15 @@ import (
 
 	"go.uber.org/zap"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	mccontroller "sigs.k8s.io/multicluster-runtime/pkg/controller"
+	mchandler "sigs.k8s.io/multicluster-runtime/pkg/handler"
 	"sigs.k8s.io/multicluster-runtime/pkg/multicluster"
+	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
+	mcsource "sigs.k8s.io/multicluster-runtime/pkg/source"
 )
 
 type engagingRunnable struct{ engaged chan context.Context }
@@ -113,5 +120,66 @@ func TestDisconnectedClusterIsDisengaged(t *testing.T) {
 
 	if ctrlCtx.Err() != nil {
 		t.Fatal("a disconnecting cluster must not stop the controller")
+	}
+}
+
+// syncingCache is a fakeCache whose WaitForCacheSync fails for a done context, like the
+// informer cache does.
+type syncingCache struct{ fakeCache }
+
+func (c syncingCache) WaitForCacheSync(ctx context.Context) bool {
+	return ctx.Err() == nil
+}
+
+func TestEngageWhileControllerIsStopping(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	dmcm := &DynamicMultiClusterManager{runnables: map[string]dynamicRunnable{}}
+	dmcm.tracker = newClusterTracker(dmcm)
+
+	newCluster := func() fakeCluster {
+		return fakeCluster{cache: syncingCache{fakeCache{informer: runInformer(ctx, t)}}}
+	}
+
+	if err := dmcm.tracker.Engage(ctx, "first", newCluster()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	reconciling := make(chan struct{}, 10)
+	release := make(chan struct{})
+
+	c, err := mccontroller.NewUnmanaged("stopping", nil, mccontroller.Options{
+		Reconciler: mcreconcile.Func(func(context.Context, mcreconcile.Request) (reconcile.Result, error) {
+			reconciling <- struct{}{}
+			<-release // keeps Start() from returning after the controller is stopped
+			return reconcile.Result{}, nil
+		}),
+		SkipNameValidation: ptr.To(true),
+	})
+	if err != nil {
+		t.Fatalf("failed to create controller: %v", err)
+	}
+
+	if err := c.MultiClusterWatch(mcsource.TypedKind(&corev1.ConfigMap{}, mchandler.TypedEnqueueRequestForObject[*corev1.ConfigMap]())); err != nil {
+		t.Fatalf("failed to watch: %v", err)
+	}
+
+	ctrl := exitNotifyingController{Controller: c, exited: make(chan struct{})}
+	ctrlCtx, stop := context.WithCancel(ctx)
+
+	if err := dmcm.StartController(ctrlCtx, zap.NewNop().Sugar(), ctrl); err != nil {
+		t.Fatalf("failed to start controller: %v", err)
+	}
+
+	<-reconciling
+	stop()
+
+	err = dmcm.tracker.Engage(ctx, "second", newCluster())
+	close(release)
+	<-ctrl.exited
+
+	if err != nil {
+		t.Fatalf("engaging a cluster while a controller is stopping must not fail: %v", err)
 	}
 }
