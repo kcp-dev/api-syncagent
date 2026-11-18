@@ -52,9 +52,29 @@ type DynamicMultiClusterManager struct {
 	// A map of sync controllers, one for each PublishedResource, using their
 	// UIDs and resourceVersion as the map keys; using the version ensures that
 	// when a PR changes, the old controller is orphaned and will be shut down.
-	runnables map[string]mcmanager.Runnable
+	runnables map[string]dynamicRunnable
 
 	tracker *clusterTracker
+}
+
+type dynamicRunnable struct {
+	mcmanager.Runnable
+	ctx context.Context
+}
+
+// engage forwards an Engage() call, but ends the engagement once either the cluster or the
+// runnable is stopped, so a stopped controller does not stay engaged until the cluster leaves.
+func (r dynamicRunnable) engage(ctx context.Context, clusterName multicluster.ClusterName, cl cluster.Cluster) error {
+	ctx, cancel := context.WithCancel(ctx)
+	stop := context.AfterFunc(r.ctx, cancel)
+	context.AfterFunc(ctx, func() { stop() })
+
+	if err := r.Engage(ctx, clusterName, cl); err != nil {
+		cancel()
+		return err
+	}
+
+	return nil
 }
 
 func NewDynamicMultiClusterManager(cfg *rest.Config, endpointSliceName string) (*DynamicMultiClusterManager, error) {
@@ -97,7 +117,7 @@ func NewDynamicMultiClusterManager(cfg *rest.Config, endpointSliceName string) (
 	dynManager := &DynamicMultiClusterManager{
 		manager:       multiClusterManager,
 		runnablesLock: sync.RWMutex{},
-		runnables:     map[string]mcmanager.Runnable{},
+		runnables:     map[string]dynamicRunnable{},
 	}
 
 	tracker := newClusterTracker(dynManager)
@@ -128,7 +148,8 @@ func (dmcm *DynamicMultiClusterManager) StartController(ctx context.Context, log
 	// keep track of this controller so we can forward the Engage() calls to it
 	dmcm.runnablesLock.Lock()
 	defer dmcm.runnablesLock.Unlock()
-	dmcm.runnables[mapKey] = controller
+	runnable := dynamicRunnable{Runnable: controller, ctx: ctx}
+	dmcm.runnables[mapKey] = runnable
 
 	// start it
 	log = log.With("component", "DynamicMultiClusterManager", "dmcmkey", mapKey)
@@ -146,7 +167,7 @@ func (dmcm *DynamicMultiClusterManager) StartController(ctx context.Context, log
 	}()
 
 	// pre-seed the controller
-	if err := dmcm.tracker.PreSeedController(controller); err != nil {
+	if err := dmcm.tracker.PreSeedController(runnable); err != nil {
 		return fmt.Errorf("failed to pre-seed controller: %w", err)
 	}
 
@@ -201,7 +222,7 @@ func (s *clusterTracker) Engage(ctx context.Context, clusterName multicluster.Cl
 	defer s.dynManager.runnablesLock.RUnlock()
 
 	for _, ctrl := range s.dynManager.runnables {
-		if err := ctrl.Engage(ctx, clusterName, cl); err != nil {
+		if err := ctrl.engage(ctx, clusterName, cl); err != nil {
 			return err
 		}
 	}
@@ -209,12 +230,12 @@ func (s *clusterTracker) Engage(ctx context.Context, clusterName multicluster.Cl
 	return nil
 }
 
-func (s *clusterTracker) PreSeedController(controller mcmanager.Runnable) error {
+func (s *clusterTracker) PreSeedController(controller dynamicRunnable) error {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
 	for name, engaged := range s.clusters {
-		if err := controller.Engage(engaged.ctx, name, engaged.cl); err != nil {
+		if err := controller.engage(engaged.ctx, name, engaged.cl); err != nil {
 			return fmt.Errorf("failed to engage with cluster: %w", err)
 		}
 	}

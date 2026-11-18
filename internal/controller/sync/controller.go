@@ -24,6 +24,7 @@ import (
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 
+	"github.com/kcp-dev/api-syncagent/internal/controllerutil"
 	"github.com/kcp-dev/api-syncagent/internal/discovery"
 	"github.com/kcp-dev/api-syncagent/internal/mutation"
 	"github.com/kcp-dev/api-syncagent/internal/projection"
@@ -167,7 +168,7 @@ func Create(
 		return sync.OwnedBy(u, agentName)
 	})
 
-	if err := c.Watch(source.TypedKind(localManager.GetCache(), localDummy, enqueueRemoteObjForLocalObj, nameFilter)); err != nil {
+	if err := c.Watch(source.TypedKind(controllerutil.HandlerRemovingCache{Cache: localManager.GetCache()}, localDummy, enqueueRemoteObjForLocalObj, nameFilter)); err != nil {
 		return nil, fmt.Errorf("failed to setup local-side watch: %w", err)
 	}
 
@@ -245,7 +246,7 @@ func setupRelatedResourceWatches(
 				return err
 			}
 
-			if err := c.Watch(source.TypedKind(localManager.GetCache(), relatedDummy, enqueueForRelated)); err != nil {
+			if err := c.Watch(source.TypedKind(controllerutil.HandlerRemovingCache{Cache: localManager.GetCache()}, relatedDummy, enqueueForRelated)); err != nil {
 				return fmt.Errorf("failed to setup watch for service-origin related resource %v: %w", gvk, err)
 			}
 		}
