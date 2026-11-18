@@ -163,14 +163,14 @@ type engagedCluster struct {
 type clusterTracker struct {
 	dynManager *DynamicMultiClusterManager
 	lock       sync.RWMutex
-	clusters   map[multicluster.ClusterName]engagedCluster
+	clusters   map[multicluster.ClusterName]*engagedCluster
 }
 
 func newClusterTracker(dmcm *DynamicMultiClusterManager) *clusterTracker {
 	return &clusterTracker{
 		dynManager: dmcm,
 		lock:       sync.RWMutex{},
-		clusters:   map[multicluster.ClusterName]engagedCluster{},
+		clusters:   map[multicluster.ClusterName]*engagedCluster{},
 	}
 }
 
@@ -180,21 +180,22 @@ func (s *clusterTracker) Start(_ context.Context) error {
 }
 
 func (s *clusterTracker) Engage(ctx context.Context, clusterName multicluster.ClusterName, cl cluster.Cluster) error {
-	if _, ok := s.clusters[clusterName]; !ok {
-		s.lock.Lock()
-		s.clusters[clusterName] = engagedCluster{ctx: ctx, cl: cl}
-		s.lock.Unlock()
+	s.lock.Lock()
+	if old, ok := s.clusters[clusterName]; !ok || old.ctx != ctx || old.cl != cl {
+		engaged := &engagedCluster{ctx: ctx, cl: cl}
+		s.clusters[clusterName] = engaged
 
-		// start a goroutine to make sure we remove the cluster when the context is done
-		go func() {
-			<-ctx.Done()
-
+		// remove the cluster when the context is done, unless it has been re-engaged since
+		context.AfterFunc(ctx, func() {
 			s.lock.Lock()
 			defer s.lock.Unlock()
 
-			delete(s.clusters, clusterName)
-		}()
+			if s.clusters[clusterName] == engaged {
+				delete(s.clusters, clusterName)
+			}
+		})
 	}
+	s.lock.Unlock()
 
 	// forward the Engage() call to all running controllers
 	s.dynManager.runnablesLock.RLock()
