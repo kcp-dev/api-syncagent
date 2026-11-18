@@ -910,9 +910,9 @@ func templateLabelSelector(relatedOrigin, relatedDest syncSide, origin syncagent
 		}
 	}
 
-	selector.MatchLabels = newMatchLabels
-
-	return selector, nil
+	newSelector := selector.DeepCopy()
+	newSelector.MatchLabels = newMatchLabels
+	return newSelector, nil
 }
 
 func remapSyncSides(relatedOrigin, relatedDest syncSide, origin syncagentv1alpha1.RelatedResourceOrigin) (localSide, remoteSide syncSide) {
