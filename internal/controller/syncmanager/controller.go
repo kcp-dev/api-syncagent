@@ -65,6 +65,7 @@ type Reconciler struct {
 	stateNamespace        string
 	agentName             string
 	enableServerSideApply bool
+	cacheSyncTimeout      time.Duration
 
 	syncCancelsLock sync.RWMutex
 	// A map of sync controllers, one for each PublishedResource, using their
@@ -84,6 +85,7 @@ func Add(
 	stateNamespace string,
 	agentName string,
 	enableServerSideApply bool,
+	cacheSyncTimeout time.Duration,
 ) error {
 	discoveryClient, err := discovery.NewClient(localManager.GetConfig())
 	if err != nil {
@@ -101,6 +103,7 @@ func Add(
 		agentName:             agentName,
 		resourceProber:        resourceProber,
 		enableServerSideApply: enableServerSideApply,
+		cacheSyncTimeout:      cacheSyncTimeout,
 		syncCancelsLock:       sync.RWMutex{},
 		syncCancels:           map[string]context.CancelCauseFunc{},
 	}
@@ -189,6 +192,7 @@ func (r *Reconciler) ensureSyncController(ctx context.Context, log *zap.SugaredL
 		r.stateNamespace,
 		r.agentName,
 		r.enableServerSideApply,
+		r.cacheSyncTimeout,
 		r.log,
 		numSyncWorkers,
 	)

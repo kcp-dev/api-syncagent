@@ -87,6 +87,7 @@ func Create(
 	stateNamespace string,
 	agentName string,
 	enableServerSideApply bool,
+	cacheSyncTimeout time.Duration,
 	log *zap.SugaredLogger,
 	numWorkers int,
 ) (mccontroller.Controller, error) {
@@ -135,6 +136,7 @@ func Create(
 	ctrlOptions := mccontroller.Options{
 		Reconciler:              reconciler,
 		MaxConcurrentReconciles: numWorkers,
+		CacheSyncTimeout:        cacheSyncTimeout,
 		SkipNameValidation:      ptr.To(true),
 		Logger:                  zapr.NewLogger(log.Desugar()),
 	}
