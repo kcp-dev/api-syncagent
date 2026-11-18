@@ -690,3 +690,23 @@ func TestResolveRelatedResourceObjects(t *testing.T) {
 		})
 	}
 }
+
+func TestTemplateLabelSelectorIsNotSharedBetweenPrimaries(t *testing.T) {
+	// the selector as it sits in the PublishedResource, shared by all primaries
+	spec := syncagentv1alpha1.RelatedResourceObjectSpec{Selector: &syncagentv1alpha1.RelatedResourceObjectSelector{
+		LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"claim-namespace": "{{ .LocalObject.metadata.namespace }}"}},
+	}}
+
+	for _, ns := range []string{"ws-a-default", "ws-b-default"} {
+		local := &unstructured.Unstructured{Object: map[string]any{"metadata": map[string]any{"name": "x", "namespace": ns}}}
+		side := syncSide{clusterName: logicalcluster.Name("c"), object: local}
+
+		got, err := templateLabelSelector(side, side, syncagentv1alpha1.RelatedResourceOriginService, &spec.Selector.LabelSelector)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.MatchLabels["claim-namespace"] != ns {
+			t.Fatalf("primary in %s got selector %v", ns, got.MatchLabels)
+		}
+	}
+}
