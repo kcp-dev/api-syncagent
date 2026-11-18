@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -35,9 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
 )
 
 const (
@@ -45,6 +47,9 @@ const (
 
 	// numSyncWorkers is the number of concurrent workers within each sync controller.
 	numSyncWorkers = 4
+
+	syncControllerMinRetryDelay = 5 * time.Second
+	syncControllerMaxRetryDelay = 5 * time.Minute
 )
 
 type ClusterProviderFunc func() []string
@@ -66,11 +71,12 @@ type Reconciler struct {
 	agentName             string
 	enableServerSideApply bool
 
-	syncCancelsLock sync.RWMutex
+	controllerEvents chan event.TypedGenericEvent[*syncagentv1alpha1.PublishedResource]
 	// A map of sync controllers, one for each PublishedResource, using their
 	// UIDs and resourceVersion as the map keys; using the version ensures that
 	// when a PR changes, the old controller is orphaned and will be shut down.
-	syncCancels map[string]context.CancelCauseFunc
+	// Only accessed by the reconcile worker, so no lock is needed.
+	syncControllers map[string]*syncController
 }
 
 // Add creates a new controller and adds it to the given manager.
@@ -101,8 +107,8 @@ func Add(
 		agentName:             agentName,
 		resourceProber:        resourceProber,
 		enableServerSideApply: enableServerSideApply,
-		syncCancelsLock:       sync.RWMutex{},
-		syncCancels:           map[string]context.CancelCauseFunc{},
+		controllerEvents:      make(chan event.TypedGenericEvent[*syncagentv1alpha1.PublishedResource]),
+		syncControllers:       map[string]*syncController{},
 	}
 
 	bldr := builder.
@@ -114,6 +120,9 @@ func Add(
 			builder.WithPredicates(predicate.ByLabels(prFilter)),
 		)
 
+	bldr.WatchesRawSource(source.Channel(reconciler.controllerEvents,
+		&handler.TypedEnqueueRequestForObject[*syncagentv1alpha1.PublishedResource]{},
+	))
 	_, err = bldr.Build(reconciler)
 
 	return err
@@ -148,9 +157,24 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 func (r *Reconciler) ensureSyncController(ctx context.Context, log *zap.SugaredLogger, pubRes *syncagentv1alpha1.PublishedResource) (reconcile.Result, error) {
 	key := getPublishedResourceKey(pubRes)
 
-	// controller already exists
-	if _, exists := r.syncCancels[key]; exists {
+	if r.ctx.Err() != nil {
 		return reconcile.Result{}, nil
+	}
+
+	retryDelay := syncControllerMinRetryDelay
+
+	// Stopped controllers are only removed here, so a late exit can't remove a replacement.
+	if controller, exists := r.syncControllers[key]; exists {
+		select {
+		case <-controller.done:
+			if delay := time.Until(controller.finishedAt.Add(controller.retryDelay)); delay > 0 {
+				return reconcile.Result{RequeueAfter: delay}, nil
+			}
+			retryDelay = nextRetryDelay(controller)
+			delete(r.syncControllers, key)
+		default:
+			return reconcile.Result{}, nil
+		}
 	}
 
 	prlog := log.With("prkey", key, "name", pubRes.Name)
@@ -178,7 +202,7 @@ func (r *Reconciler) ensureSyncController(ctx context.Context, log *zap.SugaredL
 
 	// create the sync controller;
 	// use the reconciler's log without any additional reconciling context
-	syncController, err := controllersync.Create(
+	runnable, err := controllersync.Create(
 		// This can be the reconciling context, as it's only used to find the target CRD during setup;
 		// this context *must not* be stored in the sync controller!
 		ctx,
@@ -197,13 +221,26 @@ func (r *Reconciler) ensureSyncController(ctx context.Context, log *zap.SugaredL
 		return reconcile.Result{}, fmt.Errorf("failed to create sync controller: %w", err)
 	}
 
-	r.syncCancels[key] = ctrlCancel
+	controller := &syncController{
+		Runnable:   runnable,
+		cancel:     ctrlCancel,
+		done:       make(chan struct{}),
+		retryDelay: retryDelay,
+		notify: func() {
+			select {
+			case r.controllerEvents <- event.TypedGenericEvent[*syncagentv1alpha1.PublishedResource]{Object: pubRes.DeepCopy()}:
+			case <-ctrlCtx.Done():
+			}
+		},
+	}
+	r.syncControllers[key] = controller
 
 	// time to start the controller; this will spawn a new goroutine if
 	// successful; the new controller will be pre-seeded with all knonwn
 	// (engaged) clusters by the DMCM.
-	if err = r.dmcm.StartController(ctrlCtx, log.With("prkey", key), syncController); err != nil {
+	if err = r.dmcm.StartController(ctrlCtx, log.With("prkey", key), controller); err != nil {
 		ctrlCancel(errors.New("failed to start sync controller"))
+		delete(r.syncControllers, key)
 		return reconcile.Result{}, fmt.Errorf("failed to start sync controller: %w", err)
 	}
 
@@ -214,13 +251,10 @@ func (r *Reconciler) cleanupController(log *zap.SugaredLogger, pubRes *syncagent
 	key := getPublishedResourceKey(pubRes)
 	log.Infow("Stopping sync controller…", "prkey", key)
 
-	r.syncCancelsLock.Lock()
-	defer r.syncCancelsLock.Unlock()
-
-	cancel, ok := r.syncCancels[key]
+	controller, ok := r.syncControllers[key]
 	if ok {
-		cancel(errors.New("controller is no longer needed"))
-		delete(r.syncCancels, key)
+		controller.cancel(errors.New("controller is no longer needed"))
+		delete(r.syncControllers, key)
 	}
 
 	return nil
@@ -243,4 +277,36 @@ func getPublishedResourceKey(pr *syncagentv1alpha1.PublishedResource) string {
 
 func isSyncEnabled(pr *syncagentv1alpha1.PublishedResource) bool {
 	return pr.Spec.Synchronization == nil || pr.Spec.Synchronization.Enabled
+}
+
+// syncController requests a reconcile when the wrapped controller exits unexpectedly.
+type syncController struct {
+	mcmanager.Runnable
+	cancel     context.CancelCauseFunc
+	done       chan struct{}
+	notify     func()
+	retryDelay time.Duration
+	startedAt  time.Time
+	finishedAt time.Time
+}
+
+func (c *syncController) Start(ctx context.Context) error {
+	c.startedAt = time.Now()
+	err := c.Runnable.Start(ctx)
+	c.finishedAt = time.Now()
+	close(c.done)
+	defer c.cancel(errors.New("sync controller stopped"))
+	if ctx.Err() == nil {
+		c.notify()
+	}
+	return err
+}
+
+// nextRetryDelay doubles the delay for controllers that keep failing and resets
+// it once a controller has been running for longer than the maximum delay.
+func nextRetryDelay(c *syncController) time.Duration {
+	if c.finishedAt.Sub(c.startedAt) >= syncControllerMaxRetryDelay {
+		return syncControllerMinRetryDelay
+	}
+	return min(c.retryDelay*2, syncControllerMaxRetryDelay)
 }
