@@ -32,7 +32,9 @@ import (
 	"github.com/kcp-dev/api-syncagent/internal/projection"
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -67,10 +69,15 @@ type Reconciler struct {
 	enableServerSideApply bool
 
 	syncCancelsLock sync.RWMutex
-	// A map of sync controllers, one for each PublishedResource, using their
-	// UIDs and resourceVersion as the map keys; using the version ensures that
-	// when a PR changes, the old controller is orphaned and will be shut down.
-	syncCancels map[string]context.CancelCauseFunc
+	// A map of sync controllers, one for each PublishedResource. Each entry
+	// remembers the UID and resourceVersion of the PublishedResource it was
+	// created for, so that when a PR changes, its old controller is replaced.
+	syncCancels map[types.NamespacedName]syncCancel
+}
+
+type syncCancel struct {
+	key    string
+	cancel context.CancelCauseFunc
 }
 
 // Add creates a new controller and adds it to the given manager.
@@ -102,7 +109,7 @@ func Add(
 		resourceProber:        resourceProber,
 		enableServerSideApply: enableServerSideApply,
 		syncCancelsLock:       sync.RWMutex{},
-		syncCancels:           map[string]context.CancelCauseFunc{},
+		syncCancels:           map[types.NamespacedName]syncCancel{},
 	}
 
 	bldr := builder.
@@ -125,7 +132,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 
 	pubRes := &syncagentv1alpha1.PublishedResource{}
 	if err := r.localManager.GetClient().Get(ctx, req.NamespacedName, pubRes); err != nil {
-		return reconcile.Result{}, ctrlruntimeclient.IgnoreNotFound(err)
+		if apierrors.IsNotFound(err) {
+			// PublishedResources have no finalizer, so a deleted one is only noticed here.
+			return reconcile.Result{}, r.cleanupController(log, req.NamespacedName)
+		}
+
+		return reconcile.Result{}, err
 	}
 
 	var (
@@ -136,7 +148,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 	if pubRes.DeletionTimestamp != nil || pubRes.Status.ResourceSchemaName == "" || !isSyncEnabled(pubRes) {
 		// For PubRes that have not yet been processed, have their sync disabled or are in
 		// deletion, we cleanup and stop any potentially running sync controller.
-		err = r.cleanupController(log, pubRes)
+		err = r.cleanupController(log, req.NamespacedName)
 	} else {
 		// Otherwise, ensure a sync controller is running.
 		result, err = r.ensureSyncController(ctx, log, pubRes)
@@ -147,9 +159,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 
 func (r *Reconciler) ensureSyncController(ctx context.Context, log *zap.SugaredLogger, pubRes *syncagentv1alpha1.PublishedResource) (reconcile.Result, error) {
 	key := getPublishedResourceKey(pubRes)
+	name := ctrlruntimeclient.ObjectKeyFromObject(pubRes)
 
-	// controller already exists
-	if _, exists := r.syncCancels[key]; exists {
+	// controller for this version of the PublishedResource already exists
+	r.syncCancelsLock.RLock()
+	current, exists := r.syncCancels[name]
+	r.syncCancelsLock.RUnlock()
+
+	if exists && current.key == key {
 		return reconcile.Result{}, nil
 	}
 
@@ -197,30 +214,55 @@ func (r *Reconciler) ensureSyncController(ctx context.Context, log *zap.SugaredL
 		return reconcile.Result{}, fmt.Errorf("failed to create sync controller: %w", err)
 	}
 
-	r.syncCancels[key] = ctrlCancel
-
 	// time to start the controller; this will spawn a new goroutine if
 	// successful; the new controller will be pre-seeded with all knonwn
 	// (engaged) clusters by the DMCM.
-	if err = r.dmcm.StartController(ctrlCtx, log.With("prkey", key), syncController); err != nil {
-		ctrlCancel(errors.New("failed to start sync controller"))
-		return reconcile.Result{}, fmt.Errorf("failed to start sync controller: %w", err)
-	}
+	err = r.startAndRecord(log, name, key, ctrlCancel, func() error {
+		return r.dmcm.StartController(ctrlCtx, log.With("prkey", key), syncController)
+	})
 
-	return reconcile.Result{}, nil
+	return reconcile.Result{}, err
 }
 
-func (r *Reconciler) cleanupController(log *zap.SugaredLogger, pubRes *syncagentv1alpha1.PublishedResource) error {
-	key := getPublishedResourceKey(pubRes)
-	log.Infow("Stopping sync controller…", "prkey", key)
+// startAndRecord starts a controller and only records it if the start succeeded. An
+// outdated controller for the same PublishedResource is replaced only then, so a failed
+// start neither leaves the PublishedResource without a controller nor records a
+// controller that is not running (which would prevent any retry).
+func (r *Reconciler) startAndRecord(log *zap.SugaredLogger, name types.NamespacedName, key string, cancel context.CancelCauseFunc, start func() error) error {
+	if err := start(); err != nil {
+		cancel(errors.New("failed to start sync controller"))
+		return fmt.Errorf("failed to start sync controller: %w", err)
+	}
 
+	r.recordController(log, name, key, cancel)
+
+	return nil
+}
+
+// recordController remembers the controller for the given PublishedResource. A controller
+// that is still running for an older version of the same PublishedResource is stopped, so
+// that only one sync controller per PublishedResource is active.
+func (r *Reconciler) recordController(log *zap.SugaredLogger, name types.NamespacedName, key string, cancel context.CancelCauseFunc) {
 	r.syncCancelsLock.Lock()
 	defer r.syncCancelsLock.Unlock()
 
-	cancel, ok := r.syncCancels[key]
+	if outdated, ok := r.syncCancels[name]; ok {
+		log.Infow("Stopping outdated sync controller…", "prkey", outdated.key, "name", name.Name)
+		outdated.cancel(errors.New("PublishedResource has changed"))
+	}
+
+	r.syncCancels[name] = syncCancel{key: key, cancel: cancel}
+}
+
+func (r *Reconciler) cleanupController(log *zap.SugaredLogger, name types.NamespacedName) error {
+	r.syncCancelsLock.Lock()
+	defer r.syncCancelsLock.Unlock()
+
+	current, ok := r.syncCancels[name]
 	if ok {
-		cancel(errors.New("controller is no longer needed"))
-		delete(r.syncCancels, key)
+		log.Infow("Stopping sync controller…", "prkey", current.key, "name", name.Name)
+		current.cancel(errors.New("controller is no longer needed"))
+		delete(r.syncCancels, name)
 	}
 
 	return nil
