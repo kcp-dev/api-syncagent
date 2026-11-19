@@ -145,9 +145,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 		result reconcile.Result
 	)
 
-	if pubRes.DeletionTimestamp != nil || pubRes.Status.ResourceSchemaName == "" || !isSyncEnabled(pubRes) {
-		// For PubRes that have not yet been processed, have their sync disabled or are in
-		// deletion, we cleanup and stop any potentially running sync controller.
+	if pubRes.DeletionTimestamp != nil || pubRes.Status.ResourceSchemaName == "" || !isSyncEnabled(pubRes) || !r.prFilter.Matches(labels.Set(pubRes.Labels)) {
+		// For PubRes that have not yet been processed, have their sync disabled, are in
+		// deletion or no longer match the selector, we cleanup and stop any potentially
+		// running sync controller.
 		err = r.cleanupController(log, req.NamespacedName)
 	} else {
 		// Otherwise, ensure a sync controller is running.

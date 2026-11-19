@@ -26,6 +26,7 @@ import (
 	syncagentv1alpha1 "github.com/kcp-dev/api-syncagent/sdk/apis/syncagent/v1alpha1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -57,6 +58,7 @@ func newTestReconciler(t *testing.T, objects ...ctrlruntimeclient.Object) *Recon
 		ctx:          context.Background(),
 		log:          zap.NewNop().Sugar(),
 		localManager: fakeManager{client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()},
+		prFilter:     labels.Everything(),
 		syncCancels:  map[types.NamespacedName]syncCancel{},
 	}
 }
@@ -169,5 +171,41 @@ func TestPublishedResourceInDeletionStopsController(t *testing.T) {
 
 	if _, exists := r.syncCancels[testName]; exists {
 		t.Error("Controller of a PublishedResource in deletion must be forgotten.")
+	}
+}
+
+func TestPublishedResourceNotMatchingSelectorStopsController(t *testing.T) {
+	pubRes := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   testName.Name,
+			UID:    "uid",
+			Labels: map[string]string{"agent": "other"},
+		},
+		Status: syncagentv1alpha1.PublishedResourceStatus{
+			ResourceSchemaName: "v1.things.example.com",
+		},
+	}
+
+	r := newTestReconciler(t, pubRes)
+	r.prFilter = labels.SelectorFromSet(labels.Set{"agent": "mine"})
+
+	current := &syncagentv1alpha1.PublishedResource{}
+	if err := r.localManager.GetClient().Get(context.Background(), testName, current); err != nil {
+		t.Fatalf("Failed to get PublishedResource: %v", err)
+	}
+
+	// the controller was started for this version, before the selector stopped matching
+	ctx := recordTestController(r, getPublishedResourceKey(current))
+
+	if _, err := r.Reconcile(context.Background(), reconcile.Request{NamespacedName: testName}); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if ctx.Err() == nil {
+		t.Error("Controller of a PublishedResource that no longer matches the selector must be stopped.")
+	}
+
+	if _, exists := r.syncCancels[testName]; exists {
+		t.Error("Controller of a PublishedResource that no longer matches the selector must be forgotten.")
 	}
 }
