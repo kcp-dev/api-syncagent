@@ -81,3 +81,34 @@ func TestReEngagedClusterStaysTracked(t *testing.T) {
 		t.Fatal("the tracked engagement must be the live one")
 	}
 }
+
+func TestEndedEngagementDoesNotReplaceLiveOne(t *testing.T) {
+	dmcm := newTestDMCM()
+
+	liveCtx, disconnect := context.WithCancel(context.Background())
+	defer disconnect()
+
+	if err := dmcm.tracker.Engage(liveCtx, "cluster", nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	endedCtx, end := context.WithCancel(context.Background())
+	end()
+
+	if err := dmcm.tracker.Engage(endedCtx, "cluster", nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	dmcm.tracker.lock.RLock()
+	defer dmcm.tracker.lock.RUnlock()
+
+	engaged, ok := dmcm.tracker.clusters["cluster"]
+	if !ok {
+		t.Fatal("the live engagement is no longer tracked")
+	}
+	if engaged.ctx != liveCtx {
+		t.Fatal("the tracked engagement must be the live one")
+	}
+}

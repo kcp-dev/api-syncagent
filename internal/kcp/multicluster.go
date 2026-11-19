@@ -180,6 +180,13 @@ func (s *clusterTracker) Start(_ context.Context) error {
 }
 
 func (s *clusterTracker) Engage(ctx context.Context, clusterName multicluster.ClusterName, cl cluster.Cluster) error {
+	// a late Engage() for an engagement that has already ended must neither replace the
+	// tracked engagement nor be forwarded, as a controller would cancel its live engagement
+	// in favour of the ended one if the cluster differs
+	if ctx.Err() != nil {
+		return nil
+	}
+
 	s.lock.Lock()
 	if old, ok := s.clusters[clusterName]; !ok || old.ctx != ctx || old.cl != cl {
 		engaged := &engagedCluster{ctx: ctx, cl: cl}
