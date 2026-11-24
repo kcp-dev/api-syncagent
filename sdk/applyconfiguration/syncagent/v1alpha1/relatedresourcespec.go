@@ -25,20 +25,21 @@ import (
 // RelatedResourceSpecApplyConfiguration represents a declarative configuration of the RelatedResourceSpec type for use
 // with apply.
 type RelatedResourceSpecApplyConfiguration struct {
-	Identifier    *string                                         `json:"identifier,omitempty"`
-	Origin        *syncagentv1alpha1.RelatedResourceOrigin        `json:"origin,omitempty"`
-	Group         *string                                         `json:"group,omitempty"`
-	Version       *string                                         `json:"version,omitempty"`
-	Resource      *string                                         `json:"resource,omitempty"`
-	Kind          *string                                         `json:"kind,omitempty"`
-	IdentityHash  *string                                         `json:"identityHash,omitempty"`
-	Cleanup       *bool                                           `json:"cleanup,omitempty"`
-	CleanupPolicy *syncagentv1alpha1.RelatedResourceCleanupPolicy `json:"cleanupPolicy,omitempty"`
-	Projection    *RelatedResourceProjectionApplyConfiguration    `json:"projection,omitempty"`
-	Object        *RelatedResourceObjectApplyConfiguration        `json:"object,omitempty"`
-	Mutation      *ResourceMutationSpecApplyConfiguration         `json:"mutation,omitempty"`
-	Watch         *RelatedResourceWatchApplyConfiguration         `json:"watch,omitempty"`
-	SyncStatus    *bool                                           `json:"syncStatus,omitempty"`
+	Identifier       *string                                         `json:"identifier,omitempty"`
+	Origin           *syncagentv1alpha1.RelatedResourceOrigin        `json:"origin,omitempty"`
+	Group            *string                                         `json:"group,omitempty"`
+	Version          *string                                         `json:"version,omitempty"`
+	Resource         *string                                         `json:"resource,omitempty"`
+	Kind             *string                                         `json:"kind,omitempty"`
+	IdentityHash     *string                                         `json:"identityHash,omitempty"`
+	Cleanup          *bool                                           `json:"cleanup,omitempty"`
+	CleanupPolicy    *syncagentv1alpha1.RelatedResourceCleanupPolicy `json:"cleanupPolicy,omitempty"`
+	Projection       *RelatedResourceProjectionApplyConfiguration    `json:"projection,omitempty"`
+	Object           *RelatedResourceObjectApplyConfiguration        `json:"object,omitempty"`
+	Mutation         *ResourceMutationSpecApplyConfiguration         `json:"mutation,omitempty"`
+	Watch            *RelatedResourceWatchApplyConfiguration         `json:"watch,omitempty"`
+	SyncStatus       *bool                                           `json:"syncStatus,omitempty"`
+	SyncStatusOrigin *syncagentv1alpha1.RelatedResourceOrigin        `json:"syncStatusOrigin,omitempty"`
 }
 
 // RelatedResourceSpecApplyConfiguration constructs a declarative configuration of the RelatedResourceSpec type for use with
@@ -156,5 +157,13 @@ func (b *RelatedResourceSpecApplyConfiguration) WithWatch(value *RelatedResource
 // If called multiple times, the SyncStatus field is set to the value of the last call.
 func (b *RelatedResourceSpecApplyConfiguration) WithSyncStatus(value bool) *RelatedResourceSpecApplyConfiguration {
 	b.SyncStatus = &value
+	return b
+}
+
+// WithSyncStatusOrigin sets the SyncStatusOrigin field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SyncStatusOrigin field is set to the value of the last call.
+func (b *RelatedResourceSpecApplyConfiguration) WithSyncStatusOrigin(value syncagentv1alpha1.RelatedResourceOrigin) *RelatedResourceSpecApplyConfiguration {
+	b.SyncStatusOrigin = &value
 	return b
 }

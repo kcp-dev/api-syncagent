@@ -228,6 +228,155 @@ func TestSyncRelatedObjectStatusFromKcp(t *testing.T) {
 	}
 }
 
+// TestSyncRelatedObjectStatusBackToKcp verifies that the spec and status of a related resource can
+// be synchronized in opposite directions. It updates the service-side status after both copies
+// exist to also verify that the service-side related-resource watch triggers reconciliation.
+func TestSyncRelatedObjectStatusBackToKcp(t *testing.T) {
+	const apiExportName = "kcp.example.com"
+
+	ctrlruntime.SetLogger(logr.Discard())
+
+	ctx := t.Context()
+	orgKubconfig := utils.CreateOrganization(t, ctx, "related-status-back-to-kcp", apiExportName)
+
+	envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
+		"test/crds/crontab.yaml",
+		"test/crds/crontabswithstatus.yaml",
+	})
+
+	prCronTabsWithStatus := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "publish-crontabswithstatus"},
+		Spec: syncagentv1alpha1.PublishedResourceSpec{
+			Resource: syncagentv1alpha1.SourceResourceDescriptor{
+				APIGroup: "example.com",
+				Version:  "v1",
+				Kind:     "CronTabWithStatus",
+			},
+			Projection:      &syncagentv1alpha1.ResourceProjection{Group: "kcp.example.com"},
+			Synchronization: &syncagentv1alpha1.SynchronizationSpec{Enabled: false},
+		},
+	}
+	if err := envtestClient.Create(ctx, prCronTabsWithStatus); err != nil {
+		t.Fatalf("Failed to create CronTabWithStatus PublishedResource: %v", err)
+	}
+
+	prCrontabs := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "publish-crontabs"},
+		Spec: syncagentv1alpha1.PublishedResourceSpec{
+			Resource: syncagentv1alpha1.SourceResourceDescriptor{
+				APIGroup: "example.com",
+				Version:  "v1",
+				Kind:     "CronTab",
+			},
+			Naming:     &syncagentv1alpha1.ResourceNaming{Name: "{{ .Object.metadata.name }}", Namespace: "synced-{{ .Object.metadata.namespace }}"},
+			Projection: &syncagentv1alpha1.ResourceProjection{Group: "kcp.example.com"},
+			Related: []syncagentv1alpha1.RelatedResourceSpec{
+				{
+					Identifier:       "crontabwithstatus",
+					Origin:           syncagentv1alpha1.RelatedResourceOriginKcp,
+					Group:            "kcp.example.com",
+					Version:          "v1",
+					Resource:         "crontabswithstatus",
+					Projection:       &syncagentv1alpha1.RelatedResourceProjection{Group: "example.com"},
+					SyncStatus:       true,
+					SyncStatusOrigin: syncagentv1alpha1.RelatedResourceOriginService,
+					Watch: &syncagentv1alpha1.RelatedResourceWatch{
+						BySelector: &metav1.LabelSelector{},
+					},
+					Object: syncagentv1alpha1.RelatedResourceObject{
+						RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
+							Template: &syncagentv1alpha1.TemplateExpression{Template: "my-related"},
+						},
+					},
+				},
+			},
+		},
+	}
+	if err := envtestClient.Create(ctx, prCrontabs); err != nil {
+		t.Fatalf("Failed to create CronTab PublishedResource: %v", err)
+	}
+
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
+
+	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
+	teamClusterPath := logicalcluster.NewPath("root").Join("related-status-back-to-kcp").Join("team-1")
+	teamClient := kcpClusterClient.Cluster(teamClusterPath)
+
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+		Group: apiExportName, Version: "v1", Kind: "CronTab",
+	})
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+		Group: apiExportName, Version: "v1", Kind: "CronTabWithStatus",
+	})
+
+	kcpRelated := makeCronTabWithStatus("my-related", "default")
+	kcpRelated.SetAPIVersion("kcp.example.com/v1")
+	if err := unstructured.SetNestedField(kcpRelated.Object, "from-kcp", "spec", "cronSpec"); err != nil {
+		t.Fatalf("Failed to set spec.cronSpec: %v", err)
+	}
+	if err := teamClient.Create(ctx, kcpRelated); err != nil {
+		t.Fatalf("Failed to create related resource in kcp: %v", err)
+	}
+
+	primary := utils.ToUnstructured(t, &crds.Crontab{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "kcp.example.com/v1", Kind: "CronTab"},
+		ObjectMeta: metav1.ObjectMeta{Name: "my-crontab", Namespace: "default"},
+		Spec:       crds.CrontabSpec{CronSpec: "* * *", Image: "ubuntu:latest"},
+	})
+	if err := teamClient.Create(ctx, primary); err != nil {
+		t.Fatalf("Failed to create primary CronTab: %v", err)
+	}
+
+	serviceRelated := makeCronTabWithStatus("my-related", "synced-default")
+	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 3*time.Minute, false, func(ctx context.Context) (bool, error) {
+		if err := envtestClient.Get(ctx, types.NamespacedName{Name: "my-related", Namespace: "synced-default"}, serviceRelated); err != nil {
+			return false, nil
+		}
+		cronSpec, _, _ := unstructured.NestedString(serviceRelated.Object, "spec", "cronSpec")
+		return cronSpec == "from-kcp", nil
+	})
+	if err != nil {
+		t.Fatalf("Related resource spec was not synchronized to the service cluster: %v", err)
+	}
+
+	if err := unstructured.SetNestedField(serviceRelated.Object, "from-service", "status", "id"); err != nil {
+		t.Fatalf("Failed to set status.id: %v", err)
+	}
+	if err := envtestClient.Status().Update(ctx, serviceRelated); err != nil {
+		t.Fatalf("Failed to update service-side status: %v", err)
+	}
+
+	err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 3*time.Minute, false, func(ctx context.Context) (bool, error) {
+		if err := teamClient.Get(ctx, types.NamespacedName{Name: "my-related", Namespace: "default"}, kcpRelated); err != nil {
+			return false, nil
+		}
+		id, _, _ := unstructured.NestedString(kcpRelated.Object, "status", "id")
+		return id == "from-service", nil
+	})
+	if err != nil {
+		t.Fatalf("Related resource status was not synchronized back to kcp: %v", err)
+	}
+
+	// The origin watch must remain active when status is synchronized in the opposite direction.
+	if err := unstructured.SetNestedField(kcpRelated.Object, "updated-from-kcp", "spec", "cronSpec"); err != nil {
+		t.Fatalf("Failed to update spec.cronSpec: %v", err)
+	}
+	if err := teamClient.Update(ctx, kcpRelated); err != nil {
+		t.Fatalf("Failed to update kcp-side spec: %v", err)
+	}
+
+	err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 3*time.Minute, false, func(ctx context.Context) (bool, error) {
+		if err := envtestClient.Get(ctx, types.NamespacedName{Name: "my-related", Namespace: "synced-default"}, serviceRelated); err != nil {
+			return false, nil
+		}
+		cronSpec, _, _ := unstructured.NestedString(serviceRelated.Object, "spec", "cronSpec")
+		return cronSpec == "updated-from-kcp", nil
+	})
+	if err != nil {
+		t.Fatalf("Related resource spec update was not synchronized to the service cluster: %v", err)
+	}
+}
+
 // TestSyncRelatedObjectStatusFromService verifies that when syncStatus: true is set on a related
 // resource with origin: service, the status is propagated from the service cluster to kcp.
 func TestSyncRelatedObjectStatusFromService(t *testing.T) {
@@ -373,6 +522,145 @@ func TestSyncRelatedObjectStatusFromService(t *testing.T) {
 	if err != nil {
 		id, _, _ := unstructured.NestedString(kcpObj.Object, "status", "id")
 		t.Fatalf("CronTabWithStatus status was not synced to kcp (got status.id=%q, want %q)", id, "id-svc-99999")
+	}
+}
+
+// TestSyncRelatedObjectStatusFromKcpWithServiceOrigin verifies that spec and status can be
+// synchronized in opposite directions when the related resource originates on the service side.
+// The projection also changes the resource Kind to ensure the kcp-side watch resolves its GVK
+// from the workspace RESTMapper.
+func TestSyncRelatedObjectStatusFromKcpWithServiceOrigin(t *testing.T) {
+	const apiExportName = "kcp.example.com"
+
+	ctrlruntime.SetLogger(logr.Discard())
+
+	ctx := t.Context()
+	orgKubconfig := utils.CreateOrganization(t, ctx, "related-status-kcp-service-origin", apiExportName)
+
+	envtestKubeconfig, envtestClient, _ := utils.RunEnvtest(t, []string{
+		"test/crds/crontab.yaml",
+		"test/crds/crontabswithstatus.yaml",
+		"test/crds/backupswithstatus.yaml",
+	})
+
+	// Publish BackupWithStatus so the related resource can be projected to a different Kind in kcp.
+	prBackupsWithStatus := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "publish-backupswithstatus"},
+		Spec: syncagentv1alpha1.PublishedResourceSpec{
+			Resource: syncagentv1alpha1.SourceResourceDescriptor{
+				APIGroup: "eksempel.no",
+				Version:  "v1",
+				Kind:     "BackupWithStatus",
+			},
+			Projection:      &syncagentv1alpha1.ResourceProjection{Group: apiExportName},
+			Synchronization: &syncagentv1alpha1.SynchronizationSpec{Enabled: false},
+		},
+	}
+	if err := envtestClient.Create(ctx, prBackupsWithStatus); err != nil {
+		t.Fatalf("Failed to create BackupWithStatus PublishedResource: %v", err)
+	}
+
+	prCrontabs := &syncagentv1alpha1.PublishedResource{
+		ObjectMeta: metav1.ObjectMeta{Name: "publish-crontabs"},
+		Spec: syncagentv1alpha1.PublishedResourceSpec{
+			Resource: syncagentv1alpha1.SourceResourceDescriptor{
+				APIGroup: "example.com",
+				Version:  "v1",
+				Kind:     "CronTab",
+			},
+			Naming: &syncagentv1alpha1.ResourceNaming{
+				Name:      "{{ .Object.metadata.name }}",
+				Namespace: "synced-{{ .Object.metadata.namespace }}",
+			},
+			Projection: &syncagentv1alpha1.ResourceProjection{Group: apiExportName},
+			Related: []syncagentv1alpha1.RelatedResourceSpec{
+				{
+					Identifier: "crontabwithstatus",
+					Origin:     syncagentv1alpha1.RelatedResourceOriginService,
+					Group:      "example.com",
+					Version:    "v1",
+					Resource:   "crontabswithstatus",
+					Projection: &syncagentv1alpha1.RelatedResourceProjection{
+						Group:    apiExportName,
+						Resource: "backupswithstatus",
+					},
+					SyncStatus:       true,
+					SyncStatusOrigin: syncagentv1alpha1.RelatedResourceOriginKcp,
+					Watch: &syncagentv1alpha1.RelatedResourceWatch{
+						BySelector: &metav1.LabelSelector{},
+					},
+					Object: syncagentv1alpha1.RelatedResourceObject{
+						RelatedResourceObjectSpec: syncagentv1alpha1.RelatedResourceObjectSpec{
+							Template: &syncagentv1alpha1.TemplateExpression{Template: "my-related"},
+						},
+					},
+				},
+			},
+		},
+	}
+	if err := envtestClient.Create(ctx, prCrontabs); err != nil {
+		t.Fatalf("Failed to create CronTab PublishedResource: %v", err)
+	}
+
+	utils.RunAgent(ctx, t, "bob", orgKubconfig, envtestKubeconfig, apiExportName, "")
+
+	kcpClusterClient := utils.GetKcpAdminClusterClient(t)
+	teamClusterPath := logicalcluster.NewPath("root").Join("related-status-kcp-service-origin").Join("team-1")
+	teamClient := kcpClusterClient.Cluster(teamClusterPath)
+
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+		Group: apiExportName, Version: "v1", Kind: "CronTab",
+	})
+	utils.WaitForBoundAPI(t, ctx, teamClient, schema.GroupVersionKind{
+		Group: apiExportName, Version: "v1", Kind: "BackupWithStatus",
+	})
+
+	crontab := utils.ToUnstructured(t, &crds.Crontab{
+		TypeMeta:   metav1.TypeMeta{APIVersion: apiExportName + "/v1", Kind: "CronTab"},
+		ObjectMeta: metav1.ObjectMeta{Name: "my-crontab", Namespace: "default"},
+		Spec:       crds.CrontabSpec{CronSpec: "* * *", Image: "ubuntu:latest"},
+	})
+	if err := teamClient.Create(ctx, crontab); err != nil {
+		t.Fatalf("Failed to create CronTab: %v", err)
+	}
+
+	ensureNamespace(t, ctx, envtestClient, "synced-default")
+	serviceRelated := makeCronTabWithStatus("my-related", "synced-default")
+	if err := envtestClient.Create(ctx, serviceRelated); err != nil {
+		t.Fatalf("Failed to create CronTabWithStatus in service cluster: %v", err)
+	}
+
+	kcpRelated := &unstructured.Unstructured{}
+	kcpRelated.SetAPIVersion(apiExportName + "/v1")
+	kcpRelated.SetKind("BackupWithStatus")
+	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 3*time.Minute, false, func(ctx context.Context) (bool, error) {
+		return teamClient.Get(ctx, types.NamespacedName{Name: "my-related", Namespace: "default"}, kcpRelated) == nil, nil
+	})
+	if err != nil {
+		t.Fatalf("Projected BackupWithStatus never appeared in kcp: %v", err)
+	}
+
+	if err := unstructured.SetNestedField(kcpRelated.Object, "id-kcp-67890", "status", "id"); err != nil {
+		t.Fatalf("Failed to set status.id: %v", err)
+	}
+	if err := teamClient.Status().Update(ctx, kcpRelated); err != nil {
+		t.Fatalf("Failed to update BackupWithStatus status in kcp: %v", err)
+	}
+
+	err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 3*time.Minute, false, func(ctx context.Context) (bool, error) {
+		if err := envtestClient.Get(
+			ctx,
+			types.NamespacedName{Name: "my-related", Namespace: "synced-default"},
+			serviceRelated,
+		); err != nil {
+			return false, nil
+		}
+		id, _, _ := unstructured.NestedString(serviceRelated.Object, "status", "id")
+		return id == "id-kcp-67890", nil
+	})
+	if err != nil {
+		id, _, _ := unstructured.NestedString(serviceRelated.Object, "status", "id")
+		t.Fatalf("BackupWithStatus status was not synced to the service cluster (got status.id=%q, want %q)", id, "id-kcp-67890")
 	}
 }
 

@@ -227,9 +227,10 @@ const (
 // +kubebuilder:validation:XValidation:rule="has(self.kind) != (has(self.version) || has(self.resource))",message="must specify either kind (deprecated) or group, version, resource"
 // +kubebuilder:validation:XValidation:rule="has(self.resource) == has(self.version)",message="resource and version must be configured together or not at all"
 // +kubebuilder:validation:XValidation:rule="!has(self.group) || (has(self.resource) && has(self.version))",message="configuring a group also requires a version and resource"
-// group is included here because when an identityHash is used, core/v1 cannot possible be targetted
+// group is included here because when an identityHash is used, core/v1 cannot possibly be targeted
 // +kubebuilder:validation:XValidation:rule="!has(self.identityHash) || (has(self.group) && has(self.version) && has(self.resource))",message="identity hashes can only be used with GVRs"
-// +kubebuilder:validation:XValidation:rule="!(self.origin == 'service' && has(self.syncStatus) && self.syncStatus) || has(self.watch)",message="watch must be configured when origin is service and syncStatus is true"
+// +kubebuilder:validation:XValidation:rule="!has(self.syncStatusOrigin) || (has(self.syncStatus) && self.syncStatus)",message="syncStatus must be true when syncStatusOrigin is configured"
+// +kubebuilder:validation:XValidation:rule="!has(self.syncStatus) || !self.syncStatus || (self.origin == 'kcp' && (!has(self.syncStatusOrigin) || self.syncStatusOrigin == 'kcp')) || has(self.watch)",message="watch must be configured when status synchronization involves the service side as an origin"
 // +kubebuilder:validation:XValidation:rule="!(has(self.cleanupPolicy) && self.cleanupPolicy == 'MatchOrigin' && self.origin == 'service') || has(self.watch)",message="watch must be configured when cleanupPolicy is MatchOrigin and origin is service"
 // +kubebuilder:validation:XValidation:rule="!(has(self.cleanup) && self.cleanup && has(self.cleanupPolicy) && self.cleanupPolicy == 'Orphan')",message="cleanup:true conflicts with cleanupPolicy: Orphan"
 type RelatedResourceSpec struct {
@@ -308,24 +309,45 @@ type RelatedResourceSpec struct {
 	Mutation *ResourceMutationSpec `json:"mutation,omitempty"`
 
 	// Watch configures how the agent identifies the owning primary object when a related
-	// resource with origin: kcp changes. When set, the agent sets up a watch on the related
-	// resource type and uses the configured rule to enqueue the correct primary object.
-	// Without this field, changes to origin:kcp related resources do not trigger reconciliation.
+	// resource changes. When configured, the agent watches the origin side and, if status
+	// synchronization is enabled, the side selected by SyncStatusOrigin. Without this field,
+	// changes to related resources do not trigger reconciliation.
 	Watch *RelatedResourceWatch `json:"watch,omitempty"`
 
-	// SyncStatus enables synchronization of the status subresource in the same direction as
-	// the spec (from the origin side to the destination side). When enabled, the agent will
-	// use the status subresource endpoint to update the destination object's status.
-	// This requires the related resource to have a status subresource configured in its CRD.
+	// SyncStatus enables synchronization of the status subresource. By default, status is synced
+	// in the same direction as the spec (from Origin to the opposite side). SyncStatusOrigin can
+	// select a different origin for status without changing the direction of spec synchronization.
+	// The agent uses the status subresource endpoint to update the receiving object's status.
+	// Both representations of the related resource must have a status subresource configured.
 	//
-	//   - origin: kcp -> status is synced from kcp to the service cluster
-	//   - origin: service -> status is synced from the service cluster to kcp
-	//
-	// For origin: service, Watch must also be configured so that changes to the related
-	// resource's status trigger reconciliation and ensure the informer cache is populated.
+	// Watch is required unless Origin and the effective SyncStatusOrigin are both kcp.
 	//
 	// +optional
 	SyncStatus bool `json:"syncStatus,omitempty"`
+
+	// SyncStatusOrigin selects the side from which status is synchronized when SyncStatus is true.
+	// When omitted, it defaults to Origin, preserving the existing SyncStatus behavior.
+	//
+	//   - kcp: status is synced from kcp to the service cluster
+	//   - service: status is synced from the service cluster to kcp
+	//
+	// This field requires SyncStatus to be true. Watch must be configured unless both Origin
+	// and SyncStatusOrigin are kcp, so status changes trigger reconciliation and the required
+	// informer caches are populated.
+	//
+	// +kubebuilder:validation:Enum=service;kcp
+	// +optional
+	SyncStatusOrigin RelatedResourceOrigin `json:"syncStatusOrigin,omitempty"`
+}
+
+// EffectiveSyncStatusOrigin returns the configured status origin, defaulting to the spec origin.
+// It only selects a direction; SyncStatus still controls whether status is synchronized.
+func (r *RelatedResourceSpec) EffectiveSyncStatusOrigin() RelatedResourceOrigin {
+	if r.SyncStatusOrigin != "" {
+		return r.SyncStatusOrigin
+	}
+
+	return r.Origin
 }
 
 // EffectiveCleanupPolicy normalizes the deprecated Cleanup bool and the CleanupPolicy field into
