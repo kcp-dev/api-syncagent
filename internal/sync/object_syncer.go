@@ -159,6 +159,12 @@ func (s *objectSyncer) Sync(ctx context.Context, log *zap.SugaredLogger, source,
 			return false, nil
 		}
 
+		// Status is removed from the SSA payload and must be synchronized through
+		// the status subresource separately.
+		if err := s.syncObjectStatusForward(ctx, log, source, newDest); err != nil {
+			return false, err
+		}
+
 		return s.syncObjectStatus(ctx, log, source, newDest)
 	}
 
