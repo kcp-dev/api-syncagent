@@ -243,19 +243,54 @@ spec:
       identityHash: 423ui5gfr8f237g49238hrfg7wtref132g82zv43u21
 ```
 
+## Status Synchronization
+
+Set `syncStatus: true` to synchronize a related resource's status through its `/status` endpoint.
+The default is `false`. Existing configurations keep their behavior: when `syncStatusOrigin` is
+omitted, status is copied from the resource's `origin` to the opposite side, in the same direction
+as its spec.
+
+To synchronize spec and status in opposite directions, set `syncStatusOrigin` to `kcp` or `service`.
+This field selects the side from which status is read and requires `syncStatus: true`. It does not
+change the origin or direction of spec synchronization.
+
+For example, this configuration copies a related Widget from kcp to the service cluster and copies
+its status back to kcp:
+
+```yaml
+spec:
+  related:
+    - identifier: widget
+      origin: kcp
+      group: example.com
+      version: v1
+      resource: widgets
+      syncStatus: true
+      syncStatusOrigin: service
+      object:
+        template:
+          template: my-widget
+      watch:
+        bySelector:
+          matchLabels:
+            app: my-app
+```
+
+Both representations must expose the status subresource. A `watch` is required unless both the
+resource origin and the status origin are `kcp`. The agent watches the resource origin and, when
+different, the status origin so updates on either side trigger synchronization. Configure the watch
+to identify the primary object on each watched side, using owner references or a label selector.
+
 ## Object Selection
 
 Object selection is the configuration to tell the syncagent which Kubernetes objects it should
 consider belonging to the primary object. The idea here is that you always tell the relationship
 starting from the primary object (like if the primary object had a `secretName` field).
 
-In the synchronization loop, the syncagent will always start with the primary object and then find
-the related objects for it. It never, for example, looks at a `Secret` on the service cluster and
-has to determine what `Certificate` it belongs to. As of now, the syncagent does not even watch
-related resources at all, because it currently cannot efficiently answer exactly that question.
-Instead the agent, for any given `Secret`, would have to list _all_ primary objects and for each of
-them, resolve all matching related objects and then finally check if the `Secret` is among them.
-See [issue #118](https://github.com/kcp-dev/api-syncagent/issues/118) for more information.
+In the synchronization loop, the syncagent starts with the primary object and finds its related
+objects. A related resource can also configure a `watch` to map changes back to the primary object,
+using owner references (`byOwner`) or a label selector (`bySelector`). Without a watch, changes to
+related objects are picked up when the primary object is reconciled for another reason.
 
 ### References
 
