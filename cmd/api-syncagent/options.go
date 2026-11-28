@@ -19,6 +19,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/spf13/pflag"
 
@@ -78,6 +79,10 @@ type Options struct {
 	// Crossplane writing spec.resourceRef onto a claim) and hopefully avoids
 	// accidentally creating duplicate composite resources.
 	EnableServerSideApply bool
+
+	// CacheSyncTimeout is how long each sync controller waits for its caches to
+	// sync before it gives up.
+	CacheSyncTimeout time.Duration
 }
 
 func NewOptions() *Options {
@@ -86,6 +91,7 @@ func NewOptions() *Options {
 		PublishedResourceSelector: labels.Everything(),
 		MetricsAddr:               "127.0.0.1:8085",
 		EnableServerSideApply:     false,
+		CacheSyncTimeout:          2 * time.Minute,
 	}
 }
 
@@ -104,6 +110,7 @@ func (o *Options) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.HealthAddr, "health-address", o.HealthAddr, "host and port to serve probes via /readyz and /healthz (HTTP)")
 	flags.StringSliceVar(&o.DisabledControllers, "disabled-controllers", o.DisabledControllers, fmt.Sprintf("comma-separated list of controllers (out of %v) to disable (can be given multiple times)", sets.List(availableControllers)))
 	flags.BoolVar(&o.EnableServerSideApply, "enable-server-side-apply", o.EnableServerSideApply, "use Kubernetes Server-Side Apply when writing synchronized objects to the local cluster (recommended; preserves fields owned by other controllers such as Crossplane's claim binder)")
+	flags.DurationVar(&o.CacheSyncTimeout, "cache-sync-timeout", o.CacheSyncTimeout, "how long each sync controller waits for its caches to sync before giving up (increase for PublishedResources with many objects)")
 }
 
 func (o *Options) Validate() error {
@@ -135,6 +142,10 @@ func (o *Options) Validate() error {
 		if _, err := labels.Parse(s); err != nil {
 			errs = append(errs, fmt.Errorf("invalid --published-resource-selector %q: %w", s, err))
 		}
+	}
+
+	if o.CacheSyncTimeout <= 0 {
+		errs = append(errs, errors.New("--cache-sync-timeout must be greater than zero"))
 	}
 
 	disabled := sets.New(o.DisabledControllers...)
